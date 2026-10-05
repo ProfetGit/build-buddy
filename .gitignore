@@ -1,11 +1,11 @@
-.gradle/
 build/
-run/
+dev/demo/out/
+dev/demo/.work/
 dist/
+.gradle/
 *.hprof
 .idea/
 *.iml
-__pycache__/
-dev/demo/.work/
-dev/demo/out/
 logs/
+__pycache__/
+run/

@@ -13,7 +13,7 @@ import net.minecraft.world.level.block.state.properties.Property;
 
 /**
  * One palette slot of a region. A block the game does not know (a modded block, a typo) stays in the blueprint as a
- * placeholder: {@code state} is a barrier so it still draws and counts, and {@code source} keeps the original entry so
+ * placeholder: {@code state} is red concrete so it still draws (a barrier would be invisible) and counts, and {@code source} keeps the original entry so
  * writing the blueprint back loses nothing.
  */
 public record PaletteEntry(BlockState state, CompoundTag source, boolean unknown) {
@@ -37,7 +37,7 @@ public record PaletteEntry(BlockState state, CompoundTag source, boolean unknown
         String name = nameOf(tag);
         Identifier id = Identifier.tryParse(name);
         if (id == null || !BuiltInRegistries.BLOCK.containsKey(id)) {
-            return new PaletteEntry(Blocks.BARRIER.defaultBlockState(), tag.copy(), true);
+            return new PaletteEntry(Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.RED).defaultBlockState(), tag.copy(), true);
         }
         Block block = BuiltInRegistries.BLOCK.getValue(id);
         BlockState state = block.defaultBlockState();

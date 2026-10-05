@@ -160,7 +160,7 @@ class LitematicTest {
         Blueprint bp = LitematicReader.fromTag(rawFile(0, 0, 0, 0, 3, 1, 1, palette, blocks, List.of()), "x");
         Region r = bp.regions.get(0);
         assertTrue(r.at(1, 0, 0).unknown());
-        assertTrue(r.at(1, 0, 0).state().is(Blocks.BARRIER));
+        assertTrue(r.at(1, 0, 0).state().is(Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.RED)));
         assertFalse(r.at(2, 0, 0).unknown());
         assertEquals(java.util.Set.of("othermod:gadget"), bp.unknownBlocks());
         assertEquals(2, r.nonAir());
