@@ -29,6 +29,7 @@ public enum Tool {
     NEXT("Next block", "arrow", "Mark the block to build next") {
         @Override
         void run(Minecraft mc) {
+            Interaction.reveal();
             Interaction.guide = !Interaction.guide;
             Sfx.play(Interaction.guide ? Sfx.OPEN : Sfx.CLOSE);
             Interaction.say(mc, Interaction.guide ? "Showing the next block to build." : "Next-block guide off.");

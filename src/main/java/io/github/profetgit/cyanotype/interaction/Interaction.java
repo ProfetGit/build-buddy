@@ -95,10 +95,16 @@ public final class Interaction {
 
     // ---- entry points from the mixins and the tick
 
+    /** Shows the ghosts again if they were hidden: starting to use any tool means wanting to see them. */
+    public static void reveal() {
+        GhostRenderer.hidden = false;
+    }
+
     /** Starts placing: the new placement follows the crosshair until it is locked with a click. */
     public static void startPlacing(String name, Blueprint blueprint, String ref) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
+        reveal();
         cancelPlacing();
         Placement p = new Placement(name, blueprint, ref, mc.level.dimension().identifier().toString(), mc.player.blockPosition(), Orientation.NONE);
         p.locked = false;
@@ -113,7 +119,7 @@ public final class Interaction {
     public static boolean onScroll(double amount) {
         Minecraft mc = Minecraft.getInstance();
         Placement p = Placements.active();
-        if (mc.gui.screen() != null) return false;
+        if (mc.gui.screen() != null || GhostRenderer.hidden) return false;
         if (Placements.mode() == Mode.LAYERS && p != null && p.locked) {
             scrollAcc += amount;
             int n = (int) scrollAcc;
@@ -141,6 +147,8 @@ public final class Interaction {
 
     /** The attack button went down. @return true if the mod used it (so the game must not) */
     public static boolean onAttack() {
+        // hidden ghosts and handles are not there to click
+        if (GhostRenderer.hidden) return false;
         Placement p = Placements.active();
         if (Placements.mode() == Mode.LAYERS) {
             endLayers(Minecraft.getInstance(), false);
@@ -170,6 +178,7 @@ public final class Interaction {
 
     /** The use button went down. */
     public static boolean onUse() {
+        if (GhostRenderer.hidden) return false;
         Placement p = Placements.active();
         if (Placements.mode() == Mode.LAYERS) {
             endLayers(Minecraft.getInstance(), true);
@@ -185,7 +194,7 @@ public final class Interaction {
 
     /** Whether holding the attack button should do nothing (it was used for a click or a drag, until it is let go). */
     public static boolean suppressHold() {
-        return suppressAttack || drag != null || Placements.mode() == Mode.PLACING || Placements.mode() == Mode.LAYERS;
+        return suppressAttack || drag != null || !GhostRenderer.hidden && (Placements.mode() == Mode.PLACING || Placements.mode() == Mode.LAYERS);
     }
 
     public static void tick(Minecraft mc) {
@@ -198,6 +207,9 @@ public final class Interaction {
         tickMainKey(mc, screen, clicked && testMainDown == null);
         while (Keys.TOGGLE.consumeClick()) {
             if (!screen) toggleGhosts(mc);
+        }
+        while (Keys.REMOVE.consumeClick()) {
+            if (!screen && !GhostRenderer.hidden) askRemove(mc);
         }
         while (Keys.UNDO.consumeClick()) {
             if (screen) continue;
@@ -253,6 +265,7 @@ public final class Interaction {
             say(mc, "Nothing to edit yet. Load a blueprint with /cyanotype load <name>, then /cyanotype place.");
             return false;
         }
+        reveal();
         Placements.select(aimed);
         Placements.setMode(Mode.EDIT);
         Sfx.play(Sfx.OPEN);
@@ -281,6 +294,7 @@ public final class Interaction {
             }
             p.layerLo = p.layerHi = start;
         }
+        reveal();
         endDragSafely();
         Placements.setMode(Mode.LAYERS);
         scrollAcc = 0;
@@ -321,6 +335,13 @@ public final class Interaction {
         }
     }
 
+    /** The Delete key: asks whether to remove the selected placement (the one being edited, or the one the crosshair is on). */
+    private static void askRemove(Minecraft mc) {
+        Placement p = Placements.mode() == Mode.EDIT ? Placements.active() : Placements.mode() == Mode.IDLE ? aimedPlacement(mc) : null;
+        if (p == null) return;
+        mc.gui.setScreen(new io.github.profetgit.cyanotype.ui.RemoveScreen(p));
+    }
+
     /** Toggles the show-or-hide of every ghost. */
     public static void toggleGhosts(Minecraft mc) {
         GhostRenderer.hidden = !GhostRenderer.hidden;
@@ -351,6 +372,8 @@ public final class Interaction {
         Mode mode = Placements.mode();
         hover = null;
         handles = null;
+        // with the ghosts hidden nothing of the tools shows or answers: no handles, hints, outlines or markers
+        if (GhostRenderer.hidden) return;
 
         if (mode == Mode.PLACING && (p == null || p.locked || !p.ready())) {
             if (p == null || p.locked) Placements.setMode(Mode.IDLE);
@@ -393,7 +416,7 @@ public final class Interaction {
             hover = handles.pick(camera, look);
             if (hover == null) {
                 chips(mc, new Chips.Chip("Drag arrow", "Move"), new Chips.Chip("Drag ring", "Turn"), new Chips.Chip("Click flip", "Mirror"),
-                    new Chips.Chip(Ui.keyName(Keys.UNDO), "Undo"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
+                    new Chips.Chip(Ui.keyName(Keys.UNDO), "Undo"), new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
             } else {
                 chips(mc, switch (hover.kind) {
                     case MOVE -> new Chips.Chip("Drag", "Move " + axisWords(hover.axis));
@@ -531,6 +554,7 @@ public final class Interaction {
                     say(mc, "Nothing to edit yet. Load a blueprint with /cyanotype load <name>, then /cyanotype place.");
                     return;
                 }
+                reveal();
                 Placements.select(aimed);
                 Placements.setMode(Mode.EDIT);
                 say(mc, "Editing " + aimed.name);

@@ -42,16 +42,24 @@ public final class Chips {
         return sb.toString();
     }
 
-    /** Called once per frame by the HUD. */
+    /**
+     * Called once per frame by the HUD. The chips sit well to the right of the crosshair, out of the way of what is being
+     * built, and are drawn at about three quarters of the GUI scale (rounded so the text stays on whole pixels).
+     */
     static void draw(GuiGraphicsExtractor g) {
         float visible = Motion.follow("chips#visible", wanted ? 1f : 0f, 0.1);
         wanted = false;
         if (visible < 0.02f || current.isEmpty() || !Settings.get().chips) return;
         int w = g.guiWidth(), h = g.guiHeight();
-        int rowH = 15, gap = 2;
+        double gui = Math.max(1, net.minecraft.client.Minecraft.getInstance().getWindow().getGuiScale());
+        float s = (float) (Math.max(1, Math.round(gui * 0.75)) / gui);
+        int rowH = 13, gap = 1;
         int total = current.size() * (rowH + gap) - gap;
-        int x = w / 2 + 20, y = h / 2 - total / 2;
+        int ax = w / 2 + 58, ay = Math.round(h / 2f - total * s / 2);
         double since = (System.nanoTime() - changedNs) / 1e9;
+        g.pose().pushMatrix();
+        g.pose().translate(ax, ay);
+        g.pose().scale(s, s);
         for (int i = 0; i < current.size(); i++) {
             Chip c = current.get(i);
             // each chip comes in a little after the one above it
@@ -60,12 +68,13 @@ public final class Chips {
             if (a < 0.02f) continue;
             int slide = Motion.reduced() ? 0 : (int) Math.round((1 - Motion.easeOut(local)) * 8);
             int kw = Ui.font().width(c.key()), aw = Ui.font().width(c.action());
-            int cw = kw + aw + 21;
-            int cx = x + slide, cy = y + i * (rowH + gap);
-            Ui.blit(g, "tooltip", cx, cy, cw, rowH, a);
-            Ui.text(g, c.key(), cx + 5, cy + 4, Ui.withAlpha(Ui.CYAN, a));
+            int cw = kw + aw + 19;
+            int cx = slide, cy = i * (rowH + gap);
+            Ui.blit(g, "tooltip", cx, cy, cw, rowH, a * 0.92f);
+            Ui.text(g, c.key(), cx + 5, cy + 3, Ui.withAlpha(Ui.CYAN, a));
             g.fill(cx + 8 + kw, cy + 3, cx + 9 + kw, cy + rowH - 3, Ui.withAlpha(Ui.DIM, a * 0.55f));
-            Ui.text(g, c.action(), cx + 12 + kw, cy + 4, Ui.withAlpha(Ui.WHITE, a));
+            Ui.text(g, c.action(), cx + 12 + kw, cy + 3, Ui.withAlpha(Ui.WHITE, a));
         }
+        g.pose().popMatrix();
     }
 }

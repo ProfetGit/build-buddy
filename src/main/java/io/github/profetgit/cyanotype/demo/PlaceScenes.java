@@ -336,11 +336,32 @@ final class PlaceScenes {
         act(() -> tap(Keys.MAIN));
         waitTicks(3);
         act(() -> check("handles/V again is done", Placements.mode() == Placements.Mode.IDLE, "mode " + Placements.mode()));
+        // while editing, H takes the handles and the hints away with the ghost, and nothing hidden can be grabbed
+        act(() -> tap(Keys.MAIN));
+        waitTicks(6);
+        act(() -> check("handles/editing before H", Placements.mode() == Placements.Mode.EDIT && Interaction.handleAnchor("ring") != null, "mode " + Placements.mode()));
+        act(() -> tap(Keys.TOGGLE));
+        waitTicks(6);
         act(() -> {
-            tap(Keys.TOGGLE);
+            check("handles/H hides the handles too", GhostRenderer.hidden && Interaction.handleAnchor("ring") == null && Interaction.handleAnchor("move+y") == null, "hidden " + GhostRenderer.hidden);
+            check("handles/hidden handles cannot be grabbed", !Interaction.onAttack() && !Interaction.onUse() && !Interaction.onScroll(1), "the clicks were taken");
         });
+        act(() -> tap(Keys.TOGGLE));
+        waitTicks(6);
+        act(() -> check("handles/H brings the handles back", !GhostRenderer.hidden && Interaction.handleAnchor("ring") != null, "hidden " + GhostRenderer.hidden));
+        act(() -> tap(Keys.MAIN));
+        waitTicks(3);
+        // starting a tool while hidden shows the ghosts again
+        act(() -> tap(Keys.TOGGLE));
         waitTicks(4);
         act(() -> check("handles/H hides the ghosts", GhostRenderer.hidden, "hidden " + GhostRenderer.hidden));
+        act(() -> tap(Keys.MAIN));
+        waitTicks(6);
+        act(() -> check("handles/V while hidden shows them and starts editing", !GhostRenderer.hidden && Placements.mode() == Placements.Mode.EDIT, "hidden " + GhostRenderer.hidden + ", mode " + Placements.mode()));
+        act(() -> tap(Keys.MAIN));
+        waitTicks(3);
+        act(() -> tap(Keys.TOGGLE));
+        waitTicks(3);
         act(() -> tap(Keys.TOGGLE));
         waitTicks(3);
         act(() -> check("handles/H shows them again", !GhostRenderer.hidden, "hidden " + GhostRenderer.hidden));

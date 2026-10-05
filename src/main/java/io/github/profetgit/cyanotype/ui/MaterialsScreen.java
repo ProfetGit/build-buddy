@@ -3,6 +3,7 @@ package io.github.profetgit.cyanotype.ui;
 import io.github.profetgit.cyanotype.Cyanotype;
 import io.github.profetgit.cyanotype.ghost.GhostRenderer;
 import io.github.profetgit.cyanotype.interaction.CellHighlight;
+import io.github.profetgit.cyanotype.interaction.Interaction;
 import io.github.profetgit.cyanotype.placement.Placement;
 import io.github.profetgit.cyanotype.placement.Placements;
 import io.github.profetgit.cyanotype.verify.Verifier;
@@ -524,6 +525,7 @@ public final class MaterialsScreen extends Screen {
             say("Stopped showing " + Ui.fit(r.name(), 150));
             return;
         }
+        Interaction.reveal();
         CellHighlight.show(v, r.slots(), r.key(), r.name(), layerLo, layerHi);
         Sfx.play(Sfx.RELEASE, 1.15f);
         say("Gold boxes in the world: where " + Ui.fit(r.name(), 120) + " goes");

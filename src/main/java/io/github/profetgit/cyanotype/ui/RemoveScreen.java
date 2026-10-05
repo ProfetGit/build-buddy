@@ -1,5 +1,6 @@
 package io.github.profetgit.cyanotype.ui;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import io.github.profetgit.cyanotype.interaction.Interaction;
 import io.github.profetgit.cyanotype.placement.Placement;
 import io.github.profetgit.cyanotype.placement.Placements;
@@ -125,19 +126,15 @@ public final class RemoveScreen extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        switch (event.key()) {
-            case 263, 262, 258 -> {   // left, right, tab
-                focus = 1 - focus;
-                Sfx.play(Sfx.PRESS, 1.1f);
-                return true;
-            }
-            case 257, 335 -> {         // enter
-                if (focus == 0) keep();
-                else remove();
-                return true;
-            }
-            default -> {
-            }
+        if (event.isLeft() || event.isRight() || event.input() == InputConstants.KEY_TAB) {
+            focus = 1 - focus;
+            Sfx.play(Sfx.PRESS, 1.1f);
+            return true;
+        }
+        if (event.isConfirmation()) {
+            if (focus == 0) keep();
+            else remove();
+            return true;
         }
         return super.keyPressed(event);
     }

@@ -2,5 +2,6 @@
   "key.category.cyanotype.cyanotype": "Cyanotype",
   "key.cyanotype.main": "Edit placement (tool key)",
   "key.cyanotype.toggle": "Show or hide ghosts",
-  "key.cyanotype.undo": "Undo last placement move"
+  "key.cyanotype.undo": "Undo last placement move",
+  "key.cyanotype.remove": "Remove the selected placement"
 }

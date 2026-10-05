@@ -233,6 +233,31 @@ final class UiScenes {
     /** Removing a placement: the wheel's Remove tool, the question, Keep, and Remove with the keyboard. */
     static void remove() {
         setup();
+        // the Delete key: on the ghost under the crosshair, or on the one being edited, and never while hidden
+        act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.REMOVE));
+        waitTicks(6);
+        act(() -> check("remove/Delete on the aimed ghost asks first", screen() instanceof io.github.profetgit.cyanotype.ui.RemoveScreen rs && rs.asks().get(0) == house, String.valueOf(screen())));
+        act(() -> key(com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE));
+        waitTicks(4);
+        act(() -> check("remove/Esc keeps it", screen() == null && Placements.all().contains(house), "screen " + screen()));
+        act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.MAIN));
+        waitTicks(6);
+        act(() -> check("remove/editing: the hints say Delete removes", Placements.mode() == Placements.Mode.EDIT, "mode " + Placements.mode()));
+        shot("remove_key_chips");
+        act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.REMOVE));
+        waitTicks(6);
+        act(() -> check("remove/Delete while editing asks about the edited placement", screen() instanceof io.github.profetgit.cyanotype.ui.RemoveScreen rs && rs.asks().get(0) == house, String.valueOf(screen())));
+        act(() -> key(com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE));
+        waitTicks(4);
+        act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.TOGGLE));
+        waitTicks(4);
+        act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.REMOVE));
+        waitTicks(4);
+        act(() -> check("remove/Delete with the ghosts hidden does nothing", screen() == null && Placements.all().contains(house), "screen " + screen()));
+        act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.TOGGLE));
+        waitTicks(3);
+        act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.MAIN));
+        waitTicks(4);
         act(() -> {
             io.github.profetgit.cyanotype.interaction.CellHighlight.show(GhostRenderer.verifierOf(house), java.util.List.of(new int[]{0, 1}), "k", "something", -1, -1);
         });
@@ -264,16 +289,16 @@ final class UiScenes {
         // Enter with the first focus is Keep too
         act(() -> Minecraft.getInstance().gui.setScreen(new io.github.profetgit.cyanotype.ui.RemoveScreen(house)));
         waitTicks(4);
-        act(() -> key(257));
+        act(() -> key(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN));
         waitTicks(3);
         act(() -> check("remove/Enter on the first focus keeps it", screen() == null && Placements.all().contains(house), "screen " + screen()));
         // arrow right moves to Remove, Enter removes
         act(() -> Minecraft.getInstance().gui.setScreen(new io.github.profetgit.cyanotype.ui.RemoveScreen(house)));
         waitTicks(8);
-        act(() -> key(262));
+        act(() -> key(com.mojang.blaze3d.platform.InputConstants.KEY_RIGHT));
         waitTicks(8);
         shot("remove_2_focus_remove");
-        act(() -> key(257));
+        act(() -> key(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN));
         waitTicks(6);
         act(() -> check("remove/Remove takes the placement away", screen() == null && Placements.all().isEmpty() && Placements.mode() == Placements.Mode.IDLE, "screen " + screen() + ", placements " + Placements.all().size()));
         act(() -> check("remove/its material highlight goes with it", io.github.profetgit.cyanotype.interaction.CellHighlight.shown() == 0, "cells " + io.github.profetgit.cyanotype.interaction.CellHighlight.shown()));
