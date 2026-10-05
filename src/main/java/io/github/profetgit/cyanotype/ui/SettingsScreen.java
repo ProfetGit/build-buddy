@@ -135,11 +135,11 @@ public final class SettingsScreen extends Screen {
                 r.add(new Action("localSite", "Local site", "Test site on this computer."));
             }
             case AUTO -> {
-                r.add(new Slider("autoRate", "Placing speed", "Blocks a second. Whatever the file says, the mod never goes above " + io.github.profetgit.cyanotype.auto.Rate.MAX + ".",
+                r.add(new Slider("autoRate", "Sweep speed", "Blocks a second while it builds by itself. Assist places one the moment you press, and while held one every tick. The mod never goes above " + io.github.profetgit.cyanotype.auto.Rate.MAX + ".",
                     io.github.profetgit.cyanotype.auto.Rate.MIN, io.github.profetgit.cyanotype.auto.Rate.MAX, 1, () -> d.autoRate, v -> d.autoRate = (int) v, v -> (int) v + " a second"));
                 r.add(new Toggle("autoTurn", "Turn to face", "Let it turn your view toward blocks that need a facing (stairs, logs, observers). Off: it places only what works the way you look.",
                     () -> d.autoTurn, v -> d.autoTurn = v));
-                r.add(new Note("auto", "How to use it", "Choose Auto-place on the wheel: Assist places the ghost under your crosshair while you hold use, Sweep builds everything in reach, lowest layer first. "
+                r.add(new Note("auto", "How to use it", "Choose Build on the wheel: Assist places the ghost under your crosshair the moment you press use and keeps going while you hold it (and puts nothing else down), Sweep builds everything in reach, lowest layer first. "
                     + "It stops when you are hurt, open any screen (Esc too) or run out of the blocks. On a multiplayer server it stays off until you say yes for that server."));
             }
             case SERVERS -> serverRows(r);

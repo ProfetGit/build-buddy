@@ -18,7 +18,7 @@ public final class ChipIcons {
     public record Part(Kind kind, String text, String mark) {
     }
 
-    static final int MOUSE_W = 9, MOUSE_H = 12, CAP_H = 11, GAP = 3;
+    static final int MOUSE_W = 10, MOUSE_H = 14, WHEEL_W = 13, CAP_H = 13, DRAG_W = 9, DRAG_H = 7, GAP = 4;
 
     private ChipIcons() {
     }
@@ -81,8 +81,8 @@ public final class ChipIcons {
     private static int widthOf(Part p) {
         return switch (p.kind) {
             case MOUSE_LEFT, MOUSE_RIGHT -> MOUSE_W + markWidth(p);
-            case MOUSE_WHEEL -> MOUSE_W + 5;
-            case KEYCAP -> Ui.font().width(p.text) + 6;
+            case MOUSE_WHEEL -> WHEEL_W;
+            case KEYCAP -> Ui.font().width(p.text) + 10;
             case TEXT -> Ui.font().width(p.text);
             case PLUS, SLASH -> Ui.font().width(p.text);
         };
@@ -90,47 +90,40 @@ public final class ChipIcons {
 
     private static int markWidth(Part p) {
         if (p.mark.isEmpty()) return 0;
-        return p.mark.equals("drag") ? 7 : Ui.font().width(p.mark) + 2;
+        return p.mark.equals("drag") ? DRAG_W + 1 : Ui.font().width(p.mark) + 2;
     }
 
-    /** Draws the key part with its top left corner at (x, y) in a chip row 13 units tall; {@code a} is the opacity. */
+    /** Draws the key part with its top left corner at (x, y) in a chip row 16 units tall; {@code a} is the opacity. */
     public static void draw(GuiGraphicsExtractor g, String key, int x, int y, float a) {
         int cx = x;
         for (Part p : parse(key)) {
             switch (p.kind) {
                 case MOUSE_LEFT -> {
-                    mouse(g, cx, y + 1, true, false, false, a);
+                    Ui.blit(g, "mouse_left", cx, y + 1, MOUSE_W, MOUSE_H, a);
                     cx += MOUSE_W;
                     cx += mark(g, p, cx, y, a);
                 }
                 case MOUSE_RIGHT -> {
-                    mouse(g, cx, y + 1, false, true, false, a);
+                    Ui.blit(g, "mouse_right", cx, y + 1, MOUSE_W, MOUSE_H, a);
                     cx += MOUSE_W;
                     cx += mark(g, p, cx, y, a);
                 }
                 case MOUSE_WHEEL -> {
-                    mouse(g, cx, y + 1, false, false, true, a);
-                    cx += MOUSE_W;
-                    // the wheel turns both ways
-                    int ax = cx + 2;
-                    int col = Ui.withAlpha(Ui.CYAN, a);
-                    g.fill(ax + 1, y + 2, ax + 2, y + 3, col);
-                    g.fill(ax, y + 3, ax + 3, y + 4, col);
-                    g.fill(ax, y + 9, ax + 3, y + 10, col);
-                    g.fill(ax + 1, y + 10, ax + 2, y + 11, col);
-                    cx += 5;
+                    Ui.blit(g, "mouse_wheel", cx, y + 1, WHEEL_W, MOUSE_H, a);
+                    cx += WHEEL_W;
                 }
                 case KEYCAP -> {
-                    int w = Ui.font().width(p.text) + 6;
-                    keycap(g, cx, y + 1, w, p.text, a);
+                    int w = Ui.font().width(p.text) + 10;
+                    Ui.blit(g, "keycap", cx, y + 1, w, CAP_H, a);
+                    Ui.text(g, p.text, cx + 5, y + 4, Ui.withAlpha(Ui.WHITE, a));
                     cx += w;
                 }
                 case TEXT -> {
-                    Ui.text(g, p.text, cx, y + 3, Ui.withAlpha(Ui.CYAN, a));
+                    Ui.text(g, p.text, cx, y + 4, Ui.withAlpha(Ui.CYAN, a));
                     cx += Ui.font().width(p.text);
                 }
                 case PLUS, SLASH -> {
-                    Ui.text(g, p.text, cx, y + 3, Ui.withAlpha(Ui.DIM, a));
+                    Ui.text(g, p.text, cx, y + 4, Ui.withAlpha(Ui.DIM, a));
                     cx += Ui.font().width(p.text);
                 }
             }
@@ -138,46 +131,14 @@ public final class ChipIcons {
         }
     }
 
-    /** A mouse: a body with the buttons across the top; the one that is used is lit. */
-    private static void mouse(GuiGraphicsExtractor g, int x, int y, boolean left, boolean right, boolean wheel, float a) {
-        int line = Ui.withAlpha(Ui.DIM, a), body = Ui.withAlpha(Ui.DEEP, a), lit = Ui.withAlpha(Ui.CYAN, a), hot = Ui.withAlpha(Ui.WHITE, a);
-        // the body, with its corners cut
-        g.fill(x + 1, y, x + MOUSE_W - 1, y + 1, line);
-        g.fill(x + 1, y + MOUSE_H - 1, x + MOUSE_W - 1, y + MOUSE_H, line);
-        g.fill(x, y + 1, x + 1, y + MOUSE_H - 1, line);
-        g.fill(x + MOUSE_W - 1, y + 1, x + MOUSE_W, y + MOUSE_H - 1, line);
-        g.fill(x + 1, y + 1, x + MOUSE_W - 1, y + MOUSE_H - 1, body);
-        // the buttons: left 3 wide, the wheel 1, right 3, 5 tall
-        if (left) g.fill(x + 1, y + 1, x + 4, y + 6, lit);
-        if (right) g.fill(x + 5, y + 1, x + 8, y + 6, lit);
-        g.fill(x + 4, y + 1, x + 5, y + 6, wheel ? hot : line);
-        g.fill(x + 1, y + 6, x + MOUSE_W - 1, y + 7, line);
-    }
-
-    private static void keycap(GuiGraphicsExtractor g, int x, int y, int w, String text, float a) {
-        int line = Ui.withAlpha(Ui.DIM, a);
-        g.fill(x + 1, y, x + w - 1, y + 1, line);
-        g.fill(x + 1, y + CAP_H - 1, x + w - 1, y + CAP_H, line);
-        g.fill(x, y + 1, x + 1, y + CAP_H - 1, line);
-        g.fill(x + w - 1, y + 1, x + w, y + CAP_H - 1, line);
-        g.fill(x + 1, y + 1, x + w - 1, y + CAP_H - 1, Ui.withAlpha(Ui.DEEP, a));
-        // a lighter top edge, like the top of a key
-        g.fill(x + 2, y + 1, x + w - 2, y + 2, Ui.withAlpha(Ui.NAVY, a));
-        Ui.text(g, text, x + 3, y + 2, Ui.withAlpha(Ui.CYAN, a));
-    }
-
-    /** The small mark after a mouse: drag (an arrow), twice (x2) or hold. @return its width */
+    /** The small mark after a mouse: drag (a trail and an arrow), twice (x2) or hold. @return its width */
     private static int mark(GuiGraphicsExtractor g, Part p, int x, int y, float a) {
         if (p.mark.isEmpty()) return 0;
-        int col = Ui.withAlpha(Ui.CYAN, a);
         if (p.mark.equals("drag")) {
-            // a short arrow pointing right
-            g.fill(x + 2, y + 6, x + 6, y + 7, col);
-            g.fill(x + 5, y + 5, x + 6, y + 8, col);
-            g.fill(x + 6, y + 6, x + 7, y + 7, col);
-            return 7;
+            Ui.blit(g, "mark_drag", x + 1, y + 4, DRAG_W, DRAG_H, a);
+            return DRAG_W + 1;
         }
-        Ui.text(g, p.mark, x + 2, y + 3, Ui.withAlpha(Ui.DIM, a));
+        Ui.text(g, p.mark, x + 2, y + 4, Ui.withAlpha(Ui.DIM, a));
         return Ui.font().width(p.mark) + 2;
     }
 }

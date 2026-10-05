@@ -141,17 +141,36 @@ final class AutoScenes {
 
     static void auto() {
         setup();
-        // ---- the wheel: Auto-place goes Off, Assist, Sweep, Off
+        // ---- the wheel's Build tool opens a panel: Build it myself, Place what I look at, Place everything in reach
         act(() -> check("auto/off to begin with", AutoBuilder.mode() == AutoBuilder.Mode.OFF, "mode " + AutoBuilder.mode()));
-        for (AutoBuilder.Mode want : new AutoBuilder.Mode[]{AutoBuilder.Mode.ASSIST, AutoBuilder.Mode.SWEEP, AutoBuilder.Mode.OFF}) {
-            SaveScenes.startThroughTheWheel(Tool.AUTO);
-            act(() -> check("auto/the wheel tool steps to " + want, AutoBuilder.mode() == want, "mode " + AutoBuilder.mode()));
-            if (want == AutoBuilder.Mode.SWEEP) {
-                at(32.5, 27.5, 0);
-                waitTicks(8);
-                shot("auto_0_badge");
-            }
-        }
+        SaveScenes.startThroughTheWheel(Tool.BUILD);
+        act(() -> check("auto/the wheel's Build tool opens its panel", screen() instanceof io.github.profetgit.cyanotype.ui.ChoiceScreen cs && cs.count() == 3, String.valueOf(screen())));
+        shot("auto_00_build_panel");
+        act(() -> SaveScenes.clickScreen(((io.github.profetgit.cyanotype.ui.ChoiceScreen) screen()).anchor(1)));
+        waitTicks(6);
+        act(() -> check("auto/Place what I look at turns Assist on", AutoBuilder.mode() == AutoBuilder.Mode.ASSIST && screen() == null, "mode " + AutoBuilder.mode()));
+        SaveScenes.startThroughTheWheel(Tool.BUILD);
+        act(() -> SaveScenes.clickScreen(((io.github.profetgit.cyanotype.ui.ChoiceScreen) screen()).anchor(2)));
+        waitTicks(6);
+        act(() -> check("auto/Place everything in reach turns Sweep on", AutoBuilder.mode() == AutoBuilder.Mode.SWEEP, "mode " + AutoBuilder.mode()));
+        at(32.5, 27.5, 0);
+        waitTicks(8);
+        shot("auto_0_badge");
+        SaveScenes.startThroughTheWheel(Tool.BUILD);
+        act(() -> SaveScenes.clickScreen(((io.github.profetgit.cyanotype.ui.ChoiceScreen) screen()).anchor(0)));
+        waitTicks(6);
+        act(() -> check("auto/Build it myself turns it off", AutoBuilder.mode() == AutoBuilder.Mode.OFF, "mode " + AutoBuilder.mode()));
+        // the next-block marker is a switch in the same panel
+        SaveScenes.startThroughTheWheel(Tool.BUILD);
+        act(() -> {
+            var cs = (io.github.profetgit.cyanotype.ui.ChoiceScreen) screen();
+            SaveScenes.clickScreen(cs.anchor(3));
+            check("auto/the panel's switch turns the next-block marker on", io.github.profetgit.cyanotype.interaction.Interaction.guide, "guide " + io.github.profetgit.cyanotype.interaction.Interaction.guide);
+            SaveScenes.clickScreen(cs.anchor(3));
+            check("auto/and off again", !io.github.profetgit.cyanotype.interaction.Interaction.guide, "guide " + io.github.profetgit.cyanotype.interaction.Interaction.guide);
+            screen().keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE, 0, 0));
+        });
+        waitTicks(6);
 
         // ---- sweep: the rate, with the player facing south from the north side (the stairs that face south are placeable, the others are not)
         at(32.5, 27.5, 0);
@@ -299,6 +318,12 @@ final class AutoScenes {
         act(() -> before[0] = AutoBuilder.placedCount());
         waitTicks(20);
         act(() -> check("auto/without the use key nothing is placed", AutoBuilder.placedCount() == before[0], "placed " + (AutoBuilder.placedCount() - before[0])));
+        // one press places the block at once, in the very tick of the press
+        int[] pressed = new int[1];
+        act(() -> pressed[0] = AutoBuilder.placedCount());
+        act(() -> PlaceScenes.tap(mc().options.keyUse));
+        waitTicks(2);
+        act(() -> check("auto/a single press places the block under the crosshair at once", AutoBuilder.placedCount() == pressed[0] + 1, "placed " + (AutoBuilder.placedCount() - pressed[0])));
         // hold use and sweep the crosshair over the floor, one block at a time
         act(() -> PlaceScenes.hold(mc().options.keyUse));
         for (int x = 30; x <= 34; x++) {
@@ -310,7 +335,7 @@ final class AutoScenes {
         waitTicks(6);
         act(() -> {
             int n = AutoBuilder.placedCount() - before[0];
-            check("auto/holding use over the ghost places what the crosshair goes over", n >= 4 && n <= 7, n + " placed; " + AutoBuilder.detail());
+            check("auto/holding use over the ghost places what the crosshair goes over", n >= 4 && n <= 8, n + " placed; " + AutoBuilder.detail());
             check("auto/and only blocks of the build, none stacked against them", counts().wrong() == 0 && counts().correct() >= n - 1, counts().toString());
         });
         // pointing at a right block of the build, a held use must not stack the item against it
@@ -321,10 +346,20 @@ final class AutoScenes {
         });
         waitTicks(6);
         act(() -> check("auto/a block of the build that is right is not something to build on", AutoBuilder.claimsUse(mc()), AutoBuilder.detail()));
-        // aimed at the grass in front of the feet, a real block is nearer than any ghost: the press is the game's
-        act(() -> aim(mc(), 32.5, G + 0.5, 28.9));
+        // aimed at the bare grass in front of the feet with a block in hand: with auto-placing on, nothing goes down there
+        int[] total = new int[1];
+        act(() -> {
+            aim(mc(), 32.5, G + 0.5, 28.9);
+            total[0] = AutoBuilder.placedCount();
+        });
         waitTicks(6);
-        act(() -> check("auto/a real block in front of the ghost is left to the game", !AutoBuilder.claimsUse(mc()), AutoBuilder.detail()));
+        act(() -> check("auto/a press on the bare ground takes it, so the held block cannot be placed there", AutoBuilder.claimsUse(mc()), AutoBuilder.detail()));
+        act(() -> PlaceScenes.hold(mc().options.keyUse));
+        waitTicks(10);
+        act(() -> PlaceScenes.release(mc().options.keyUse));
+        waitTicks(4);
+        act(() -> check("auto/and nothing was put on the ground", mc().level.getBlockState(new BlockPos(32, G + 1, 28)).isAir() && mc().level.getBlockState(new BlockPos(32, G + 1, 29)).isAir(), mc().level.getBlockState(new BlockPos(32, G + 1, 28)).toString()));
+        shot("auto_4b_ground_blocked");
         off();
 
         // ---- the warning on a multiplayer server, the choice that is remembered, the block list

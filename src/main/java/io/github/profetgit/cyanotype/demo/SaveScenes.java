@@ -83,8 +83,32 @@ final class SaveScenes {
     }
 
     /** Opens the Save area tool the way a player does: hold the tool key, point at the segment, let go. */
+    /** The Save area's box, the way a player starts it: the wheel's Save tool, then "Select a box". */
     static void startThroughTheWheel() {
-        startThroughTheWheel(Tool.SAVE);
+        chooseThroughTheWheel(Tool.SAVE, 1);
+    }
+
+    /** Smart Pick, the way a player starts it: the wheel's Save tool, then "Pick a build". */
+    static void startPickThroughTheWheel() {
+        chooseThroughTheWheel(Tool.SAVE, 0);
+    }
+
+    /** The wheel's tool opens a choice panel; this takes one of its rows with the mouse. */
+    static void chooseThroughTheWheel(Tool tool, int row) {
+        startThroughTheWheel(tool);
+        act(() -> {
+            Screen sc = screen();
+            if (sc instanceof io.github.profetgit.cyanotype.ui.ChoiceScreen cs) clickScreen(cs.anchor(row));
+            else check("wheel/" + tool + " opens a choice panel", false, String.valueOf(sc));
+        });
+        waitTicks(8);
+    }
+
+    static void clickScreen(int[] at) {
+        Screen sc = screen();
+        var info = new net.minecraft.client.input.MouseButtonInfo(0, 0);
+        sc.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info), false);
+        sc.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info));
     }
 
     static void startThroughTheWheel(Tool tool) {

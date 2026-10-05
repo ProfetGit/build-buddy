@@ -53,7 +53,7 @@ public final class Chips {
         int w = g.guiWidth(), h = g.guiHeight();
         double gui = Math.max(1, net.minecraft.client.Minecraft.getInstance().getWindow().getGuiScale());
         float s = (float) (Math.max(1, Math.round(gui * 0.75)) / gui);
-        int rowH = 13, gap = 1;
+        int rowH = 16, gap = 1;
         int total = current.size() * (rowH + gap) - gap;
         int ax = w / 2 + 58, ay = Math.round(h / 2f - total * s / 2);
         double since = (System.nanoTime() - changedNs) / 1e9;
@@ -72,8 +72,8 @@ public final class Chips {
             int cx = slide, cy = i * (rowH + gap);
             Ui.blit(g, "tooltip", cx, cy, cw, rowH, a * 0.92f);
             ChipIcons.draw(g, c.key(), cx + 5, cy, a);
-            g.fill(cx + 8 + kw, cy + 3, cx + 9 + kw, cy + rowH - 3, Ui.withAlpha(Ui.DIM, a * 0.55f));
-            Ui.text(g, c.action(), cx + 12 + kw, cy + 3, Ui.withAlpha(Ui.WHITE, a));
+            g.fill(cx + 8 + kw, cy + 4, cx + 9 + kw, cy + rowH - 4, Ui.withAlpha(Ui.DIM, a * 0.55f));
+            Ui.text(g, c.action(), cx + 12 + kw, cy + 4, Ui.withAlpha(Ui.WHITE, a));
         }
         g.pose().popMatrix();
     }

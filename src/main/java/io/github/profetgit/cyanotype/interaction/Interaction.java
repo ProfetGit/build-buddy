@@ -228,7 +228,7 @@ public final class Interaction {
             suppressAttack = true;
             return true;
         }
-        if (Placements.mode() == Mode.IDLE && io.github.profetgit.cyanotype.auto.AutoBuilder.claimsUse(Minecraft.getInstance())) return true;
+        if (Placements.mode() == Mode.IDLE && io.github.profetgit.cyanotype.auto.AutoBuilder.onUse(Minecraft.getInstance())) return true;
         return Placements.mode() == Mode.EDIT && hover != null;
     }
 

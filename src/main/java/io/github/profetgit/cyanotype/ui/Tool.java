@@ -9,7 +9,12 @@ import io.github.profetgit.cyanotype.placement.Placement;
 import io.github.profetgit.cyanotype.placement.Placements;
 import net.minecraft.client.Minecraft;
 
-/** The eight tools of the wheel, clockwise from the top (PRD 7.9). */
+/**
+ * The six tools of the wheel, clockwise from the top (PRD 7.9): the ones a builder reaches for all the time. What is used
+ * less often lives next to what it belongs to: Settings and the list of placed blueprints in the Library, Undo and Redo on
+ * Ctrl+Z and Ctrl+Y (and in the placed list), Show/hide on H, Remove on Delete, Next block and Auto-place under Build, Smart
+ * Pick and the box under Save.
+ */
 public enum Tool {
     LIBRARY("Library", "folder", "Pick a blueprint to place") {
         @Override
@@ -29,29 +34,15 @@ public enum Tool {
             Interaction.startLayers(mc);
         }
     },
-    NEXT("Next block", "arrow", "Mark the block to build next") {
+    BUILD("Build", "hammer", "Help with building: next block, auto-place") {
         @Override
         void run(Minecraft mc) {
-            Interaction.reveal();
-            Interaction.guide = !Interaction.guide;
-            Sfx.play(Interaction.guide ? Sfx.OPEN : Sfx.CLOSE);
-            Interaction.say(mc, Interaction.guide ? "Showing the next block to build." : "Next-block guide off.");
+            mc.gui.setScreen(buildScreen(mc));
         }
 
         @Override
         boolean enabled(Minecraft mc) {
-            return locked() != null;
-        }
-    },
-    AUTO("Auto-place", "hammer", "Place blocks for you from your inventory") {
-        @Override
-        void run(Minecraft mc) {
-            AutoBuilder.cycle(mc);
-        }
-
-        @Override
-        boolean enabled(Minecraft mc) {
-            return locked() != null || AutoBuilder.on();
+            return locked() != null || AutoBuilder.on() || Interaction.guide;
         }
     },
     MATERIALS("Materials", "list", "What is still needed") {
@@ -60,67 +51,10 @@ public enum Tool {
             mc.gui.setScreen(new MaterialsScreen());
         }
     },
-    SAVE("Save area", "save", "Pick a box of your build and save it") {
+    SAVE("Save", "save", "Save a build of yours as a blueprint") {
         @Override
         void run(Minecraft mc) {
-            Selecting.start(mc);
-        }
-    },
-    PICK("Smart pick", "wand", "Click a build to pick all of it") {
-        @Override
-        void run(Minecraft mc) {
-            Picking.start(mc);
-        }
-    },
-    SETTINGS("Settings", "gear", "Look, feel and defaults") {
-        @Override
-        void run(Minecraft mc) {
-            mc.gui.setScreen(new SettingsScreen());
-        }
-    },
-    GHOSTS("Show / hide", "eye", "Hide or show the ghosts") {
-        @Override
-        void run(Minecraft mc) {
-            Interaction.toggleGhosts(mc);
-        }
-    },
-    REMOVE("Remove", "trash", "Take a placed blueprint away") {
-        @Override
-        void run(Minecraft mc) {
-            Placement p = Interaction.aimedPlacement(mc);
-            if (p == null) p = Placements.active();
-            if (p == null) {
-                Sfx.play(Sfx.ERROR);
-                return;
-            }
-            mc.gui.setScreen(new RemoveScreen(p));
-        }
-
-        @Override
-        boolean enabled(Minecraft mc) {
-            return !Placements.all().isEmpty();
-        }
-    },
-    UNDO("Undo", "undo", "Take back the last change (Ctrl+Z)") {
-        @Override
-        void run(Minecraft mc) {
-            Interaction.undo(mc);
-        }
-
-        @Override
-        boolean enabled(Minecraft mc) {
-            return Placements.canUndo();
-        }
-    },
-    REDO("Redo", "redo", "Do the undone change again (Ctrl+Y)") {
-        @Override
-        void run(Minecraft mc) {
-            Interaction.redo(mc);
-        }
-
-        @Override
-        boolean enabled(Minecraft mc) {
-            return Placements.canRedo();
+            mc.gui.setScreen(saveScreen());
         }
     };
 
@@ -142,5 +76,32 @@ public enum Tool {
     static Placement locked() {
         Placement p = Placements.active();
         return p != null && p.locked && p.ready() && GhostRenderer.verifierOf(p) != null ? p : null;
+    }
+
+    /** What Build offers: auto-placing off, Assist or Sweep, and the next-block marker. */
+    static ChoiceScreen buildScreen(Minecraft mc) {
+        boolean ready = locked() != null;
+        String need = ready ? "" : "Place a blueprint first.  ";
+        java.util.List<ChoiceScreen.Choice> choices = java.util.List.of(
+            new ChoiceScreen.Choice("cube", "Build it myself", "Nothing is placed for you.", true, !AutoBuilder.on(), () -> AutoBuilder.request(mc, AutoBuilder.Mode.OFF)),
+            new ChoiceScreen.Choice("hammer", "Place what I look at", "Hold use on a ghost block and it goes down at once. Nothing else can be placed.", ready, AutoBuilder.mode() == AutoBuilder.Mode.ASSIST,
+                () -> AutoBuilder.request(mc, AutoBuilder.Mode.ASSIST)),
+            new ChoiceScreen.Choice("sweep", "Place everything in reach", "Builds what is near you, lowest layer first, while you walk.", ready, AutoBuilder.mode() == AutoBuilder.Mode.SWEEP,
+                () -> AutoBuilder.request(mc, AutoBuilder.Mode.SWEEP)));
+        ChoiceScreen.Toggle next = new ChoiceScreen.Toggle("Mark the next block to build", "A marker and an arrow show where to build next.", () -> Interaction.guide, v -> {
+            Interaction.reveal();
+            Interaction.guide = v;
+            Interaction.say(mc, v ? "Showing the next block to build." : "Next-block marker off.");
+        });
+        return new ChoiceScreen("Build", need + "It stops when you are hurt or open a screen.", choices, ready ? next : null);
+    }
+
+    /** What Save offers: pick a whole build with one click, or select a box. */
+    static ChoiceScreen saveScreen() {
+        Minecraft mc = Minecraft.getInstance();
+        java.util.List<ChoiceScreen.Choice> choices = java.util.List.of(
+            new ChoiceScreen.Choice("wand", "Pick a build", "Click any part of a build and the whole of it is picked.", true, false, () -> Picking.start(mc)),
+            new ChoiceScreen.Choice("select", "Select a box", "Click two corners, then drag the sides to fit.", true, false, () -> Selecting.start(mc)));
+        return new ChoiceScreen("Save a build", "Either way you name it next and it goes into your Library.", choices, null);
     }
 }

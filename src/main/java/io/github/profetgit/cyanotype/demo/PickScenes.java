@@ -113,14 +113,14 @@ final class PickScenes {
         act(() -> houseA[0] = SaveScenes.worldBlocks(SelectionBox.of(AX, G + 1, Z0, AX + 6, G + 4, Z1)));
 
         // ---- the wheel starts it; the crosshair says what a click would do
-        SaveScenes.startThroughTheWheel(Tool.PICK);
+        SaveScenes.startPickThroughTheWheel();
         act(() -> check("pick/the wheel's Smart pick starts the tool", Placements.mode() == Placements.Mode.PICK && Picking.stage() == Picking.Stage.AIM, "mode " + Placements.mode()));
         aimCell(AX + 2, G + 3, Z1);
         shot("pick_0_aim_wall");
         // right click with nothing picked leaves the tool
         rightClick();
         act(() -> check("pick/right click with nothing picked leaves the tool", Placements.mode() == Placements.Mode.IDLE, "mode " + Placements.mode()));
-        SaveScenes.startThroughTheWheel(Tool.PICK);
+        SaveScenes.startPickThroughTheWheel();
 
         // ---- terrain asks twice
         aimCell(AX + 2, G, 28);
@@ -259,7 +259,7 @@ final class PickScenes {
         });
 
         // ---- save again without the ground: the same house, no grass, a numbered name
-        SaveScenes.startThroughTheWheel(Tool.PICK);
+        SaveScenes.startPickThroughTheWheel();
         act(() -> SaveScreen.lastSaved = null);
         aimCell(AX + 2, G + 3, Z1);
         click();
@@ -285,7 +285,7 @@ final class PickScenes {
         });
 
         // ---- a bare block of the lawn, asked twice, picks the whole lawn as one big flood: finishes, sliced, without a hitch
-        SaveScenes.startThroughTheWheel(Tool.PICK);
+        SaveScenes.startPickThroughTheWheel();
         camera(23.5, G + 7, 32, 180, 28);
         waitTicks(10);
         aimCell(AX + 2, G, 28);

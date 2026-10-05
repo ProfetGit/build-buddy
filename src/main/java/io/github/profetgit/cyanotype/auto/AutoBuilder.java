@@ -26,6 +26,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ClipContext;
@@ -402,7 +403,7 @@ public final class AutoBuilder {
                 SKIP_UNTIL.put(key, tickNo + 12);
                 continue;
             }
-            if (place(mc, p, res.plan(), cost.item(), key)) {
+            if (place(mc, p, res.plan(), cost.item(), key, true)) {
                 noItemTicks = 0;
                 missingItem = "";
                 return;
@@ -440,14 +441,19 @@ public final class AutoBuilder {
 
     private static void assist(Minecraft mc, LocalPlayer p, Placement pl, Verifier v) {
         assist = findAssist(mc, p, v);
-        boolean down = mc.options.keyUse.isDown();
-        if (!down) {
+        if (!mc.options.keyUse.isDown()) {
             status = assist != null ? "Hold use to place " + nameOf(assist.wanted) : "Hold use on a ghost block";
             return;
         }
-        Assist a = assist;
-        if (a == null) return;
-        if (!RATE.ready()) return;
+        // the use key is held: the block under the crosshair goes down every tick, the fastest there is (20 a second)
+        if (assist != null) assistPlace(mc, p, assist);
+    }
+
+    private static long lastAssistTick = -1;
+
+    /** Places the ghost block under the crosshair now, with no delay: one block a tick, 20 a second, the ceiling of the mod. */
+    private static void assistPlace(Minecraft mc, LocalPlayer p, Assist a) {
+        if (lastAssistTick == tickNo) return;
         if (count(p, a.cost.item()) < 1) {
             status = "You have no " + a.cost.item().getName(new ItemStack(a.cost.item())).getString();
             return;
@@ -463,7 +469,7 @@ public final class AutoBuilder {
             };
             return;
         }
-        place(mc, p, res.plan(), a.cost.item(), a.cell.asLong());
+        if (place(mc, p, res.plan(), a.cost.item(), a.cell.asLong(), false)) lastAssistTick = tickNo;
     }
 
     /** The ghost block under the crosshair: the first cell along the look that the build wants a block in and has none, before any real block. */
@@ -489,24 +495,43 @@ public final class AutoBuilder {
         return null;
     }
 
-    /** Whether a use-key press belongs to Assist: it is on, and a ghost block is under the crosshair, so the game must not place a block against whatever is behind it. */
+    /**
+     * Whether a use-key press belongs to auto-placing. With it on, a block never goes down anywhere but where the build wants
+     * it: a ghost block under the crosshair takes the press, and so does any press with a block in hand (nothing is placed
+     * on the ground at random). A block that does something when used (a chest, a door) is still the game's.
+     */
     public static boolean claimsUse(Minecraft mc) {
-        if (mode != Mode.ASSIST || mc.gui.screen() != null || GhostRenderer.hidden || mc.player == null || mc.level == null) return false;
+        if (mode == Mode.OFF || mc.gui.screen() != null || GhostRenderer.hidden || mc.player == null || mc.level == null) return false;
         Placement pl = Placements.active();
         Verifier v = pl == null || !pl.locked || !pl.ready() ? null : GhostRenderer.verifierOf(pl);
         if (v == null) return false;
         if (findAssist(mc, mc.player, v) != null) return true;
-        // pointing at a block that is already a right part of the build: a press must not stack the item in hand against it
+        if (!(mc.player.getMainHandItem().getItem() instanceof BlockItem)) return false;
         Vec3 eye = mc.player.getEyePosition();
         BlockHitResult real = mc.level.clip(new ClipContext(eye, eye.add(mc.player.getLookAngle().scale(PlacePlanner.reach(mc.player) + 0.5)), ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, mc.player));
-        if (real.getType() != HitResult.Type.BLOCK) return false;
-        BlockPos b = real.getBlockPos();
-        return v.statusAt(b.getX(), b.getY(), b.getZ()) == Verifier.CORRECT;
+        if (real.getType() == HitResult.Type.BLOCK && !mc.player.isShiftKeyDown() && PlacePlanner.interactive(mc.level, real.getBlockPos(), mc.level.getBlockState(real.getBlockPos()))) return false;
+        return true;
+    }
+
+    /** A use press, as the game handles it: takes it (true) and places the block under the crosshair at once, or leaves it to the game (false). */
+    public static boolean onUse(Minecraft mc) {
+        if (!claimsUse(mc)) return false;
+        LocalPlayer p = mc.player;
+        Placement pl = Placements.active();
+        Verifier v = GhostRenderer.verifierOf(pl);
+        Assist a = findAssist(mc, p, v);
+        if (a != null) {
+            assist = a;
+            assistPlace(mc, p, a);
+        } else {
+            status = "Look at a ghost block to place it";
+        }
+        return true;
     }
 
     /** The cursor chip for Assist: what a held use key would place. */
     public static void frame(Minecraft mc) {
-        if (mode != Mode.ASSIST || assist == null || mc.gui.screen() != null || GhostRenderer.hidden) return;
+        if (mode == Mode.OFF || assist == null || mc.gui.screen() != null || GhostRenderer.hidden) return;
         Chips.show(new Chips.Chip("Hold use", "Place " + nameOf(assist.wanted)));
     }
 
@@ -517,7 +542,7 @@ public final class AutoBuilder {
     // ---- placing
 
     /** Does one placement: the right item in hand, a turn when the plan needs one, then the game's own use-item-on. @return whether a block was placed */
-    private static boolean place(Minecraft mc, LocalPlayer p, PlacePlanner.Plan plan, Item item, long cell) {
+    private static boolean place(Minecraft mc, LocalPlayer p, PlacePlanner.Plan plan, Item item, long cell, boolean paid) {
         if (plan.turn()) {
             // look toward the way the block needs: a few degrees a tick, so the view turns smoothly and nothing is hidden
             float dy = wrap(plan.yaw() - p.getYRot()), dp = plan.pitch() - p.getXRot();
@@ -541,7 +566,7 @@ public final class AutoBuilder {
             }
             placed++;
             PENDING.put(cell, tickNo);
-            RATE.spend();
+            if (paid) RATE.spend();
             status = "Placed " + placed;
             return true;
         }

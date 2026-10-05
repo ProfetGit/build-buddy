@@ -306,6 +306,10 @@ public final class LibraryScreen extends Screen {
         int fy = py + ph - 24;
         boolean overFolder = Ui.button(g, "lib#folder", px + 10, fy, 86, 16, "Open folder", "folder", mx, my, down.equals("folder"), true);
         boolean overClose = Ui.button(g, "lib#close", px + pw - 10 - 52, fy, 52, 16, "Close", null, mx, my, down.equals("close"), true);
+        // what used to be wheel segments: the list of what is placed, and the settings
+        Ui.button(g, "lib#placed", placedX(), fy, 62, 16, "Placed", "eye", mx, my, down.equals("placed"), true);
+        boolean overGear = Ui.button(g, "lib#gear", gearX(), fy, 20, 16, "", "gear", mx, my, down.equals("gear"), true);
+        if (overGear) Ui.tooltip(g, mx, my, "Settings");
         String count = model.all().size() + (model.all().size() == 1 ? " blueprint" : " blueprints") + (view.size() != model.all().size() ? "  (" + view.size() + " shown)" : "");
         Ui.text(g, count, px + 104, fy + 4, Ui.withAlpha(Ui.DIM, inner));
         if (!toast.isEmpty() && System.nanoTime() - toastNs < 3_500_000_000L) {
@@ -389,6 +393,16 @@ public final class LibraryScreen extends Screen {
             Sfx.play(Sfx.PRESS);
             return true;
         }
+        if (Ui.inside(mx, my, placedX(), fy, 62, 16)) {
+            down = "placed";
+            Sfx.play(Sfx.PRESS);
+            return true;
+        }
+        if (Ui.inside(mx, my, gearX(), fy, 20, 16)) {
+            down = "gear";
+            Sfx.play(Sfx.PRESS);
+            return true;
+        }
         if (tab == Tab.COMMUNITY) return community.mouseClicked(mx, my);
         int tx = px + 10;
         for (LibraryModel.Sort s : LibraryModel.Sort.values()) {
@@ -422,6 +436,16 @@ public final class LibraryScreen extends Screen {
         LibraryModel.Entry card = downCard;
         down = "";
         downCard = null;
+        if (was.equals("placed") && Ui.inside(mx, my, placedX(), fy, 62, 16)) {
+            Sfx.play(Sfx.RELEASE);
+            minecraft.gui.setScreen(new PlacedScreen());
+            return true;
+        }
+        if (was.equals("gear") && Ui.inside(mx, my, gearX(), fy, 20, 16)) {
+            Sfx.play(Sfx.RELEASE);
+            minecraft.gui.setScreen(new SettingsScreen());
+            return true;
+        }
         if (tab == Tab.COMMUNITY && was.isEmpty()) return community.mouseReleased(mx, my) || super.mouseReleased(event);
         if (was.equals("folder") && Ui.inside(mx, my, px + 10, fy, 86, 16)) {
             Sfx.play(Sfx.RELEASE);
@@ -443,6 +467,14 @@ public final class LibraryScreen extends Screen {
             return true;
         }
         return super.mouseReleased(event);
+    }
+
+    private int gearX() {
+        return px() + panelW() - 10 - 52 - 4 - 20;
+    }
+
+    private int placedX() {
+        return gearX() - 4 - 62;
     }
 
     private LibraryModel.Entry cardAt(int mx, int my) {

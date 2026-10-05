@@ -357,42 +357,20 @@ final class UiScenes {
         PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, false);
         waitTicks(6);
 
-        // the wheel has them too, greyed out when there is nothing to do
+        // the Placed screen has buttons for them, greyed out when there is nothing to do
         act(() -> DevCommands.run("/cyanotype move 8 " + (G + 1) + " 6"));
         waitTicks(4);
-        act(() -> {
-            WheelScreen.testHeld = true;
-            Interaction.testMainDown = true;
-        });
+        act(() -> Minecraft.getInstance().gui.setScreen(new io.github.profetgit.cyanotype.ui.PlacedScreen()));
         waitTicks(8);
-        act(() -> Ui.testMouse = segmentPoint(io.github.profetgit.cyanotype.ui.Tool.UNDO.ordinal()));
-        waitTicks(10);
-        shot("undo_wheel");
-        act(() -> {
-            WheelScreen.testHeld = false;
-            Interaction.testMainDown = false;
-        });
-        waitTicks(14);
-        act(() -> {
-            Ui.testMouse = null;
-            check("undo/the wheel's Undo tool takes the last change back", screen() == null && Placements.canRedo() && house.origin.getX() != 8, "screen " + screen() + ", can redo " + Placements.canRedo() + ", " + at(house));
-        });
-        act(() -> {
-            WheelScreen.testHeld = true;
-            Interaction.testMainDown = true;
-        });
-        waitTicks(8);
-        act(() -> Ui.testMouse = segmentPoint(io.github.profetgit.cyanotype.ui.Tool.REDO.ordinal()));
+        shot("undo_placed");
+        act(() -> click(((io.github.profetgit.cyanotype.ui.PlacedScreen) screen()).anchor("undo")));
         waitTicks(6);
-        act(() -> {
-            WheelScreen.testHeld = false;
-            Interaction.testMainDown = false;
-        });
-        waitTicks(14);
-        act(() -> {
-            Ui.testMouse = null;
-            check("undo/the wheel's Redo tool does it again", screen() == null && !Placements.canRedo() && house.origin.getX() == 8, "screen " + screen() + ", can redo " + Placements.canRedo() + ", " + at(house));
-        });
+        act(() -> check("undo/the Placed screen's Undo takes the last change back", screen() instanceof io.github.profetgit.cyanotype.ui.PlacedScreen && Placements.canRedo() && house.origin.getX() != 8, "screen " + screen() + ", can redo " + Placements.canRedo() + ", " + at(house)));
+        act(() -> click(((io.github.profetgit.cyanotype.ui.PlacedScreen) screen()).anchor("redo")));
+        waitTicks(6);
+        act(() -> check("undo/its Redo does it again", !Placements.canRedo() && house.origin.getX() == 8, "can redo " + Placements.canRedo() + ", " + at(house)));
+        act(() -> Minecraft.getInstance().gui.setScreen(null));
+        waitTicks(4);
         teardown();
     }
 
@@ -429,23 +407,12 @@ final class UiScenes {
         });
         waitTicks(6);
         act(() -> check("remove/a highlight is showing before", io.github.profetgit.cyanotype.interaction.CellHighlight.shown() > 0, "cells " + io.github.profetgit.cyanotype.interaction.CellHighlight.shown()));
-        act(() -> {
-            WheelScreen.testHeld = true;
-            Interaction.testMainDown = true;
-        });
+        act(() -> Minecraft.getInstance().gui.setScreen(new io.github.profetgit.cyanotype.ui.PlacedScreen()));
         waitTicks(8);
-        act(() -> Ui.testMouse = segmentPoint(io.github.profetgit.cyanotype.ui.Tool.REMOVE.ordinal()));
-        waitTicks(10);
-        shot("remove_0_wheel");
-        act(() -> {
-            WheelScreen.testHeld = false;
-            Interaction.testMainDown = false;
-        });
-        waitTicks(14);
-        act(() -> {
-            Ui.testMouse = null;
-            check("remove/the wheel opens the question for the placement", screen() instanceof io.github.profetgit.cyanotype.ui.RemoveScreen rs && rs.asks().get(0) == house, String.valueOf(screen()));
-        });
+        shot("remove_0_placed");
+        act(() -> click(((io.github.profetgit.cyanotype.ui.PlacedScreen) screen()).anchor("trash:0")));
+        waitTicks(8);
+        act(() -> check("remove/the trash button in the Placed list opens the question for the placement", screen() instanceof io.github.profetgit.cyanotype.ui.RemoveScreen rs && rs.asks().get(0) == house, String.valueOf(screen())));
         waitTicks(6);
         shot("remove_1_confirm");
         // Keep it: by mouse, nothing changes
@@ -470,21 +437,13 @@ final class UiScenes {
         act(() -> check("remove/its material highlight goes with it", io.github.profetgit.cyanotype.interaction.CellHighlight.shown() == 0, "cells " + io.github.profetgit.cyanotype.interaction.CellHighlight.shown()));
         waitTicks(10);
         act(() -> check("remove/its ghost is gone", GhostRenderer.ghosts().isEmpty(), "ghosts " + GhostRenderer.ghosts().size()));
-        // with nothing placed, Remove on the wheel is greyed out and chooses nothing
-        act(() -> {
-            WheelScreen.testHeld = true;
-            Interaction.testMainDown = true;
-        });
+        // with nothing placed the list says so
+        act(() -> Minecraft.getInstance().gui.setScreen(new io.github.profetgit.cyanotype.ui.PlacedScreen()));
         waitTicks(8);
-        act(() -> Ui.testMouse = segmentPoint(io.github.profetgit.cyanotype.ui.Tool.REMOVE.ordinal()));
-        waitTicks(10);
-        shot("remove_3_nothing_to_remove");
-        act(() -> {
-            WheelScreen.testHeld = false;
-            Interaction.testMainDown = false;
-        });
-        waitTicks(10);
-        act(() -> check("remove/with nothing placed the tool does nothing", screen() == null, "screen " + screen()));
+        shot("remove_3_nothing_placed");
+        act(() -> check("remove/with nothing placed the Placed list is empty", Placements.all().isEmpty() && screen() instanceof io.github.profetgit.cyanotype.ui.PlacedScreen, "screen " + screen()));
+        act(() -> Minecraft.getInstance().gui.setScreen(null));
+        waitTicks(4);
         teardown();
     }
 
@@ -550,15 +509,19 @@ final class UiScenes {
         waitTicks(3);
         act(() -> check("wheel/right click shows all layers", Placements.mode() == Placements.Mode.IDLE && !house.layered(), "layers " + house.layerLo + "-" + house.layerHi));
 
-        // Redo has nothing to redo here: choosing it does nothing
+        // Build has nothing to work on when nothing is placed: choosing it does nothing
+        act(() -> {
+            for (Placement p : java.util.List.copyOf(Placements.all())) Placements.remove(p);
+        });
+        waitTicks(6);
         act(() -> {
             WheelScreen.testHeld = true;
             Interaction.testMainDown = true;
         });
         waitTicks(8);
-        act(() -> Ui.testMouse = segmentPoint(io.github.profetgit.cyanotype.ui.Tool.REDO.ordinal()));
+        act(() -> Ui.testMouse = segmentPoint(io.github.profetgit.cyanotype.ui.Tool.BUILD.ordinal()));
         waitTicks(6);
-        shot("wheel_redo_disabled");
+        shot("wheel_build_disabled");
         act(() -> {
             WheelScreen.testHeld = false;
             Interaction.testMainDown = false;
