@@ -1,0 +1,10 @@
+.gradle/
+build/
+run/
+dist/
+*.hprof
+.idea/
+*.iml
+__pycache__/
+dev/demo/.work/
+dev/demo/out/
