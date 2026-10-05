@@ -277,7 +277,7 @@ public final class LibraryScreen extends Screen {
         // the grid
         scroll = Motion.follow("lib#scroll", scrollTarget, 0.06);
         int gx = gridX(), gy = gridY(), gw = gridW(), gh = gridH();
-        g.enableScissor(gx - 2, gy, gx + gw + 2, gy + gh);
+        g.enableScissor(gx - 2, gy - 3, gx + gw + 2, gy + gh);
         int cols = cols();
         int left = (gw - (cols * (CARD_W + GAP) - GAP)) / 2;
         LibraryModel.Entry hover = null;

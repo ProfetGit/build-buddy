@@ -339,7 +339,7 @@ public final class CommunityPane {
         int max = Math.max(0, contentH(items.size()) - gh);
         scrollTarget = Math.max(0, Math.min(max, scrollTarget));
         scroll = Motion.follow("com#scroll", scrollTarget, 0.06);
-        g.enableScissor(gx - 2, gy, gx + gw + 2, gy + gh);
+        g.enableScissor(gx - 2, gy - 3, gx + gw + 2, gy + gh);
         int cols = cols(), left = (gw - (cols * (CARD_W + GAP) - GAP)) / 2;
         Api.Build hover = null;
         for (int i = 0; i < items.size(); i++) {
