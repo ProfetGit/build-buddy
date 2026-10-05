@@ -67,6 +67,28 @@ Primary: survival builder and the new player. Technical power users get depth th
 
 Style **B "Cyanotype"** (chosen 2026-10-04): navy blueprint-paper panels with a faint grid, thin white and cyan lines, dashed slots, hatched progress bars, corner brackets. Assets in `dev/ui/out/B_final/` (45 sprites, atlas with 9-slice data). Text uses the vanilla font. The in-world ghost uses the same palette: cyan tint for "to place", red for wrong, nothing for done.
 
+## 6b. Motion and feedback
+
+Premium feel comes from timing, easing and sound, not from baked frames. Rule: **state changes are animated in code between the static sprites, and always interruptible.** A hover that is left halfway reverses from where it is, never snaps or finishes first.
+
+| Interaction | Behaviour |
+|---|---|
+| Hover in/out | Ease over ~100 ms; colour fades between the normal and hover sprites; corner tick marks sweep in. |
+| Press | ~60 ms down: 1 px shift and the pressed sprite. |
+| Release | ~140 ms spring with a 1 px overshoot, then settle. |
+| Selection | Marching dashes on the selected slot or card (looping `.mcmeta` texture). |
+| Progress bar | Hatch scrolls slowly inside the fill (looping texture); fill value eases to the new value. |
+| Panel open | Blueprint draw-on: the border grows from the corners like a pen, then the grid fades in (~250 ms), done in code on the existing 9-slice sprites. Closing reverses it faster (~150 ms). |
+| Step complete | Small sparkle plus a stamp-style "done" mark. |
+| Click | Corner-bracket ripple that flashes outward from the click point. |
+| Tool wheel | Wedge slides to the hovered segment with a spring; the chosen segment pulses once on release. |
+
+- **Pixel crisp:** all movement snaps to whole pixels of the current GUI scale; no sub-pixel smearing, no non-integer scaling of pixel art.
+- **Sound:** every hover, press, release and completion has a soft tick or click (own sounds, vanilla-like volume, never louder than vanilla UI). A sound plays on the state change, not on the animation end.
+- **Textures only where they loop or are one-offs:** looping effects use animated GUI textures (`.mcmeta`); one-off sprites (ripple, sparkle, stamp) are drawn in Aseprite in `dev/ui/` and packed into the atlas.
+- **Budget:** animations must cost under 0.2 ms per frame in total and never allocate per frame.
+- **Setting "Reduce motion":** removes draw-on, springs and sparkles; hover and press become instant colour changes. Sound stays.
+
 ## 7. Feature specification
 
 ### 7.1a Formats (decided 2026-10-04)
@@ -205,7 +227,7 @@ Auto-placing places blocks for the player from their inventory.
 | M1 | Load and ghost | `.litematic` parses (round-trip tested); a placement draws as a translucent ghost at a chosen position in the real client; frame time measured. **Go/no-go on rendering approach here.** |
 | M2 | Placement tools | Rotate, mirror, move handles, lock, multiple placements, persistence. |
 | M3 | Verifier and layers | Correct/wrong/missing states, incremental updates, layer focus, progress bar, "next error". |
-| M4 | UI pass | Tool wheel, library, material panel, tooltips and chips using kit B, sounds and animations. |
+| M4 | UI pass | Tool wheel, library, material panel, tooltips and chips using kit B, with the motion and sounds from 6b (reduce-motion setting included). |
 | M5 | Save area | Selection box tool, write `.litematic`, reload test. |
 | M5b | Smart Pick | Click-to-select picks a test set of builds (house, duck, village house, cave cabin) with correct bounds; refinement tools work; no frame hitch while it runs. |
 | M6 | Auto-placing | Assist and Sweep modes, limits, server disclaimer and per-server memory, blocked-server list, HUD badge. |
