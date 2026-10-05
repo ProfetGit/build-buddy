@@ -1,0 +1,289 @@
+package io.github.profetgit.cyanotype.demo;
+
+import static io.github.profetgit.cyanotype.demo.Director.G;
+import static io.github.profetgit.cyanotype.demo.Director.act;
+import static io.github.profetgit.cyanotype.demo.Director.camera;
+import static io.github.profetgit.cyanotype.demo.Director.check;
+import static io.github.profetgit.cyanotype.demo.Director.shot;
+import static io.github.profetgit.cyanotype.demo.Director.until;
+import static io.github.profetgit.cyanotype.demo.Director.waitTicks;
+
+import io.github.profetgit.cyanotype.command.DevCommands;
+import io.github.profetgit.cyanotype.ghost.GhostRenderer;
+import io.github.profetgit.cyanotype.interaction.Interaction;
+import io.github.profetgit.cyanotype.placement.Placement;
+import io.github.profetgit.cyanotype.placement.Placements;
+import io.github.profetgit.cyanotype.ui.Ui;
+import io.github.profetgit.cyanotype.ui.WheelScreen;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+
+/** The screens and the wheel in the real client, with the mouse and the tool key driven through the seams. */
+final class UiScenes {
+    private UiScenes() {
+    }
+
+    static Placement house;
+
+    static Screen screen() {
+        return Minecraft.getInstance().gui.screen();
+    }
+
+    /** Places the sample house locked, with the HUD on. */
+    static void setup() {
+        Director.clean();
+        act(() -> {
+            Director.hideHud(Minecraft.getInstance(), false);
+            DevCommands.run("/cyanotype sample");
+        });
+        waitTicks(10);
+        act(() -> {
+            DevCommands.run("/cyanotype place 0 " + (G + 1) + " 6");
+            house = Placements.active();
+        });
+        camera(5.5, G + 6, -16, 0, 12);
+        until("ui/baked", 400, () -> GhostRenderer.verifierOf(house) != null && GhostRenderer.verifierOf(house).settled());
+        waitTicks(10);
+    }
+
+    static void teardown() {
+        act(() -> {
+            Ui.testMouse = null;
+            WheelScreen.testHeld = null;
+            Interaction.testMainDown = null;
+            Minecraft.getInstance().gui.setScreen(null);
+            for (Placement p : java.util.List.copyOf(Placements.all())) Placements.remove(p);
+            Director.hideHud(Minecraft.getInstance(), true);
+        });
+        waitTicks(4);
+    }
+
+    /** Where the mouse has to be to point at wheel segment {@code i}. */
+    static int[] segmentPoint(int i) {
+        Screen s = screen();
+        double ang = i * Math.PI / 4 - Math.PI / 2;
+        double r = 40;
+        return new int[]{(int) Math.round(s.width / 2.0 + Math.cos(ang) * r), (int) Math.round(s.height / 2.0 + Math.sin(ang) * r)};
+    }
+
+    static void library() {
+        Director.clean();
+        act(() -> {
+            try {
+                java.nio.file.Files.createDirectories(io.github.profetgit.cyanotype.placement.BlueprintLibrary.ownDir());
+                java.nio.file.Path dir = io.github.profetgit.cyanotype.placement.BlueprintLibrary.ownDir();
+                // start from a known library: the sample files only
+                try (var files = java.nio.file.Files.list(dir)) {
+                    for (java.nio.file.Path f : (Iterable<java.nio.file.Path>) files::iterator) java.nio.file.Files.deleteIfExists(f);
+                }
+                write(dir, "sample-house", Samples.house());
+                write(dir, "watch-tower", Samples.tower());
+                write(dir, "pyramid", Samples.pyramid());
+                write(dir, "arch-bridge", Samples.bridge());
+                write(dir, "big-noise", Samples.noise(40, 0.45));
+                java.nio.file.Files.write(dir.resolve("watch-tower.litematic"), java.nio.file.Files.readAllBytes(dir.resolve("watch-tower.litematic")));
+                java.nio.file.Files.writeString(dir.resolve("watch-tower.cyanotype.json"), "{\"tags\":[\"castle\",\"medieval\"]}");
+                java.nio.file.Files.writeString(dir.resolve("broken.litematic"), "this is not a litematic file");
+            } catch (java.io.IOException e) {
+                check("library/files written", false, e.toString());
+            }
+            Director.hideHud(Minecraft.getInstance(), false);
+            Minecraft.getInstance().gui.setScreen(new io.github.profetgit.cyanotype.ui.LibraryScreen());
+        });
+        waitTicks(8);
+        until("library/everything read", 200, () -> screen() instanceof io.github.profetgit.cyanotype.ui.LibraryScreen ls && ls.entries().stream().allMatch(e -> e.loaded() || e.error != null));
+        act(() -> {
+            io.github.profetgit.cyanotype.ui.LibraryScreen ls = (io.github.profetgit.cyanotype.ui.LibraryScreen) screen();
+            check("library/six files listed, the broken one marked", ls.entries().size() == 6 && ls.entries().stream().filter(e -> e.error != null).count() == 1, ls.entries().size() + " entries");
+        });
+        waitTicks(10);
+        shot("library_0");
+        act(() -> {
+            io.github.profetgit.cyanotype.ui.LibraryScreen ls = (io.github.profetgit.cyanotype.ui.LibraryScreen) screen();
+            int idx = 0;
+            for (int i = 0; i < ls.entries().size(); i++) if (ls.entries().get(i).title().toLowerCase().contains("tower")) idx = i;
+            Ui.testMouse = ls.cardCenter(idx);
+        });
+        waitTicks(10);
+        shot("library_1_hover");
+        waitTicks(5);
+        shot("library_2_hover_turned");
+        act(() -> {
+            io.github.profetgit.cyanotype.ui.LibraryScreen ls = (io.github.profetgit.cyanotype.ui.LibraryScreen) screen();
+            ls.searchFor("tower");
+            Ui.testMouse = new int[]{0, 0};
+        });
+        waitTicks(8);
+        act(() -> {
+            io.github.profetgit.cyanotype.ui.LibraryScreen ls = (io.github.profetgit.cyanotype.ui.LibraryScreen) screen();
+            check("library/search finds by name and tag", ls.entries().size() == 1 && ls.entries().get(0).title().toLowerCase().contains("tower"), ls.entries().size() + " shown");
+        });
+        shot("library_3_search");
+        act(() -> {
+            io.github.profetgit.cyanotype.ui.LibraryScreen ls = (io.github.profetgit.cyanotype.ui.LibraryScreen) screen();
+            ls.searchFor("castle");
+        });
+        waitTicks(4);
+        act(() -> check("library/search finds by tag", ((io.github.profetgit.cyanotype.ui.LibraryScreen) screen()).entries().size() == 1, "tag castle"));
+        act(() -> ((io.github.profetgit.cyanotype.ui.LibraryScreen) screen()).searchFor("zzzz"));
+        waitTicks(6);
+        shot("library_4_empty_search");
+        act(() -> ((io.github.profetgit.cyanotype.ui.LibraryScreen) screen()).searchFor(""));
+        waitTicks(4);
+        // sort by size: the biggest build first
+        act(() -> ((io.github.profetgit.cyanotype.ui.LibraryScreen) screen()).sortBy("SIZE"));
+        waitTicks(8);
+        act(() -> {
+            var list = ((io.github.profetgit.cyanotype.ui.LibraryScreen) screen()).entries();
+            boolean ordered = true;
+            for (int i = 1; i < list.size(); i++) {
+                long a = list.get(i - 1).info == null ? -1 : list.get(i - 1).info.blocks(), b = list.get(i).info == null ? -1 : list.get(i).info.blocks();
+                if (a < b) ordered = false;
+            }
+            check("library/sorted by size", ordered, list.get(0).title());
+        });
+        shot("library_5_size");
+        // drop a file on the window
+        act(() -> {
+            try {
+                java.nio.file.Path tmp = java.nio.file.Files.createTempFile("dropped", ".litematic");
+                io.github.profetgit.cyanotype.blueprint.LitematicWriter.write(Samples.uniform(5, 4, 5), tmp);
+                ((io.github.profetgit.cyanotype.ui.LibraryScreen) screen()).onFilesDrop(java.util.List.of(tmp));
+            } catch (java.io.IOException e) {
+                check("library/drop", false, e.toString());
+            }
+        });
+        waitTicks(10);
+        act(() -> check("library/a dropped file is added", ((io.github.profetgit.cyanotype.ui.LibraryScreen) screen()).entries().size() == 7, ((io.github.profetgit.cyanotype.ui.LibraryScreen) screen()).entries().size() + " entries"));
+        shot("library_6_dropped");
+        // pick the pyramid: the library closes and placing starts
+        act(() -> {
+            io.github.profetgit.cyanotype.ui.LibraryScreen ls = (io.github.profetgit.cyanotype.ui.LibraryScreen) screen();
+            ls.sortBy("NAME");
+        });
+        waitTicks(6);
+        act(() -> {
+            io.github.profetgit.cyanotype.ui.LibraryScreen ls = (io.github.profetgit.cyanotype.ui.LibraryScreen) screen();
+            int idx = -1;
+            for (int i = 0; i < ls.entries().size(); i++) if (ls.entries().get(i).title().toLowerCase().contains("pyramid")) idx = i;
+            int[] c = ls.cardCenter(idx);
+            var info = new net.minecraft.client.input.MouseButtonInfo(0, 0);
+            ls.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(c[0], c[1], info), false);
+            ls.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(c[0], c[1], info));
+        });
+        waitTicks(12);
+        act(() -> {
+            Placement p = Placements.active();
+            check("library/clicking a card starts placing it", screen() == null && Placements.mode() == Placements.Mode.PLACING && p != null && p.name.toLowerCase().contains("pyramid"), "screen " + screen() + ", mode " + Placements.mode() + ", " + (p == null ? "none" : p.name));
+        });
+        camera(5.5, G + 5, -14, 0, 14);
+        waitTicks(14);
+        shot("library_7_placing");
+        act(() -> {
+            Ui.testMouse = null;
+            for (Placement p : java.util.List.copyOf(Placements.all())) Placements.remove(p);
+            Director.hideHud(Minecraft.getInstance(), true);
+        });
+        waitTicks(4);
+    }
+
+    static void write(java.nio.file.Path dir, String name, io.github.profetgit.cyanotype.blueprint.Blueprint bp) throws java.io.IOException {
+        io.github.profetgit.cyanotype.blueprint.LitematicWriter.write(bp, dir.resolve(name + ".litematic"));
+    }
+
+    static void wheel() {
+        setup();
+        // a short press of the tool key is a tap: it starts editing and no wheel opens
+        act(() -> Interaction.testMainDown = true);
+        waitTicks(2);
+        act(() -> Interaction.testMainDown = false);
+        waitTicks(3);
+        act(() -> check("wheel/a tap edits, no wheel", screen() == null && Placements.mode() == Placements.Mode.EDIT, "mode " + Placements.mode() + ", screen " + screen()));
+        act(() -> Placements.setMode(Placements.Mode.IDLE));
+
+        // held long enough, the wheel opens
+        act(() -> {
+            WheelScreen.testHeld = true;
+            Interaction.testMainDown = true;
+        });
+        waitTicks(8);
+        act(() -> check("wheel/a hold opens the wheel", screen() instanceof WheelScreen, String.valueOf(screen())));
+        waitTicks(6);
+        shot("wheel_0_open");
+        for (int seg : new int[]{0, 2, 4, 6}) {
+            int s = seg;
+            act(() -> Ui.testMouse = segmentPoint(s));
+            waitTicks(8);
+            shot("wheel_seg_" + seg);
+        }
+        // let go on Layers (segment 2): the wheel closes and the Layers tool starts
+        act(() -> Ui.testMouse = segmentPoint(2));
+        waitTicks(6);
+        act(() -> {
+            WheelScreen.testHeld = false;
+            Interaction.testMainDown = false;
+        });
+        waitTicks(12);
+        act(() -> check("wheel/letting go on Layers starts the layer tool", screen() == null && Placements.mode() == Placements.Mode.LAYERS && house.layered(), "mode " + Placements.mode() + ", layers " + house.layerLo + "-" + house.layerHi + ", screen " + screen()));
+        shot("wheel_layers");
+        // scroll moves the layer window
+        act(() -> PlaceScenes.scroll(Minecraft.getInstance(), 1));
+        waitTicks(4);
+        act(() -> PlaceScenes.scroll(Minecraft.getInstance(), 1));
+        waitTicks(4);
+        act(() -> check("wheel/scroll moves the layer", house.layerLo == 2 && house.layerHi == 2, "layers " + house.layerLo + "-" + house.layerHi));
+        act(() -> {
+            Interaction.testModifiers = 1;
+            PlaceScenes.scroll(Minecraft.getInstance(), 2);
+            Interaction.testModifiers = -1;
+        });
+        waitTicks(4);
+        act(() -> check("wheel/shift+scroll thickens it", house.layerLo == 2 && house.layerHi == 4, "layers " + house.layerLo + "-" + house.layerHi));
+        shot("wheel_layers_scrolled");
+        // a click ends it, keeping the layers; right click shows everything again
+        act(() -> PlaceScenes.hold(Minecraft.getInstance().options.keyAttack));
+        waitTicks(3);
+        act(() -> PlaceScenes.release(Minecraft.getInstance().options.keyAttack));
+        waitTicks(3);
+        act(() -> check("wheel/a click ends the layer tool and keeps the layers", Placements.mode() == Placements.Mode.IDLE && house.layered(), "mode " + Placements.mode()));
+        act(() -> Interaction.startLayers(Minecraft.getInstance()));
+        act(() -> PlaceScenes.hold(Minecraft.getInstance().options.keyUse));
+        waitTicks(3);
+        act(() -> PlaceScenes.release(Minecraft.getInstance().options.keyUse));
+        waitTicks(3);
+        act(() -> check("wheel/right click shows all layers", Placements.mode() == Placements.Mode.IDLE && !house.layered(), "layers " + house.layerLo + "-" + house.layerHi));
+
+        // the Save tool is not available yet: choosing it does nothing
+        act(() -> {
+            WheelScreen.testHeld = true;
+            Interaction.testMainDown = true;
+        });
+        waitTicks(8);
+        act(() -> Ui.testMouse = segmentPoint(5));
+        waitTicks(6);
+        shot("wheel_save_disabled");
+        act(() -> {
+            WheelScreen.testHeld = false;
+            Interaction.testMainDown = false;
+        });
+        waitTicks(8);
+        act(() -> check("wheel/an unavailable tool closes the wheel and does nothing", screen() == null && Placements.mode() == Placements.Mode.IDLE, "screen " + screen() + ", mode " + Placements.mode()));
+
+        // letting go in the middle closes it without choosing
+        act(() -> {
+            WheelScreen.testHeld = true;
+            Interaction.testMainDown = true;
+            Ui.testMouse = null;
+        });
+        waitTicks(8);
+        act(() -> Ui.testMouse = new int[]{screen().width / 2, screen().height / 2});
+        waitTicks(4);
+        act(() -> {
+            WheelScreen.testHeld = false;
+            Interaction.testMainDown = false;
+        });
+        waitTicks(8);
+        act(() -> check("wheel/letting go in the middle chooses nothing", screen() == null && Placements.mode() == Placements.Mode.IDLE, "screen " + screen() + ", mode " + Placements.mode()));
+        teardown();
+    }
+}

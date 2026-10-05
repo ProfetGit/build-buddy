@@ -30,7 +30,6 @@ public final class Settings {
         public boolean verify = true;
         // Materials
         public boolean groupVariants = false;
-        public boolean countNearby = false;
         // Advanced
         public boolean showNames = true;
     }
@@ -95,6 +94,20 @@ public final class Settings {
             dirtyAt = 0;
             save();
         }
+    }
+
+    /** Writes a pending change now (the Settings screen closing). */
+    public static void flush() {
+        if (dirtyAt != 0) {
+            dirtyAt = 0;
+            save();
+        }
+    }
+
+    /** Back to the defaults. */
+    public static void reset() {
+        data = new Data();
+        changed();
     }
 
     public static void save() {

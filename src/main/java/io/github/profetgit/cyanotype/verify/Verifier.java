@@ -126,6 +126,31 @@ public final class Verifier {
         return parts.get(part).paletteCounts[slot * STATES + state];
     }
 
+    /**
+     * Blocks still to place or fix per palette slot of a part, within a range of layers (counted up from the placement's
+     * base; a negative end leaves that side open). With no limits it is read from the counters, otherwise the cells of the
+     * layers are looked at.
+     */
+    public int[] todoBySlot(int part, int layerLo, int layerHi) {
+        Part p = parts.get(part);
+        int[] out = new int[p.region.states.length];
+        if (layerLo < 0 && layerHi < 0) {
+            for (int s = 0; s < out.length; s++) out[s] = p.paletteCounts[s * STATES + MISSING] + p.paletteCounts[s * STATES + WRONG];
+            return out;
+        }
+        OrientedRegion r = p.region;
+        int lo = Math.max(0, layerLo), hi = layerHi < 0 ? height - 1 : Math.min(height - 1, layerHi);
+        int y0 = Math.max(0, lo - r.oy), y1 = Math.min(r.sy - 1, hi - r.oy);
+        for (int y = y0; y <= y1; y++) {
+            int base = y * r.sz * r.sx;
+            for (int i = 0, n = r.sz * r.sx; i < n; i++) {
+                byte st = p.status[base + i];
+                if (st == MISSING || st == WRONG) out[r.blocks[base + i] & 0xFFFF]++;
+            }
+        }
+        return out;
+    }
+
     /** Bumps whenever anything about the verified cells changed; cheap to compare. */
     public long changes() {
         return changes;

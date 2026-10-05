@@ -215,6 +215,11 @@ public final class Director {
                 case "hints" -> PlaceScenes.hints();
                 case "verify" -> VerifyScenes.verify();
                 case "verify-perf" -> VerifyScenes.perf();
+                case "hud" -> VerifyScenes.hud();
+                case "wheel" -> UiScenes.wheel();
+                case "library" -> UiScenes.library();
+                case "materials" -> MaterialsScenes.materials();
+                case "settings" -> SettingsScenes.settings();
                 case "look" -> PlaceScenes.look();
                 case "persist" -> PlaceScenes.persist();
                 case "persist-leave" -> PlaceScenes.persistLeave();

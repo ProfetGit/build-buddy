@@ -17,12 +17,14 @@ public abstract class MinecraftMixin {
         Minecraft mc = (Minecraft) (Object) this;
         Session.tick(mc);
         Interaction.tick(mc);
+        io.github.profetgit.cyanotype.ui.Settings.tick();
         if (Director.ACTIVE) Director.onTick(mc);
     }
 
     /** The dev demo's frame grabber (inert unless the game runs with -Dcyanotype.demo). */
     @Inject(method = "runTick", at = @At("TAIL"))
     private void cyanotype$frame(boolean advanceGameTime, CallbackInfo ci) {
+        io.github.profetgit.cyanotype.ui.Motion.endFrame();
         if (Director.ACTIVE) Director.onFrame((Minecraft) (Object) this);
     }
 

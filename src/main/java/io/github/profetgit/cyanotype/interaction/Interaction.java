@@ -7,18 +7,20 @@ import io.github.profetgit.cyanotype.placement.Placement;
 import io.github.profetgit.cyanotype.placement.PlacementStore;
 import io.github.profetgit.cyanotype.placement.Placements;
 import io.github.profetgit.cyanotype.placement.Placements.Mode;
+import io.github.profetgit.cyanotype.ui.Chips;
+import io.github.profetgit.cyanotype.ui.Settings;
+import io.github.profetgit.cyanotype.ui.Sfx;
+import io.github.profetgit.cyanotype.ui.Ui;
 import io.github.profetgit.cyanotype.verify.Counts;
 import io.github.profetgit.cyanotype.verify.Verifier;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
-import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gizmos.Gizmos;
 import net.minecraft.gizmos.GizmoStyle;
 import net.minecraft.network.chat.Component;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.phys.AABB;
@@ -100,6 +102,7 @@ public final class Interaction {
         cancelPlacing();
         Placement p = new Placement(name, blueprint, ref, mc.level.dimension().identifier().toString(), mc.player.blockPosition(), Orientation.NONE);
         p.locked = false;
+        p.opacity = Settings.get().opacity;
         lift = 0;
         scrollAcc = 0;
         Placements.add(p);
@@ -110,7 +113,15 @@ public final class Interaction {
     public static boolean onScroll(double amount) {
         Minecraft mc = Minecraft.getInstance();
         Placement p = Placements.active();
-        if (Placements.mode() != Mode.PLACING || p == null || p.locked || mc.gui.screen() != null) return false;
+        if (mc.gui.screen() != null) return false;
+        if (Placements.mode() == Mode.LAYERS && p != null && p.locked) {
+            scrollAcc += amount;
+            int n = (int) scrollAcc;
+            scrollAcc -= n;
+            if (n != 0) layerScroll(mc, p, n);
+            return true;
+        }
+        if (Placements.mode() != Mode.PLACING || p == null || p.locked) return false;
         scrollAcc += amount;
         int steps = (int) scrollAcc;
         scrollAcc -= steps;
@@ -120,10 +131,10 @@ public final class Interaction {
         } else if (ctrl(mc)) {
             Vec3 look = mc.player.getLookAngle();
             p.set(p.origin, p.orientation.flipped(Math.abs(look.x) > Math.abs(look.z) ? Direction.Axis.Z : Direction.Axis.X));
-            ui(1.3f);
+            Sfx.play(Sfx.PRESS, 1.2f);
         } else {
             for (int i = 0; i < Math.abs(steps); i++) p.set(p.origin, p.orientation.rotated(steps > 0 ? Rotation.CLOCKWISE_90 : Rotation.COUNTERCLOCKWISE_90));
-            ui(1.5f);
+            Sfx.play(Sfx.SNAP, 1.15f);
         }
         return true;
     }
@@ -131,6 +142,11 @@ public final class Interaction {
     /** The attack button went down. @return true if the mod used it (so the game must not) */
     public static boolean onAttack() {
         Placement p = Placements.active();
+        if (Placements.mode() == Mode.LAYERS) {
+            endLayers(Minecraft.getInstance(), false);
+            suppressAttack = true;
+            return true;
+        }
         if (Placements.mode() == Mode.PLACING && p != null && !p.locked) {
             lock(p);
             suppressAttack = true;
@@ -142,7 +158,7 @@ public final class Interaction {
                 Placements.remember(p);
                 p.set(p.origin, p.orientation.flipped(hover.axis));
                 PlacementStore.markDirty();
-                ui(1.3f);
+                Sfx.play(Sfx.PRESS, 1.2f);
             } else {
                 Placements.remember(p);
                 drag = new Drag(p, hover);
@@ -155,6 +171,10 @@ public final class Interaction {
     /** The use button went down. */
     public static boolean onUse() {
         Placement p = Placements.active();
+        if (Placements.mode() == Mode.LAYERS) {
+            endLayers(Minecraft.getInstance(), true);
+            return true;
+        }
         if (Placements.mode() == Mode.PLACING && p != null && !p.locked) {
             lock(p);
             suppressAttack = true;
@@ -165,30 +185,147 @@ public final class Interaction {
 
     /** Whether holding the attack button should do nothing (it was used for a click or a drag, until it is let go). */
     public static boolean suppressHold() {
-        return suppressAttack || drag != null || Placements.mode() == Mode.PLACING;
+        return suppressAttack || drag != null || Placements.mode() == Mode.PLACING || Placements.mode() == Mode.LAYERS;
     }
 
     public static void tick(Minecraft mc) {
         if (mc.player == null || mc.level == null) return;
         boolean screen = mc.gui.screen() != null;
-        while (Keys.MAIN.consumeClick()) if (!screen) onMainKey(mc);
+        // the press is read from the key's state, so that a tap and a hold can be told apart; the click count only
+        // matters for a tap too short for the state to show
+        boolean clicked = false;
+        while (Keys.MAIN.consumeClick()) clicked = true;
+        tickMainKey(mc, screen, clicked && testMainDown == null);
         while (Keys.TOGGLE.consumeClick()) {
-            if (!screen) {
-                GhostRenderer.hidden = !GhostRenderer.hidden;
-                say(mc, GhostRenderer.hidden ? "Ghosts hidden" : "Ghosts shown");
-            }
+            if (!screen) toggleGhosts(mc);
         }
         while (Keys.UNDO.consumeClick()) {
             if (screen) continue;
             Placement back = Placements.undo();
             say(mc, back == null ? "Nothing to undo" : "Undid the last move of " + back.name);
-            if (back != null) sound(SoundEvents.AMETHYST_BLOCK_PLACE, 0.8f, 0.8f);
+            if (back != null) Sfx.play(Sfx.RELEASE, 0.8f);
+            else Sfx.play(Sfx.ERROR);
         }
         boolean down = mc.options.keyAttack.isDown();
         if (drag != null && (!down || screen)) endDrag();
         if (suppressAttack && !down) suppressAttack = false;
         GhostRenderer.tickVerifiers(mc);
         PlacementStore.tick();
+    }
+
+    // ---- the tool key: tap to start or end editing, hold for the wheel
+
+    /** Dev demo only: the tool key's state instead of the real one (null = the real key). */
+    public static volatile Boolean testMainDown;
+    private static boolean mainWasDown, mainOpened;
+    private static long mainDownNs;
+
+    private static boolean mainDown() {
+        Boolean t = testMainDown;
+        return t != null ? t : Keys.MAIN.isDown();
+    }
+
+    private static void tickMainKey(Minecraft mc, boolean screen, boolean tapped) {
+        boolean down = mainDown();
+        long now = System.nanoTime();
+        if (tapped && !down && !mainWasDown) {
+            if (!screen) onMainKey(mc);
+            return;
+        }
+        if (down && !mainWasDown) {
+            mainDownNs = now;
+            mainOpened = false;
+        }
+        if (down && mainWasDown && !mainOpened && !screen && (now - mainDownNs) / 1_000_000L >= Settings.get().wheelHoldMs) {
+            mainOpened = true;
+            mc.gui.setScreen(new io.github.profetgit.cyanotype.ui.WheelScreen());
+        }
+        if (!down && mainWasDown && !mainOpened && !screen) onMainKey(mc);
+        mainWasDown = down;
+    }
+
+    /** Edit mode for the placement under the crosshair, or the active one. */
+    public static boolean enterEdit(Minecraft mc) {
+        Placement aimed = aimedPlacement(mc);
+        if (aimed == null) aimed = Placements.active();
+        if (aimed == null || !aimed.ready() || !aimed.locked) {
+            Sfx.play(Sfx.ERROR);
+            say(mc, "Nothing to edit yet. Load a blueprint with /cyanotype load <name>, then /cyanotype place.");
+            return false;
+        }
+        Placements.select(aimed);
+        Placements.setMode(Mode.EDIT);
+        Sfx.play(Sfx.OPEN);
+        return true;
+    }
+
+    /** The Layers tool: scroll moves a window of layers up and down the build. */
+    public static boolean startLayers(Minecraft mc) {
+        Placement p = Placements.active();
+        if (p == null || !p.ready() || !p.locked) {
+            Sfx.play(Sfx.ERROR);
+            say(mc, "Place a blueprint first, then pick the Layers tool.");
+            return false;
+        }
+        if (!p.layered()) {
+            // start at the lowest layer that is not finished
+            int start = 0;
+            Verifier v = GhostRenderer.verifierOf(p);
+            if (v != null) {
+                for (int l = 0; l < v.height; l++) {
+                    if (v.layerCount(l, Verifier.MISSING) + v.layerCount(l, Verifier.WRONG) > 0) {
+                        start = l;
+                        break;
+                    }
+                }
+            }
+            p.layerLo = p.layerHi = start;
+        }
+        endDragSafely();
+        Placements.setMode(Mode.LAYERS);
+        scrollAcc = 0;
+        PlacementStore.markDirty();
+        Sfx.play(Sfx.OPEN);
+        return true;
+    }
+
+    private static void endDragSafely() {
+        endDrag();
+    }
+
+    private static void endLayers(Minecraft mc, boolean showAll) {
+        Placement p = Placements.active();
+        if (showAll && p != null) {
+            p.layerLo = p.layerHi = -1;
+            PlacementStore.markDirty();
+        }
+        Placements.setMode(Mode.IDLE);
+        Sfx.play(Sfx.CLOSE);
+    }
+
+    private static void layerScroll(Minecraft mc, Placement p, int steps) {
+        int h = p.sizeY();
+        int lo = Math.max(0, p.layerLo), hi = p.layerHi < 0 ? h - 1 : Math.min(h - 1, p.layerHi);
+        if (shift(mc)) {
+            hi = Math.max(lo, Math.min(h - 1, hi + steps));
+        } else {
+            int thick = hi - lo;
+            lo = Math.max(0, Math.min(h - 1 - thick, lo + steps));
+            hi = lo + thick;
+        }
+        if (lo != p.layerLo || hi != p.layerHi) {
+            p.layerLo = lo;
+            p.layerHi = hi;
+            PlacementStore.markDirty();
+            Sfx.play(Sfx.SNAP, 0.9f + 0.5f * lo / Math.max(1, h));
+        }
+    }
+
+    /** Toggles the show-or-hide of every ghost. */
+    public static void toggleGhosts(Minecraft mc) {
+        GhostRenderer.hidden = !GhostRenderer.hidden;
+        Sfx.play(GhostRenderer.hidden ? Sfx.CLOSE : Sfx.OPEN);
+        say(mc, GhostRenderer.hidden ? "Ghosts hidden" : "Ghosts shown");
     }
 
     /** Forgets everything in progress (the world changed). */
@@ -219,7 +356,15 @@ public final class Interaction {
             if (p == null || p.locked) Placements.setMode(Mode.IDLE);
         } else if (mode == Mode.PLACING) {
             follow(mc, p, pos, look);
-            hint(mc, "Scroll: turn  |  Shift+scroll: up and down  |  Ctrl+scroll: flip  |  Click: lock in place  |  V: cancel");
+            chips(mc, new Chips.Chip("Scroll", "Turn"), new Chips.Chip("Shift+Scroll", "Up / down"), new Chips.Chip("Ctrl+Scroll", "Flip"),
+                new Chips.Chip("Click", "Lock in place"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Cancel"));
+        } else if (mode == Mode.LAYERS) {
+            if (p == null || !p.locked || !p.ready()) {
+                Placements.setMode(Mode.IDLE);
+            } else {
+                chips(mc, new Chips.Chip("Scroll", "Move up / down"), new Chips.Chip("Shift+Scroll", "Thicker / thinner"), new Chips.Chip("Click", "Done"),
+                    new Chips.Chip("Right click", "Show all layers"));
+            }
         } else if (mode == Mode.EDIT) {
             if (p == null || !p.locked || !p.ready() || !GhostRenderer.drawn(p)) {
                 if (p == null || !p.locked) Placements.setMode(Mode.IDLE);
@@ -243,15 +388,19 @@ public final class Interaction {
         if (drag != null) {
             updateDrag(mc, camera, look);
             hover = drag.handle;
+            chips(mc, new Chips.Chip("Release", "Drop it here"));
         } else {
             hover = handles.pick(camera, look);
-            hint(mc, hover == null
-                ? "Drag an arrow: move  |  Drag the ring: turn  |  Click a flip arrow  |  Z: undo  |  V: done"
-                : switch (hover.kind) {
-                    case MOVE -> "Drag to move " + axisWords(hover.axis);
-                    case RING -> "Drag around to turn in quarter turns";
-                    case FLIP -> "Click to flip " + (hover.axis == Direction.Axis.X ? "east-west" : "north-south");
+            if (hover == null) {
+                chips(mc, new Chips.Chip("Drag arrow", "Move"), new Chips.Chip("Drag ring", "Turn"), new Chips.Chip("Click flip", "Mirror"),
+                    new Chips.Chip(Ui.keyName(Keys.UNDO), "Undo"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
+            } else {
+                chips(mc, switch (hover.kind) {
+                    case MOVE -> new Chips.Chip("Drag", "Move " + axisWords(hover.axis));
+                    case RING -> new Chips.Chip("Drag", "Turn in quarter turns");
+                    case FLIP -> new Chips.Chip("Click", "Flip " + (hover.axis == Direction.Axis.X ? "east-west" : "north-south"));
                 });
+            }
         }
         handles.animate(hover, drag == null ? null : drag.handle, dt());
         handles.emit();
@@ -301,10 +450,10 @@ public final class Interaction {
             if (steps != d.steps) {
                 d.steps = steps;
                 p.set(d.startOrigin.offset((int) (d.axis.x * steps), (int) (d.axis.y * steps), (int) (d.axis.z * steps)), p.orientation);
-                ui(1.7f);
+                Sfx.play(Sfx.SNAP, 1.0f + 0.04f * Math.min(12, Math.abs(steps)));
             }
             String what = steps == 0 ? "Drag along the arrow" : "Move " + Math.abs(steps) + " " + wordFor(d.handle.axis, steps);
-            say(mc, what + "   now at " + p.origin.getX() + " " + p.origin.getY() + " " + p.origin.getZ());
+            if (!Settings.get().chips) say(mc, what + "   now at " + p.origin.getX() + " " + p.origin.getY() + " " + p.origin.getZ());
         } else {
             if (!d.armed) {
                 d.ringY = d.startOrigin.getY() + 0.05;
@@ -330,9 +479,9 @@ public final class Interaction {
                 int nsx = o.sizeX(bp.sizeX, bp.sizeZ), nsz = o.sizeZ(bp.sizeX, bp.sizeZ);
                 int[] xz = Moves.keepCenter(d.startOrigin.getX(), d.startOrigin.getZ(), d.startSx, d.startSz, nsx, nsz);
                 p.set(new BlockPos(xz[0], d.startOrigin.getY(), xz[1]), o);
-                ui(1.5f);
+                Sfx.play(Sfx.SNAP, 1.25f);
             }
-            say(mc, d.turns == 0 ? "Drag around the ring" : "Turn " + Math.abs(d.turns * 90) + " degrees " + (d.turns > 0 ? "clockwise" : "anticlockwise"));
+            if (!Settings.get().chips) say(mc, d.turns == 0 ? "Drag around the ring" : "Turn " + Math.abs(d.turns * 90) + " degrees " + (d.turns > 0 ? "clockwise" : "anticlockwise"));
         }
     }
 
@@ -350,7 +499,7 @@ public final class Interaction {
         p.settleStartNs = System.nanoTime();
         Placements.setMode(Mode.EDIT);
         PlacementStore.markDirty();
-        sound(SoundEvents.AMETHYST_BLOCK_CHIME, 0.9f, 1.2f);
+        Sfx.play(Sfx.LOCK);
         Minecraft mc = Minecraft.getInstance();
         say(mc, p.name + " placed. Drag the arrows to adjust it, V when done.");
     }
@@ -365,6 +514,7 @@ public final class Interaction {
         switch (Placements.mode()) {
             case PLACING -> {
                 cancelPlacing();
+                Sfx.play(Sfx.CLOSE);
                 say(mc, "Placing cancelled");
             }
             case EDIT -> {
@@ -372,10 +522,12 @@ public final class Interaction {
                 Placements.setMode(Mode.IDLE);
                 say(mc, "Done editing");
             }
+            case LAYERS -> endLayers(mc, false);
             case IDLE -> {
                 Placement aimed = aimedPlacement(mc);
                 if (aimed == null) aimed = Placements.active();
                 if (aimed == null || !aimed.ready() || !aimed.locked) {
+                    Sfx.play(Sfx.ERROR);
                     say(mc, "Nothing to edit yet. Load a blueprint with /cyanotype load <name>, then /cyanotype place.");
                     return;
                 }
@@ -438,7 +590,7 @@ public final class Interaction {
                     lx -= right.x * (halfW + 1.2 * nameScale);
                     lz -= right.z * (halfW + 1.2 * nameScale);
                 }
-                Handles.label(new Vec3(lx, box.maxY + lift + 0.5 * nameScale, lz), p.name, nameScale, 0xFFFFFFFF, p.accent);
+                if (Settings.get().showNames) Handles.label(new Vec3(lx, box.maxY + lift + 0.5 * nameScale, lz), p.name, nameScale, 0xFFFFFFFF, p.accent);
                 if (strong) {
                     float dimScale = Handles.labelScale(dist, 0.55, 0.036);
                     String sizeText = p.sizeX() + " x " + p.sizeY() + " x " + p.sizeZ();
@@ -449,6 +601,7 @@ public final class Interaction {
             }
         }
         if (guide) nextBlock(mc, camera, active);
+        CellHighlight.emit(camera);
     }
 
     /** "42%  310 to go" or "done". */
@@ -499,7 +652,7 @@ public final class Interaction {
 
     // ---- small helpers
 
-    private static void say(Minecraft mc, String text) {
+    public static void say(Minecraft mc, String text) {
         mc.gui.hud.setOverlayMessage(Component.literal(text), false);
     }
 
@@ -523,12 +676,10 @@ public final class Interaction {
         };
     }
 
-    private static void ui(float pitch) {
-        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, pitch));
-    }
-
-    private static void sound(net.minecraft.sounds.SoundEvent event, float pitch, float volume) {
-        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(event, pitch, volume));
+    /** Shows cursor chips, or the same words on the action bar when chips are switched off. */
+    private static void chips(Minecraft mc, Chips.Chip... chips) {
+        if (Settings.get().chips) Chips.show(chips);
+        else say(mc, Chips.line(chips));
     }
 
     /** Where a handle's tip is drawn this frame, for the demo to aim at ("move+x", "move-z", "ring", "flipx", "flipz"). */

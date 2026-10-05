@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "ChatScreenMixin",
+    "HudMixin",
     "LevelMixin",
     "LevelRendererMixin",
     "MinecraftMixin",

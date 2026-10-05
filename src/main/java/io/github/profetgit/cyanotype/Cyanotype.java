@@ -10,6 +10,7 @@ public final class Cyanotype implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        io.github.profetgit.cyanotype.ui.Settings.load();
         LOG.info("Cyanotype ready");
     }
 }

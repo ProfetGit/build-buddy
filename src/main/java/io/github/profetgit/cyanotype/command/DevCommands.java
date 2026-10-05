@@ -151,6 +151,7 @@ public final class DevCommands {
         }
         Placement p = new Placement(loadedName, loaded, loadedRef, mc.level.dimension().identifier().toString(), at, Orientation.NONE);
         p.locked = true;
+        p.opacity = io.github.profetgit.cyanotype.ui.Settings.get().opacity;
         Placements.add(p);
         say("Placed " + p.name + " at " + at.toShortString() + ".");
     }

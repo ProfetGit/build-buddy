@@ -9,3 +9,4 @@ dist/
 logs/
 __pycache__/
 run/
+dev/sounds/out/

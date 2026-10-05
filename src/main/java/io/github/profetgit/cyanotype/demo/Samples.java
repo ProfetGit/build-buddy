@@ -132,6 +132,68 @@ public final class Samples {
         return g.build("Cyanotype solid " + side);
     }
 
+    /** A square tower with a door, windows and battlements. */
+    static Blueprint tower() {
+        Grid g = new Grid(9, 24, 9);
+        BlockState brick = Blocks.STONE_BRICKS.defaultBlockState(), mossy = Blocks.MOSSY_STONE_BRICKS.defaultBlockState();
+        for (int y = 0; y < 20; y++) {
+            for (int z = 0; z < 9; z++) {
+                for (int x = 0; x < 9; x++) {
+                    boolean wall = x == 0 || z == 0 || x == 8 || z == 8;
+                    if (wall) g.set(x, y, z, (x + y + z) % 7 == 0 ? mossy : brick);
+                }
+            }
+            if (y % 5 == 3) for (int i = 3; i <= 5; i++) {
+                g.set(i, y, 0, Blocks.AIR.defaultBlockState());
+                g.set(i, y, 8, Blocks.AIR.defaultBlockState());
+            }
+        }
+        g.fill(0, 20, 0, 8, 20, 8, Blocks.SPRUCE_PLANKS.defaultBlockState());
+        for (int i = 0; i < 9; i += 2) {
+            g.set(i, 21, 0, brick);
+            g.set(i, 21, 8, brick);
+            g.set(0, 21, i, brick);
+            g.set(8, 21, i, brick);
+        }
+        g.fill(3, 22, 3, 5, 22, 5, Blocks.DARK_OAK_PLANKS.defaultBlockState());
+        return g.build("Watch tower");
+    }
+
+    /** A stepped sandstone pyramid. */
+    static Blueprint pyramid() {
+        int n = 17;
+        Grid g = new Grid(n, 9, n);
+        for (int y = 0; y < 9; y++) {
+            g.fill(y, y, y, n - 1 - y, y, n - 1 - y, y % 2 == 0 ? Blocks.SANDSTONE.defaultBlockState() : Blocks.CUT_SANDSTONE.defaultBlockState());
+            if (y > 0) g.fill(y + 1, y, y + 1, n - 2 - y, y, n - 2 - y, Blocks.AIR.defaultBlockState());
+        }
+        g.fill(7, 0, 0, 9, 2, 1, Blocks.AIR.defaultBlockState());
+        g.set(8, 8, 8, Blocks.GOLD_BLOCK.defaultBlockState());
+        return g.build("Little pyramid");
+    }
+
+    /** A stone arch bridge over a gap. */
+    static Blueprint bridge() {
+        Grid g = new Grid(27, 9, 5);
+        BlockState stone = Blocks.STONE_BRICKS.defaultBlockState(), slab = Blocks.STONE_BRICK_SLAB.defaultBlockState();
+        for (int x = 0; x < 27; x++) {
+            double u = (x - 13) / 13.0;
+            int top = (int) Math.round(5 - 4 * u * u);
+            g.fill(x, top, 0, x, top, 4, stone);
+            g.fill(x, Math.max(0, top - 1), 1, x, top - 1, 3, stone);
+            if (x % 3 == 0) {
+                g.set(x, top + 1, 0, Blocks.STONE_BRICK_WALL.defaultBlockState());
+                g.set(x, top + 1, 4, Blocks.STONE_BRICK_WALL.defaultBlockState());
+            }
+        }
+        for (int y = 0; y < 3; y++) {
+            g.fill(0, y, 0, 1, y, 4, stone);
+            g.fill(25, y, 0, 26, y, 4, stone);
+        }
+        g.set(13, 6, 2, slab);
+        return g.build("Arch bridge");
+    }
+
     /** A box of stone bricks, solid: what a mass fill can match exactly. */
     static Blueprint uniform(int sx, int sy, int sz) {
         Grid g = new Grid(sx, sy, sz);

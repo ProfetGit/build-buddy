@@ -18,7 +18,9 @@ public final class Placements {
         /** The active placement follows the crosshair until a click locks it. */
         PLACING,
         /** The active, locked placement shows its handles. */
-        EDIT
+        EDIT,
+        /** Scroll moves the window of layers shown (the Layers tool). */
+        LAYERS
     }
 
     private record Snapshot(Placement placement, BlockPos origin, Orientation orientation) {

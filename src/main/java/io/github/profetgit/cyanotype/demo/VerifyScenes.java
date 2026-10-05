@@ -144,6 +144,51 @@ final class VerifyScenes {
         });
     }
 
+    /** The HUD in use: the progress panel while building, the stamp when it is finished, and the cursor chips. */
+    static void hud() {
+        Director.clean();
+        act(() -> Director.hideHud(Minecraft.getInstance(), false));
+        cmd("fill -2 " + (G + 1) + " 3 14 " + (G + 8) + " 22 air");
+        Placement[] small = new Placement[1];
+        act(() -> {
+            small[0] = new Placement("Garden shed", Samples.uniform(5, 3, 5), "cyanotype:shed.litematic", Director.DIM, new BlockPos(0, G + 1, 6), io.github.profetgit.cyanotype.placement.Orientation.NONE);
+            small[0].locked = true;
+            Placements.add(small[0]);
+            Placements.setMode(Placements.Mode.EDIT);
+        });
+        camera(2.5, G + 3, -5, 0, 10);
+        until("hud/compared", 400, () -> GhostRenderer.verifierOf(small[0]) != null && GhostRenderer.verifierOf(small[0]).settled());
+        waitTicks(20);
+        shot("hud_0_start");
+        cmd("fill 0 " + (G + 1) + " 6 4 " + (G + 1) + " 10 stone_bricks");
+        until("hud/first layer", 200, () -> GhostRenderer.verifierOf(small[0]).counts().correct() == 25);
+        waitTicks(25);
+        shot("hud_1_third");
+        act(() -> DevCommands.run("/cyanotype layer 2"));
+        waitTicks(25);
+        shot("hud_2_layer");
+        act(() -> DevCommands.run("/cyanotype layer all"));
+        cmd("fill 0 " + (G + 2) + " 6 4 " + (G + 3) + " 10 stone_bricks");
+        until("hud/finished", 200, () -> GhostRenderer.verifierOf(small[0]).counts().done());
+        waitTicks(5);
+        shot("hud_3_stamp");
+        waitTicks(30);
+        shot("hud_4_done");
+        cmd("fill -2 " + (G + 1) + " 3 14 " + (G + 8) + " 22 air");
+        act(() -> {
+            Placements.remove(small[0]);
+            DevCommands.run("/cyanotype sample");
+        });
+        waitTicks(10);
+        act(() -> DevCommands.run("/cyanotype place"));
+        waitTicks(25);
+        shot("hud_5_chips_placing");
+        act(() -> {
+            for (Placement p : java.util.List.copyOf(Placements.all())) Placements.remove(p);
+            Director.hideHud(Minecraft.getInstance(), true);
+        });
+    }
+
     /**
      * A large uniform build, to see what verifying costs: the scan of a placement, then a mass edit that makes all of it
      * correct at once. Frame times are collected while it runs.

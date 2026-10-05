@@ -10,14 +10,24 @@ import java.util.Map;
  */
 public final class Motion {
     private static final Map<String, float[]> VALUES = new HashMap<>();
-    private static long lastNs;
+    private static long lastNs, frameNo, seenFrame = -1;
     private static double dt = 0.016;
 
     private Motion() {
     }
 
-    /** Call once per rendered frame before drawing anything. */
+    /** Called at the end of every rendered frame. */
+    public static void endFrame() {
+        frameNo++;
+    }
+
+    /**
+     * Call before drawing anything: the first call in a rendered frame measures the time since the last one, later calls in
+     * the same frame (the HUD and an open screen both call it) change nothing, or the second would see a dt of about zero.
+     */
     public static void frame() {
+        if (seenFrame == frameNo) return;
+        seenFrame = frameNo;
         long now = System.nanoTime();
         dt = lastNs == 0 ? 0.016 : Math.min(0.1, (now - lastNs) / 1e9);
         lastNs = now;
