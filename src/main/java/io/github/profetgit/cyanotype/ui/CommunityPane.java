@@ -199,8 +199,8 @@ public final class CommunityPane {
         int bodyX = px + 10, bodyW = pw - 20, bodyY = py + 26, footY = py + ph - 24;
         switch (gate()) {
             case NO_ADDRESS -> notice(g, bodyX, bodyY, bodyW, footY - bodyY, inner, "No community website yet",
-                "There is no website address to talk to, so this tab sends nothing. When the community site has a public address it appears here by itself. To try a copy on this computer, use Settings.",
-                new String[][]{{"settings", "Settings"}}, mx, my);
+                "There is no website address to talk to, so this tab sends nothing. When the community site has a public address it appears here by itself. To try a copy running on this computer, press Use local site.",
+                new String[][]{{"localSite", "Use local site"}, {"settings", "Settings"}}, mx, my);
             case NEEDS_CONSENT -> {
                 String host = CommunityConfig.hostOf(Community.base());
                 notice(g, bodyX, bodyY, bodyW, footY - bodyY, inner, "Browse builds from other players?",
@@ -704,6 +704,10 @@ public final class CommunityPane {
                 case "consent:off" -> {
                     Community.setConsent(CommunityConfig.OFF);
                     host.say("Community is off. Nothing was sent.");
+                }
+                case "localSite" -> {
+                    Settings.get().communityUrl = CommunityConfig.LOCAL_TEST_URL;
+                    Settings.changed();
                 }
                 case "settings" -> host.openSettings();
                 case "back" -> model.close();

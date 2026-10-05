@@ -388,6 +388,18 @@ final class CommunityScenes {
             check("community/and sends nothing", Community.requestsSent() == sentAfterOff, Community.requestsSent() + " vs " + sentAfterOff);
         });
         shot("community_16_no_address");
+        act(() -> {
+            Settings.get().community = CommunityConfig.ASK;
+            Settings.changed();
+        });
+        waitTicks(6);
+        clickControl("localSite");
+        waitTicks(12);
+        act(() -> {
+            check("community/Use local site sets the address and the first-run question follows, no trip to Settings", pane().gate() == CommunityPane.Gate.NEEDS_CONSENT && CommunityConfig.LOCAL_TEST_URL.equals(Settings.get().communityUrl), "gate " + pane().gate());
+            check("community/and still nothing is sent", Community.requestsSent() == sentAfterOff, Community.requestsSent() + " vs " + sentAfterOff);
+        });
+        shot("community_16b_then_asks");
 
         // ---- settings
         act(() -> {
