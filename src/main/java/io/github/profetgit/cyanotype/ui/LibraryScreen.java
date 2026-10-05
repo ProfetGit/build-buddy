@@ -146,7 +146,7 @@ public final class LibraryScreen extends Screen {
                 for (int x = 0; x < LibraryModel.THUMB_W; x++) img.setPixel(f * LibraryModel.THUMB_W + x, y, frames[f][y * LibraryModel.THUMB_W + x]);
             }
         }
-        DynamicTexture tex = new DynamicTexture(() -> "Cyanotype library preview", img);
+        Skin.Smooth tex = new Skin.Smooth("Cyanotype library preview", img, false);
         Identifier id = Identifier.fromNamespaceAndPath(Cyanotype.MOD_ID, "library/" + Integer.toHexString(System.identityHashCode(e)) + "_" + System.nanoTime());
         minecraft.getTextureManager().register(id, tex);
         owned.put(e, tex);
@@ -241,13 +241,13 @@ public final class LibraryScreen extends Screen {
         Identifier tex = textureOf(e);
         if (tex != null) {
             int frame = over && !Motion.reduced() ? (int) (t * 4) % LibraryModel.THUMB_FRAMES : 0;
-            g.blit(RenderPipelines.GUI_TEXTURED, tex, tx, ty, (float) (frame * LibraryModel.THUMB_W), 0f, LibraryModel.THUMB_W, LibraryModel.THUMB_H,
-                LibraryModel.THUMB_W * LibraryModel.THUMB_FRAMES, LibraryModel.THUMB_H);
+            g.blit(RenderPipelines.GUI_TEXTURED, tex, tx, ty, (float) (frame * LibraryModel.THUMB_W), 0f, LibraryModel.THUMB_SHOW_W, LibraryModel.THUMB_SHOW_H,
+                LibraryModel.THUMB_W, LibraryModel.THUMB_H, LibraryModel.THUMB_W * LibraryModel.THUMB_FRAMES, LibraryModel.THUMB_H);
         } else if (e.error != null) {
             Ui.icon(g, "cross", tx + 25, ty + 17, false);
         } else {
             int dots = 1 + (int) (t * 3) % 3;
-            Ui.centered(g, ".".repeat(dots), tx + LibraryModel.THUMB_W / 2, ty + 18, Ui.DIM);
+            Ui.centered(g, ".".repeat(dots), tx + LibraryModel.THUMB_SHOW_W / 2, ty + 18, Ui.DIM);
         }
         // the words
         int ly = y + 57;

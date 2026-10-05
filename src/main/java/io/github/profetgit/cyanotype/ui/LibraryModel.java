@@ -70,7 +70,8 @@ public final class LibraryModel {
         }
     }
 
-    public static final int THUMB_W = 64, THUMB_H = 48, THUMB_FRAMES = 8;
+    /** The preview is made at twice the size it is shown at (GUI units), and sampled smoothly. */
+    public static final int THUMB_W = 128, THUMB_H = 96, THUMB_SHOW_W = 64, THUMB_SHOW_H = 48, THUMB_FRAMES = 8;
 
     private final List<Entry> entries = new ArrayList<>();
 

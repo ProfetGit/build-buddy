@@ -57,7 +57,7 @@ public enum Tool {
             return false;
         }
     },
-    SETTINGS("Settings", "select", "Look, feel and defaults") {
+    SETTINGS("Settings", "gear", "Look, feel and defaults") {
         @Override
         void run(Minecraft mc) {
             mc.gui.setScreen(new SettingsScreen());
@@ -67,6 +67,23 @@ public enum Tool {
         @Override
         void run(Minecraft mc) {
             Interaction.toggleGhosts(mc);
+        }
+    },
+    REMOVE("Remove", "trash", "Take a placed blueprint away") {
+        @Override
+        void run(Minecraft mc) {
+            Placement p = Interaction.aimedPlacement(mc);
+            if (p == null) p = Placements.active();
+            if (p == null) {
+                Sfx.play(Sfx.ERROR);
+                return;
+            }
+            mc.gui.setScreen(new RemoveScreen(p));
+        }
+
+        @Override
+        boolean enabled(Minecraft mc) {
+            return !Placements.all().isEmpty();
         }
     };
 

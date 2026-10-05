@@ -69,6 +69,8 @@ public final class Placements {
 
     public static void remove(Placement p) {
         ALL.remove(p);
+        // a material highlight belongs to a placement's verifier: it goes with it
+        io.github.profetgit.cyanotype.interaction.CellHighlight.clear();
         UNDO.removeIf(s -> s.placement == p);
         if (active == p) {
             active = null;
@@ -82,6 +84,7 @@ public final class Placements {
     }
 
     public static void clear() {
+        io.github.profetgit.cyanotype.interaction.CellHighlight.clear();
         ALL.clear();
         UNDO.clear();
         active = null;

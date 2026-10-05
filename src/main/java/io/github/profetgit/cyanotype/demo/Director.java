@@ -217,6 +217,8 @@ public final class Director {
                 case "verify-perf" -> VerifyScenes.perf();
                 case "hud" -> VerifyScenes.hud();
                 case "wheel" -> UiScenes.wheel();
+                case "wheel-counts" -> UiScenes.wheelCounts();
+                case "remove" -> UiScenes.remove();
                 case "library" -> UiScenes.library();
                 case "materials" -> MaterialsScenes.materials();
                 case "settings" -> SettingsScenes.settings();

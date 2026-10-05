@@ -61,9 +61,9 @@ final class UiScenes {
     /** Where the mouse has to be to point at wheel segment {@code i}. */
     static int[] segmentPoint(int i) {
         Screen s = screen();
-        double ang = i * Math.PI / 4 - Math.PI / 2;
-        double r = 40;
-        return new int[]{(int) Math.round(s.width / 2.0 + Math.cos(ang) * r), (int) Math.round(s.height / 2.0 + Math.sin(ang) * r)};
+        int n = ((io.github.profetgit.cyanotype.ui.WheelScreen) s).toolCount();
+        double[] at = io.github.profetgit.cyanotype.ui.WheelGeometry.pointAt(i, n, 40);
+        return new int[]{(int) Math.round(s.width / 2.0 + at[0]), (int) Math.round(s.height / 2.0 + at[1])};
     }
 
     static void library() {
@@ -189,6 +189,112 @@ final class UiScenes {
 
     static void write(java.nio.file.Path dir, String name, io.github.profetgit.cyanotype.blueprint.Blueprint bp) throws java.io.IOException {
         io.github.profetgit.cyanotype.blueprint.LitematicWriter.write(bp, dir.resolve(name + ".litematic"));
+    }
+
+    private static void click(int[] at) {
+        Screen s = screen();
+        var info = new net.minecraft.client.input.MouseButtonInfo(0, 0);
+        s.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info), false);
+        s.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info));
+    }
+
+    private static void key(int code) {
+        screen().keyPressed(new net.minecraft.client.input.KeyEvent(code, 0, 0));
+    }
+
+    /** The wheel cut for other numbers of tools, to see that the lines stay between the icons. */
+    static void wheelCounts() {
+        setup();
+        for (int n : new int[]{3, 5, 12}) {
+            io.github.profetgit.cyanotype.ui.Tool[] all = io.github.profetgit.cyanotype.ui.Tool.values();
+            io.github.profetgit.cyanotype.ui.Tool[] set = new io.github.profetgit.cyanotype.ui.Tool[n];
+            for (int i = 0; i < n; i++) set[i] = all[i % all.length];
+            act(() -> {
+                WheelScreen.testTools = set;
+                WheelScreen.testHeld = true;
+                Interaction.testMainDown = true;
+            });
+            waitTicks(8);
+            act(() -> Ui.testMouse = segmentPoint(1));
+            waitTicks(12);
+            shot("wheel_n" + n);
+            act(() -> {
+                Ui.testMouse = new int[]{screen().width / 2, screen().height / 2};
+                WheelScreen.testHeld = false;
+                Interaction.testMainDown = false;
+            });
+            waitTicks(10);
+            act(() -> check("wheel/" + n + " tools: the wheel opened with that many segments and closed again", screen() == null, "screen " + screen()));
+        }
+        act(() -> WheelScreen.testTools = null);
+        teardown();
+    }
+
+    /** Removing a placement: the wheel's Remove tool, the question, Keep, and Remove with the keyboard. */
+    static void remove() {
+        setup();
+        act(() -> {
+            io.github.profetgit.cyanotype.interaction.CellHighlight.show(GhostRenderer.verifierOf(house), java.util.List.of(new int[]{0, 1}), "k", "something", -1, -1);
+        });
+        waitTicks(6);
+        act(() -> check("remove/a highlight is showing before", io.github.profetgit.cyanotype.interaction.CellHighlight.shown() > 0, "cells " + io.github.profetgit.cyanotype.interaction.CellHighlight.shown()));
+        act(() -> {
+            WheelScreen.testHeld = true;
+            Interaction.testMainDown = true;
+        });
+        waitTicks(8);
+        act(() -> Ui.testMouse = segmentPoint(io.github.profetgit.cyanotype.ui.Tool.REMOVE.ordinal()));
+        waitTicks(10);
+        shot("remove_0_wheel");
+        act(() -> {
+            WheelScreen.testHeld = false;
+            Interaction.testMainDown = false;
+        });
+        waitTicks(14);
+        act(() -> {
+            Ui.testMouse = null;
+            check("remove/the wheel opens the question for the placement", screen() instanceof io.github.profetgit.cyanotype.ui.RemoveScreen rs && rs.asks().get(0) == house, String.valueOf(screen()));
+        });
+        waitTicks(6);
+        shot("remove_1_confirm");
+        // Keep it: by mouse, nothing changes
+        act(() -> click(((io.github.profetgit.cyanotype.ui.RemoveScreen) screen()).anchor("keep")));
+        waitTicks(4);
+        act(() -> check("remove/Keep it leaves the placement alone", screen() == null && Placements.all().contains(house), "screen " + screen() + ", placements " + Placements.all().size()));
+        // Enter with the first focus is Keep too
+        act(() -> Minecraft.getInstance().gui.setScreen(new io.github.profetgit.cyanotype.ui.RemoveScreen(house)));
+        waitTicks(4);
+        act(() -> key(257));
+        waitTicks(3);
+        act(() -> check("remove/Enter on the first focus keeps it", screen() == null && Placements.all().contains(house), "screen " + screen()));
+        // arrow right moves to Remove, Enter removes
+        act(() -> Minecraft.getInstance().gui.setScreen(new io.github.profetgit.cyanotype.ui.RemoveScreen(house)));
+        waitTicks(8);
+        act(() -> key(262));
+        waitTicks(8);
+        shot("remove_2_focus_remove");
+        act(() -> key(257));
+        waitTicks(6);
+        act(() -> check("remove/Remove takes the placement away", screen() == null && Placements.all().isEmpty() && Placements.mode() == Placements.Mode.IDLE, "screen " + screen() + ", placements " + Placements.all().size()));
+        act(() -> check("remove/its material highlight goes with it", io.github.profetgit.cyanotype.interaction.CellHighlight.shown() == 0, "cells " + io.github.profetgit.cyanotype.interaction.CellHighlight.shown()));
+        waitTicks(10);
+        act(() -> check("remove/its ghost is gone", GhostRenderer.ghosts().isEmpty(), "ghosts " + GhostRenderer.ghosts().size()));
+        // with nothing placed, Remove on the wheel is greyed out and chooses nothing
+        act(() -> {
+            WheelScreen.testHeld = true;
+            Interaction.testMainDown = true;
+        });
+        waitTicks(8);
+        act(() -> Ui.testMouse = segmentPoint(io.github.profetgit.cyanotype.ui.Tool.REMOVE.ordinal()));
+        waitTicks(10);
+        shot("remove_3_nothing_to_remove");
+        act(() -> {
+            WheelScreen.testHeld = false;
+            Interaction.testMainDown = false;
+        });
+        waitTicks(10);
+        act(() -> check("remove/with nothing placed the tool does nothing", screen() == null, "screen " + screen()));
+        teardown();
     }
 
     static void wheel() {

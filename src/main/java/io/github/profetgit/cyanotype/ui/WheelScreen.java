@@ -18,7 +18,10 @@ public final class WheelScreen extends Screen {
     /** Dev demo only: whether the tool key counts as held, and where the mouse is (null = the real ones). */
     public static volatile Boolean testHeld;
 
-    private static final Tool[] TOOLS = Tool.values();
+    /** Dev demo only: a different set of tools, to see the wheel with other counts. */
+    public static volatile Tool[] testTools;
+
+    private final Tool[] tools = testTools != null ? testTools : Tool.values();
     private int hovered = -1;
     private int chosen = -1;
     private long openedNs = System.nanoTime(), chosenNs;
@@ -27,6 +30,11 @@ public final class WheelScreen extends Screen {
 
     public WheelScreen() {
         super(Component.literal("Cyanotype tools"));
+    }
+
+    /** Dev demo: how many tools the wheel is cut for. */
+    public int toolCount() {
+        return tools.length;
     }
 
     @Override
@@ -70,7 +78,7 @@ public final class WheelScreen extends Screen {
     }
 
     private void release() {
-        if (hovered >= 0 && TOOLS[hovered].enabled(minecraft)) {
+        if (hovered >= 0 && tools[hovered].enabled(minecraft)) {
             chosen = hovered;
             chosenNs = System.nanoTime();
             Sfx.play(Sfx.PRESS);
@@ -82,7 +90,7 @@ public final class WheelScreen extends Screen {
     }
 
     private void finish() {
-        Tool t = TOOLS[chosen];
+        Tool t = tools[chosen];
         onClose();
         t.run(minecraft);
     }
@@ -99,15 +107,6 @@ public final class WheelScreen extends Screen {
         return true;
     }
 
-    /** Which segment a point is over, 0 at the top and clockwise, or -1 inside the middle or outside the wheel. */
-    static int segmentAt(double dx, double dy, double inner, double outer) {
-        double r = Math.hypot(dx, dy);
-        if (r < inner || r > outer) return -1;
-        double a = Math.atan2(dy, dx) + Math.PI / 2 + Math.PI / 8;
-        a = ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-        return (int) (a / (Math.PI / 4)) % 8;
-    }
-
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int rawX, int rawY, float partial) {
         Motion.frame();
@@ -115,9 +114,11 @@ public final class WheelScreen extends Screen {
         int cx = width / 2, cy = height / 2;
         int scale = height >= 270 ? 2 : 1;
         int size = 64 * scale;
-        double inner = 14 * scale, outer = 34 * scale + 90;
+        int n = tools.length;
+        WheelArt.ensure(n, size);
+        double inner = WheelArt.hub(size), outer = 34 * scale + 90, rim = WheelArt.outer(size);
         if (chosen < 0) {
-            int now = segmentAt(mx - cx, my - cy, inner, outer);
+            int now = WheelGeometry.segmentAt(mx - cx, my - cy, inner, outer, n);
             if (now != hovered) {
                 hovered = now;
                 if (now >= 0) Sfx.play(Sfx.WHEEL_TICK, 0.9f + 0.05f * now);
@@ -132,10 +133,10 @@ public final class WheelScreen extends Screen {
         g.pose().scale(s, s);
         g.pose().translate(-cx, -cy);
 
-        Ui.blit(g, "wheel_base", cx - size / 2, cy - size / 2, size, size, alpha);
+        WheelArt.drawBase(g, cx - size / 2, cy - size / 2, size, alpha);
         // the wedge follows the hovered segment with a spring-like ease, going the short way round
         if (hovered >= 0) {
-            float target = (float) (hovered * Math.PI / 4);
+            float target = (float) WheelGeometry.center(hovered, n);
             if (!wedgeVisible) {
                 wedgeAngle = target;
                 wedgeVisible = true;
@@ -150,24 +151,27 @@ public final class WheelScreen extends Screen {
             g.pose().pushMatrix();
             g.pose().translate(cx, cy);
             g.pose().rotate(wedgeAngle);
-            Ui.blit(g, "wheel_wedge", -size / 2, -size / 2, size, size, wedgeA);
+            WheelArt.drawWedge(g, -size / 2, -size / 2, size, wedgeA);
             g.pose().popMatrix();
         }
-        double ringR = 22.5 * scale;
-        for (int i = 0; i < TOOLS.length; i++) {
-            double ang = i * Math.PI / 4 - Math.PI / 2;
-            Tool t = TOOLS[i];
+        // icons sit in the middle of their segments; they shrink when many tools share the ring
+        double ringR = (inner + rim) / 2, arc = 2 * Math.PI * ringR / n;
+        double iconHalf = Math.min(7 * scale, Math.min(arc * 0.34, (rim - inner) * 0.4));
+        for (int i = 0; i < n; i++) {
+            Tool t = tools[i];
             boolean on = t.enabled(minecraft);
             boolean hot = i == hovered;
             boolean pulse = i == chosen;
             double pulseK = pulse && !Motion.reduced() ? 1 + 0.35 * Math.sin(Math.min(1, (System.nanoTime() - chosenNs) / 150e6) * Math.PI) : 1;
-            int ix = (int) Math.round(cx + Math.cos(ang) * ringR), iy = (int) Math.round(cy + Math.sin(ang) * ringR);
+            double[] at = WheelGeometry.pointAt(i, n, ringR);
+            int ix = (int) Math.round(cx + at[0]), iy = (int) Math.round(cy + at[1]);
             float lift = Motion.follow("wheel#icon" + i, hot ? 1f : 0f, 0.07);
-            int isz = (int) Math.round(7 * scale * (1 + 0.12 * lift) * pulseK);
+            int isz = (int) Math.round(iconHalf * (1 + 0.12 * lift) * pulseK);
             // dark icons on the lit wedge, light ones on the base
             boolean dark = hot && on;
             Ui.icon(g, t.icon, ix - isz, iy - isz, dark, isz * 2, on ? alpha : alpha * 0.4f);
             // the name outside the wheel
+            double ang = WheelGeometry.center(i, n) - Math.PI / 2;
             int lx = (int) Math.round(cx + Math.cos(ang) * (size / 2.0 + 12 * scale)), ly = (int) Math.round(cy + Math.sin(ang) * (size / 2.0 + 10 * scale));
             int col = !on ? 0xFF5E7C99 : hot ? Ui.WHITE : Ui.DIM;
             String label = t.label;
@@ -180,9 +184,9 @@ public final class WheelScreen extends Screen {
         }
         // the middle names the segment; what it does goes under the wheel
         if (hovered >= 0) {
-            Tool t = TOOLS[hovered];
-            Ui.centered(g, Ui.fit(t.label, 26 * scale), cx, cy - 4, Ui.withAlpha(t.enabled(minecraft) ? Ui.WHITE : Ui.DIM, alpha));
-            String hint = t.enabled(minecraft) ? t.hint : t.hint;
+            Tool t = tools[hovered];
+            Ui.centered(g, Ui.fit(t.label, (int) (inner * 1.8)), cx, cy - 4, Ui.withAlpha(t.enabled(minecraft) ? Ui.WHITE : Ui.DIM, alpha));
+            String hint = t.hint;
             int hw = Ui.font().width(hint);
             int hy = cy + size / 2 + 26 * scale;
             g.fill(cx - hw / 2 - 4, hy - 2, cx + hw / 2 + 4, hy + 11, Ui.withAlpha(Ui.DEEP, alpha * 0.72f));

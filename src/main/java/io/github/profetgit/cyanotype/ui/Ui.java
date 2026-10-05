@@ -1,12 +1,9 @@
 package io.github.profetgit.cyanotype.ui;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import io.github.profetgit.cyanotype.Cyanotype;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.Identifier;
 
 /**
  * Drawing the Cyanotype look: navy blueprint panels, white and cyan lines, from the sprites of dev/ui/out/B_final
@@ -21,25 +18,27 @@ public final class Ui {
     private Ui() {
     }
 
-    public static Identifier sprite(String name) {
-        return Identifier.fromNamespaceAndPath(Cyanotype.MOD_ID, name);
-    }
-
     public static Font font() {
         return Minecraft.getInstance().font;
     }
 
     public static void blit(GuiGraphicsExtractor g, String sprite, int x, int y, int w, int h) {
-        g.blitSprite(RenderPipelines.GUI_TEXTURED, sprite(sprite), x, y, w, h);
+        Skin.blit(g, sprite, x, y, w, h, 1f);
     }
 
     public static void blit(GuiGraphicsExtractor g, String sprite, int x, int y, int w, int h, float alpha) {
         if (alpha <= 0.003f) return;
-        g.blitSprite(RenderPipelines.GUI_TEXTURED, sprite(sprite), x, y, w, h, alpha);
+        Skin.blit(g, sprite, x, y, w, h, alpha);
+    }
+
+    /** A sprite multiplied by a colour (ARGB). */
+    public static void blitTint(GuiGraphicsExtractor g, String sprite, int x, int y, int w, int h, int color) {
+        Skin.blit(g, sprite, x, y, w, h, color);
     }
 
     public static void panel(GuiGraphicsExtractor g, int x, int y, int w, int h) {
         blit(g, "panel", x, y, w, h);
+        Skin.grid(g, x + 1, y + 1, w - 2, h - 2, 1f);
     }
 
     public static void inset(GuiGraphicsExtractor g, int x, int y, int w, int h) {
@@ -183,7 +182,7 @@ public final class Ui {
     public static void checkbox(GuiGraphicsExtractor g, String key, int x, int y, boolean on, boolean over) {
         float hv = Motion.hover(key, over);
         blit(g, on ? "checkbox_on" : "checkbox_off", x, y, 10, 10);
-        if (hv > 0.02f) g.outline(x - 1, y - 1, 12, 12, (int) (hv * 160) << 24 | 0x7FE3FF);
+        if (hv > 0.02f) blit(g, "checkbox_hover", x - 1, y - 1, 12, 12, hv);
     }
 
     /**
@@ -195,14 +194,8 @@ public final class Ui {
         float v = Motion.follow(key + "#bar", (float) Math.max(0, Math.min(1, value)), 0.18);
         int fw = (int) Math.round((w - 4) * v);
         if (fw <= 0) return;
-        int fx = x + 2, fy = y + 2, fh = h - 4;
-        g.enableScissor(fx, fy, fx + fw, fy + fh);
-        // the fill sprite tiled, shifted along with time so its pixels crawl
-        int shift = Motion.reduced() ? 0 : (int) (seconds * 6) % 4;
-        for (int tx = fx - 4 + shift; tx < fx + fw; tx += 4) {
-            for (int ty = fy; ty < fy + fh; ty += 4) blit(g, "bar_fill", tx, ty, 4, 4);
-        }
-        g.disableScissor();
+        // the hatch drifts along the fill, a little over a unit a second
+        Skin.hatch(g, x + 2, y + 2, fw, h - 4, Motion.reduced() ? 0 : -seconds * 1.5);
     }
 
     /**
@@ -216,20 +209,10 @@ public final class Ui {
         double v = Math.max(0, Math.min(1, value));
         int knobX = x + 2 + (int) Math.round((w - 4 - 5) * v);
         int fw = knobX - (x + 2) + 2;
-        int fx = x + 2, fy = y + 2, fh = h - 4;
-        if (fw > 0) {
-            g.enableScissor(fx, fy, fx + fw, fy + fh);
-            int shift = Motion.reduced() ? 0 : (int) (seconds * 6) % 4;
-            for (int tx = fx - 4 + shift; tx < fx + fw; tx += 4) {
-                for (int ty = fy; ty < fy + fh; ty += 4) blit(g, "bar_fill", tx, ty, 4, 4);
-            }
-            g.disableScissor();
-        }
+        if (fw > 0) Skin.hatch(g, x + 2, y + 2, fw, h - 4, Motion.reduced() ? 0 : -seconds * 1.5);
         float hv = Motion.hover(key, hover || held), pr = Motion.press(key, held);
         int kh = h + 4, ky = y - 2;
-        g.fill(knobX - 1, ky - 1, knobX + 6, ky + kh + 1, withAlpha(DEEP, 0.95f));
-        g.fill(knobX, ky, knobX + 5, ky + kh, mixColor(mixColor(LINE, WHITE, hv), CYAN, pr));
-        g.fill(knobX + 2, ky + 2, knobX + 3, ky + kh - 2, withAlpha(NAVY, 0.55f));
+        blitTint(g, "knob", knobX, ky, 5, kh, 0xFF000000 | mixColor(mixColor(LINE, WHITE, hv), CYAN, pr) & 0xFFFFFF);
     }
 
     /** Marching dashes around a rectangle: what is selected. */
