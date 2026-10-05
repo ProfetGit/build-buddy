@@ -223,6 +223,7 @@ public final class Director {
                 case "layer-caps" -> UiScenes.layerCaps();
                 case "shapes" -> UiScenes.shapes();
                 case "library" -> UiScenes.library();
+                case "community" -> CommunityScenes.community();
                 case "save" -> SaveScenes.save();
                 case "pick" -> PickScenes.pick();
                 case "materials" -> MaterialsScenes.materials();

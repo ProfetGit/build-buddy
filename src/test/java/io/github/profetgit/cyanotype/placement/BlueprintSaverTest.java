@@ -43,6 +43,26 @@ class BlueprintSaverTest {
     }
 
     @Test
+    void namesWindowsCannotCreateGetAnUnderscore() {
+        assertEquals("CON_", BlueprintSaver.stem("CON"));
+        assertEquals("nul_", BlueprintSaver.stem("nul"));
+        assertEquals("com1_", BlueprintSaver.stem("com1"));
+        assertEquals("Lpt9_", BlueprintSaver.stem("Lpt9"));
+        assertEquals("aux_.txt", BlueprintSaver.stem("aux.txt"));
+        assertEquals("console", BlueprintSaver.stem("console"));
+        assertEquals("com10", BlueprintSaver.stem("com10"));
+    }
+
+    @Test
+    void aTagsFileLeftBehindKeepsAFreshNameFromReusingIt(@TempDir Path dir) throws IOException {
+        Files.writeString(dir.resolve("house.cyanotype.json"), "{}");
+        assertEquals("house.litematic", BlueprintSaver.freePath(dir, "house").getFileName().toString(), "the plain rule looks at the schematic only");
+        assertEquals("house 2.litematic", BlueprintSaver.freePath(dir, "house", true).getFileName().toString());
+        assertEquals("fresh.litematic", BlueprintSaver.freePath(dir, "fresh", true).getFileName().toString());
+        assertEquals("fresh.litematic", BlueprintSaver.freePath(dir.resolve("not-yet"), "fresh", true).getFileName().toString());
+    }
+
+    @Test
     void anExistingFileIsNeverReplaced(@TempDir Path dir) throws IOException {
         assertEquals("house.litematic", BlueprintSaver.freePath(dir, "house").getFileName().toString());
         Files.writeString(dir.resolve("house.litematic"), "x");

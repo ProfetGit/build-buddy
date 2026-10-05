@@ -34,19 +34,33 @@ public final class BlueprintSaver {
         }
         String s = sb.toString().replaceAll("\\s+", " ").replaceAll("^[. ]+", "").replaceAll("[. ]+$", "");
         if (s.length() > MAX_STEM) s = s.substring(0, MAX_STEM).trim();
-        return s.isEmpty() ? "blueprint" : s;
+        if (s.isEmpty()) return "blueprint";
+        // Windows cannot create a file named like a device (CON, NUL, COM1...), with or without an extension
+        java.util.regex.Matcher dev = RESERVED.matcher(s);
+        if (dev.matches()) s = dev.group(1) + "_" + (dev.group(2) == null ? "" : dev.group(2));
+        return s;
     }
+
+    private static final java.util.regex.Pattern RESERVED = java.util.regex.Pattern.compile("(?i)(con|prn|aux|nul|com[1-9]|lpt[1-9])(\\..*)?");
 
     /** The first of {@code stem}, {@code stem 2}, {@code stem 3}... that has no file yet in the folder. */
     public static Path freePath(Path dir, String stem) {
+        return freePath(dir, stem, false);
+    }
+
+    /** As {@link #freePath(Path, String)}; with {@code sidecarToo} a name whose tags file is still lying there is not free either. */
+    public static Path freePath(Path dir, String stem, boolean sidecarToo) {
         Path p = dir.resolve(stem + ".litematic");
         int n = 2;
-        while (exists(p)) p = dir.resolve(stem + " " + n++ + ".litematic");
+        while (exists(p) || sidecarToo && exists(dir.resolve(p.getFileName().toString().replaceFirst("(?i)\\.litematic$", "") + ".cyanotype.json"))) {
+            p = dir.resolve(stem + " " + n++ + ".litematic");
+        }
         return p;
     }
 
     private static boolean exists(Path p) {
         // a case-insensitive file system would otherwise let "House" replace "house"
+        if (!Files.isDirectory(p.getParent())) return false;
         try (var s = Files.list(p.getParent())) {
             String want = p.getFileName().toString().toLowerCase(Locale.ROOT);
             return s.anyMatch(q -> q.getFileName().toString().toLowerCase(Locale.ROOT).equals(want));

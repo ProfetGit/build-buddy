@@ -19,7 +19,7 @@ import net.minecraft.network.chat.Component;
  */
 public final class SettingsScreen extends Screen {
     private enum Group {
-        APPEARANCE("Appearance"), GHOST("Ghost"), MATERIALS("Materials"), AUTO("Auto-place"), SERVERS("Servers"), ADVANCED("Advanced");
+        APPEARANCE("Appearance"), GHOST("Ghost"), MATERIALS("Materials"), COMMUNITY("Community"), AUTO("Auto-place"), SERVERS("Servers"), ADVANCED("Advanced");
 
         final String label;
 
@@ -120,6 +120,15 @@ public final class SettingsScreen extends Screen {
                 r.add(new Toggle("verify", "Check what is built", "Hide right blocks, mark wrong ones, count progress.", () -> d.verify, v -> d.verify = v));
             }
             case MATERIALS -> r.add(new Toggle("groupVariants", "Group variants", "Count every colour or wood of a block as one line.", () -> d.groupVariants, v -> d.groupVariants = v));
+            case COMMUNITY -> {
+                String base = io.github.profetgit.cyanotype.community.Community.base();
+                r.add(new Toggle("community", "Community tab", "Browse and download builds that people shared on the community website. Off sends nothing.",
+                    () -> io.github.profetgit.cyanotype.community.CommunityConfig.ON.equals(io.github.profetgit.cyanotype.community.Community.consent()),
+                    v -> io.github.profetgit.cyanotype.community.Community.setConsent(v ? io.github.profetgit.cyanotype.community.CommunityConfig.ON : io.github.profetgit.cyanotype.community.CommunityConfig.OFF)));
+                r.add(new Note("communityUrl", "Website address", base != null ? base + "  To change it, edit communityUrl in config/cyanotype.json."
+                    : "None yet: the community website has no public address. To try a local copy, edit communityUrl in config/cyanotype.json or use the button below."));
+                r.add(new Action("localSite", "Local site", "Test site on this computer."));
+            }
             case AUTO -> r.add(new Note("auto", "Auto-placing is not in this version",
                 "A later version can place blocks for you from your inventory. On multiplayer servers it will stay off until you turn it on for that server."));
             case SERVERS -> r.add(new Note("servers", "No servers to manage yet",
@@ -374,6 +383,16 @@ public final class SettingsScreen extends Screen {
             Sfx.play(Sfx.CLOSE);
             onClose();
             return true;
+        }
+        if (was.equals("localSite")) {
+            for (Laid l : laid()) {
+                if (l.row instanceof Action ac && ac.id.equals("localSite") && Ui.inside(mx, my, l.x, l.y + 1, 90, 16)) {
+                    Settings.get().communityUrl = io.github.profetgit.cyanotype.community.CommunityConfig.LOCAL_TEST_URL;
+                    Settings.changed();
+                    Sfx.play(Sfx.COMPLETE);
+                    return true;
+                }
+            }
         }
         if (was.equals("reset")) {
             for (Laid l : laid()) {
