@@ -10,6 +10,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(MouseHandler.class)
 public abstract class MouseHandlerMixin {
+    /**
+     * Remembers which modifier keys were down at the moment of a press, as the window system reported them with the click:
+     * a click is read a tick later, and polling the keyboard then can miss a Shift or Ctrl that the event carried.
+     */
+    @Inject(method = "onButton", at = @At("HEAD"))
+    private void cyanotype$button(long handle, net.minecraft.client.input.MouseButtonInfo info, int action, CallbackInfo ci) {
+        if (action == 1) Interaction.noteClick(info.modifiers());
+    }
+
     /** While a ghost follows the crosshair the wheel turns it instead of changing the hotbar. */
     @Inject(method = "onScroll", at = @At("HEAD"), cancellable = true)
     private void cyanotype$scroll(long handle, double xoffset, double yoffset, CallbackInfo ci) {

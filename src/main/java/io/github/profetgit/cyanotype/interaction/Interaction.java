@@ -70,12 +70,26 @@ public final class Interaction {
     /** Dev demo only: which modifier keys the scroll sees (1 = shift, 2 = ctrl) instead of the real ones; -1 = the real keys. */
     public static volatile int testModifiers = -1;
 
+    /** Modifier bits of the last mouse press as the window reported them (3 = Shift, 192 = Ctrl), and when. */
+    private static volatile int clickMods;
+    private static volatile long clickNs;
+
+    public static void noteClick(int modifiers) {
+        clickMods = modifiers;
+        clickNs = System.nanoTime();
+    }
+
+    /** Whether a modifier was held with the click that is being handled now: what the click itself carried, or the keyboard. */
+    private static boolean recentClick(int mask) {
+        return (clickMods & mask) != 0 && System.nanoTime() - clickNs < 250_000_000L;
+    }
+
     static boolean shift(Minecraft mc) {
-        return testModifiers >= 0 ? (testModifiers & 1) != 0 : mc.hasShiftDown();
+        return testModifiers >= 0 ? (testModifiers & 1) != 0 : mc.hasShiftDown() || recentClick(3);
     }
 
     static boolean ctrl(Minecraft mc) {
-        return testModifiers >= 0 ? (testModifiers & 2) != 0 : mc.hasControlDown();
+        return testModifiers >= 0 ? (testModifiers & 2) != 0 : mc.hasControlDown() || recentClick(192);
     }
 
     /** Blocks the placement has been lifted above the surface it aims at (shift+scroll). */

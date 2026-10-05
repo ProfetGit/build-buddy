@@ -67,11 +67,11 @@ public final class Chips {
             float a = (float) (Motion.easeOut(local) * visible);
             if (a < 0.02f) continue;
             int slide = Motion.reduced() ? 0 : (int) Math.round((1 - Motion.easeOut(local)) * 8);
-            int kw = Ui.font().width(c.key()), aw = Ui.font().width(c.action());
+            int kw = ChipIcons.width(c.key()), aw = Ui.font().width(c.action());
             int cw = kw + aw + 19;
             int cx = slide, cy = i * (rowH + gap);
             Ui.blit(g, "tooltip", cx, cy, cw, rowH, a * 0.92f);
-            Ui.text(g, c.key(), cx + 5, cy + 3, Ui.withAlpha(Ui.CYAN, a));
+            ChipIcons.draw(g, c.key(), cx + 5, cy, a);
             g.fill(cx + 8 + kw, cy + 3, cx + 9 + kw, cy + rowH - 3, Ui.withAlpha(Ui.DIM, a * 0.55f));
             Ui.text(g, c.action(), cx + 12 + kw, cy + 3, Ui.withAlpha(Ui.WHITE, a));
         }
