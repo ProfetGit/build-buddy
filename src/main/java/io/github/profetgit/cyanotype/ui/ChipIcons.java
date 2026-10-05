@@ -7,7 +7,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 /**
  * Draws the key part of a cursor chip as pictures: a small mouse with the pressed button lit, key caps for Shift, Ctrl and
  * the keys of the mod. The chip's key text ("Shift+Click", "Right click", "Ctrl+Z / Y") says what to draw; anything that is
- * not a known mouse action or a short key name stays text. Pure parsing (tested) and plain rectangles, so it needs no art.
+ * not a known mouse action or a short key name stays text. Pure parsing (tested); the pictures are the 16 x 16 pixel sprites.
  */
 public final class ChipIcons {
     public enum Kind {
@@ -18,7 +18,8 @@ public final class ChipIcons {
     public record Part(Kind kind, String text, String mark) {
     }
 
-    static final int MOUSE_W = 10, MOUSE_H = 14, WHEEL_W = 13, CAP_H = 13, DRAG_W = 9, DRAG_H = 7, GAP = 4;
+    /** The pixel mouse is 16 x 16 with 2 empty columns each side: 12 are drawn. A key cap shows 14 of 16 rows' width: 1 empty column each side. */
+    static final int MOUSE_W = 12, WHEEL_W = 12, DRAG_W = 10, DRAG_H = 8, GAP = 4, CAP_PAD = 3, CAP_TEXT_COLOR = 0xFF1C222E;
 
     private ChipIcons() {
     }
@@ -82,10 +83,14 @@ public final class ChipIcons {
         return switch (p.kind) {
             case MOUSE_LEFT, MOUSE_RIGHT -> MOUSE_W + markWidth(p);
             case MOUSE_WHEEL -> WHEEL_W;
-            case KEYCAP -> Ui.font().width(p.text) + 10;
+            case KEYCAP -> capWidth(p);
             case TEXT -> Ui.font().width(p.text);
             case PLUS, SLASH -> Ui.font().width(p.text);
         };
+    }
+
+    private static int capWidth(Part p) {
+        return Ui.font().width(p.text) + 2 * CAP_PAD + 2;
     }
 
     private static int markWidth(Part p) {
@@ -99,23 +104,23 @@ public final class ChipIcons {
         for (Part p : parse(key)) {
             switch (p.kind) {
                 case MOUSE_LEFT -> {
-                    Ui.blit(g, "mouse_left", cx, y + 1, MOUSE_W, MOUSE_H, a);
+                    Skin.pixel(g, "mouse_left", cx - 2, y, 16, 16, a);
                     cx += MOUSE_W;
                     cx += mark(g, p, cx, y, a);
                 }
                 case MOUSE_RIGHT -> {
-                    Ui.blit(g, "mouse_right", cx, y + 1, MOUSE_W, MOUSE_H, a);
+                    Skin.pixel(g, "mouse_right", cx - 2, y, 16, 16, a);
                     cx += MOUSE_W;
                     cx += mark(g, p, cx, y, a);
                 }
                 case MOUSE_WHEEL -> {
-                    Ui.blit(g, "mouse_wheel", cx, y + 1, WHEEL_W, MOUSE_H, a);
+                    Skin.pixel(g, "mouse_wheel", cx - 2, y, 16, 16, a);
                     cx += WHEEL_W;
                 }
                 case KEYCAP -> {
-                    int w = Ui.font().width(p.text) + 10;
-                    Ui.blit(g, "keycap", cx, y + 1, w, CAP_H, a);
-                    Ui.text(g, p.text, cx + 5, y + 4, Ui.withAlpha(Ui.WHITE, a));
+                    int w = capWidth(p);
+                    Skin.pixelSlice(g, "keycap", cx - 1, y, w + 2, 16, 7, a);
+                    Ui.text(g, p.text, cx + 1 + CAP_PAD, y + 3, Ui.withAlpha(CAP_TEXT_COLOR, a));
                     cx += w;
                 }
                 case TEXT -> {
@@ -135,7 +140,7 @@ public final class ChipIcons {
     private static int mark(GuiGraphicsExtractor g, Part p, int x, int y, float a) {
         if (p.mark.isEmpty()) return 0;
         if (p.mark.equals("drag")) {
-            Ui.blit(g, "mark_drag", x + 1, y + 4, DRAG_W, DRAG_H, a);
+            Skin.pixel(g, "mark_drag", x + 1, y + 4, DRAG_W, DRAG_H, a);
             return DRAG_W + 1;
         }
         Ui.text(g, p.mark, x + 2, y + 4, Ui.withAlpha(Ui.DIM, a));

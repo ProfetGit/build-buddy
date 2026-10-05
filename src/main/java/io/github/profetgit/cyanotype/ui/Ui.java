@@ -139,10 +139,10 @@ public final class Ui {
         int tx = x + w / 2, ty = y + (h - 8) / 2 + sink;
         int color = !enabled ? 0xFF5E7C99 : pr > 0.5f ? DEEP : LINE;
         if (icon != null) {
-            int total = font().width(label == null ? "" : label) + 14 + (label == null || label.isEmpty() ? 0 : 4);
+            int total = font().width(label == null ? "" : label) + 16 + (label == null || label.isEmpty() ? 0 : 4);
             int ix = x + (w - total) / 2;
-            icon(g, icon, ix, y + (h - 14) / 2 + sink, pr > 0.5f);
-            if (label != null && !label.isEmpty()) text(g, label, ix + 18, ty, color);
+            icon(g, icon, ix, y + (h - 16) / 2 + sink, pr > 0.5f, 16, 1f);
+            if (label != null && !label.isEmpty()) text(g, label, ix + 20, ty, color);
         } else if (label != null) {
             centered(g, label, tx, ty, color);
         }
@@ -162,14 +162,20 @@ public final class Ui {
         return t != null ? t[1] : real;
     }
 
-    /** An icon drawn at another size, with an opacity. */
+    /**
+     * An icon in a box of {@code size} units: the 16 x 16 pixel icon, drawn square and crisp, centred in the box at 16 units (or
+     * 32 for a box over 20), so a pixel is a whole number of screen pixels. {@code dark} is no longer a separate look: the
+     * icons are white with a dark outline and read on the dark and on the lit wedge alike.
+     */
     public static void icon(GuiGraphicsExtractor g, String name, int x, int y, boolean dark, int size, float alpha) {
-        blit(g, dark ? "icon_" + name + "_dark" : "icon_" + name, x, y, size, size, alpha);
+        int drawn = size <= 20 ? 16 : 32;
+        int off = Math.floorDiv(size - drawn, 2);
+        Skin.pixel(g, name, x + off, y + off, drawn, drawn, alpha);
     }
 
-    /** A 14 x 14 icon of the kit: the light one for dark backgrounds, the dark one for light. */
+    /** A pixel icon in the usual 14 unit box. */
     public static void icon(GuiGraphicsExtractor g, String name, int x, int y, boolean dark) {
-        blit(g, dark ? "icon_" + name + "_dark" : "icon_" + name, x, y, 14, 14);
+        icon(g, name, x, y, dark, 14, 1f);
     }
 
     public static void tab(GuiGraphicsExtractor g, String key, int x, int y, int w, String label, boolean selected, int mx, int my) {

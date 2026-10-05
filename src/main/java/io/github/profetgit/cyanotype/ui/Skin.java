@@ -36,6 +36,19 @@ public final class Skin {
         }
     }
 
+    /** A texture sampled with no smoothing: the pixel icons stay square at any GUI scale. */
+    public static final class Crisp extends DynamicTexture {
+        public Crisp(String label, NativeImage image) {
+            super(() -> label, image);
+            this.sampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
+        }
+    }
+
+    private static final Identifier PIXEL = Identifier.fromNamespaceAndPath(Cyanotype.MOD_ID, "skin/pixel");
+    private static final Map<String, int[]> PIXELS = new HashMap<>();
+    private static int pixelW, pixelH;
+    private static boolean pixelLoaded, pixelFailed;
+
     private static final Identifier ATLAS = Identifier.fromNamespaceAndPath(Cyanotype.MOD_ID, "skin/atlas"), GRID = Identifier.fromNamespaceAndPath(Cyanotype.MOD_ID, "skin/grid"),
         HATCH = Identifier.fromNamespaceAndPath(Cyanotype.MOD_ID, "skin/hatch");
     private static final Map<String, Sprite> SPRITES = new HashMap<>();
@@ -74,6 +87,71 @@ public final class Skin {
         } catch (IOException | RuntimeException e) {
             failed = true;
             Cyanotype.LOG.error("Cannot load the interface art", e);
+        }
+    }
+
+    private static void loadPixel() {
+        if (pixelLoaded || pixelFailed) return;
+        try {
+            JsonObject meta;
+            try (InputStream in = open("ui/pixel.json")) {
+                meta = new Gson().fromJson(new InputStreamReader(in, StandardCharsets.UTF_8), JsonObject.class);
+            }
+            JsonObject sprites = meta.getAsJsonObject("sprites");
+            for (String name : sprites.keySet()) {
+                JsonObject o = sprites.getAsJsonObject(name);
+                PIXELS.put(name, new int[]{o.get("x").getAsInt(), o.get("y").getAsInt(), o.get("w").getAsInt(), o.get("h").getAsInt()});
+            }
+            NativeImage sheet = image("ui/pixel.png");
+            pixelW = sheet.getWidth();
+            pixelH = sheet.getHeight();
+            Minecraft.getInstance().getTextureManager().register(PIXEL, new Crisp("Cyanotype pixels", sheet));
+            pixelLoaded = true;
+        } catch (IOException | RuntimeException e) {
+            pixelFailed = true;
+            Cyanotype.LOG.error("Cannot load the pixel icons", e);
+        }
+    }
+
+    /** Whether a pixel icon of this name exists. */
+    public static boolean hasPixel(String name) {
+        loadPixel();
+        return PIXELS.containsKey(name);
+    }
+
+    /** The size of a pixel sprite: {width, height}. */
+    public static int[] pixelSize(String name) {
+        loadPixel();
+        int[] s = PIXELS.get(name);
+        return s == null ? new int[]{16, 16} : new int[]{s[2], s[3]};
+    }
+
+    /** Draws a pixel sprite at a size; use a whole multiple of its own (16 gives one icon pixel per GUI unit) so the pixels stay square. */
+    public static void pixel(GuiGraphicsExtractor g, String name, int x, int y, int w, int h, float alpha) {
+        loadPixel();
+        int[] s = PIXELS.get(name);
+        if (s == null || w <= 0 || h <= 0 || alpha <= 0.003f) return;
+        g.blit(RenderPipelines.GUI_TEXTURED, PIXEL, x, y, s[0], s[1], w, h, s[2], s[3], pixelW, pixelH, white(alpha));
+    }
+
+    /**
+     * Draws a pixel sprite stretched to a width and height with the border of {@code slice} pixels kept as it is and the
+     * middle repeated (the key caps: any width, the same corners).
+     */
+    public static void pixelSlice(GuiGraphicsExtractor g, String name, int x, int y, int w, int h, int slice, float alpha) {
+        loadPixel();
+        int[] s = PIXELS.get(name);
+        if (s == null || w <= 0 || h <= 0 || alpha <= 0.003f) return;
+        int b = Math.min(slice, Math.min(w, h) / 2);
+        int[] sx = {s[0], s[0] + slice, s[0] + s[2] - slice}, sw = {slice, s[2] - 2 * slice, slice};
+        int[] sy = {s[1], s[1] + slice, s[1] + s[3] - slice}, sh = {slice, s[3] - 2 * slice, slice};
+        int[] dx = {x, x + b, x + w - b}, dw = {b, w - 2 * b, b};
+        int[] dy = {y, y + b, y + h - b}, dh = {b, h - 2 * b, b};
+        for (int j = 0; j < 3; j++) {
+            for (int i = 0; i < 3; i++) {
+                if (dw[i] <= 0 || dh[j] <= 0) continue;
+                g.blit(RenderPipelines.GUI_TEXTURED, PIXEL, dx[i], dy[j], sx[i], sy[j], dw[i], dh[j], sw[i], sh[j], pixelW, pixelH, white(alpha));
+            }
         }
     }
 

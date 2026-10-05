@@ -19,20 +19,31 @@ class AtlasTest {
         return JsonParser.parseString(Files.readString(ART.resolve("atlas.json"))).getAsJsonObject().getAsJsonObject("sprites");
     }
 
+    private static JsonObject pixels() throws IOException {
+        return JsonParser.parseString(Files.readString(ART.resolve("pixel.json"))).getAsJsonObject().getAsJsonObject("sprites");
+    }
+
     @Test
-    void everyIconOfTheWheelHasBothLooks() throws IOException {
-        JsonObject s = sprites();
+    void everyIconOfTheWheelIsAPixelSprite() throws IOException {
+        JsonObject s = pixels();
         for (Tool t : Tool.values()) {
-            assertTrue(s.has("icon_" + t.icon), t + " needs icon_" + t.icon);
-            assertTrue(s.has("icon_" + t.icon + "_dark"), t + " needs icon_" + t.icon + "_dark");
+            assertTrue(s.has(t.icon), t + " needs the pixel icon " + t.icon);
+        }
+    }
+
+    @Test
+    void theIconsAndHintPartsTheScreensDrawArePixelSprites() throws IOException {
+        JsonObject s = pixels();
+        for (String name : List.of("check", "cross", "list", "folder", "move", "layers", "hammer", "save", "gear", "eye", "eye_off", "trash", "undo", "redo", "wand", "cube", "sweep", "select",
+            "mouse_left", "mouse_right", "mouse_wheel", "mouse_none", "keycap", "mark_drag")) {
+            assertTrue(s.has(name), "missing pixel sprite " + name);
         }
     }
 
     @Test
     void theControlsTheScreensDrawAreThere() throws IOException {
         JsonObject s = sprites();
-        for (String name : List.of("panel", "inset", "button_0", "button_1", "button_2", "tab_on", "tab_off", "tooltip", "bar_track", "checkbox_on", "checkbox_off", "checkbox_hover", "knob",
-            "icon_check", "icon_cross", "icon_list", "icon_folder")) {
+        for (String name : List.of("panel", "inset", "button_0", "button_1", "button_2", "tab_on", "tab_off", "tooltip", "bar_track", "checkbox_on", "checkbox_off", "checkbox_hover", "knob")) {
             assertTrue(s.has(name), "missing " + name);
         }
     }
