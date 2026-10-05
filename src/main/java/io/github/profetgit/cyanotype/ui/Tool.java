@@ -2,6 +2,7 @@ package io.github.profetgit.cyanotype.ui;
 
 import io.github.profetgit.cyanotype.ghost.GhostRenderer;
 import io.github.profetgit.cyanotype.interaction.Interaction;
+import io.github.profetgit.cyanotype.interaction.Picking;
 import io.github.profetgit.cyanotype.interaction.Selecting;
 import io.github.profetgit.cyanotype.placement.Placement;
 import io.github.profetgit.cyanotype.placement.Placements;
@@ -51,6 +52,12 @@ public enum Tool {
         @Override
         void run(Minecraft mc) {
             Selecting.start(mc);
+        }
+    },
+    PICK("Smart pick", "wand", "Click a build to pick all of it") {
+        @Override
+        void run(Minecraft mc) {
+            Picking.start(mc);
         }
     },
     SETTINGS("Settings", "gear", "Look, feel and defaults") {

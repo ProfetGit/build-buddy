@@ -22,7 +22,9 @@ public final class Placements {
         /** Scroll moves the window of layers shown (the Layers tool). */
         LAYERS,
         /** The Save area tool: corners are picked and the box is sized (see Selecting). */
-        SELECT
+        SELECT,
+        /** The Smart Pick tool: a click picks a whole build (see Picking). */
+        PICK
     }
 
     /**

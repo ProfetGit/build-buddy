@@ -79,6 +79,7 @@ public final class Selecting {
         Interaction.reveal();
         Interaction.cancelPlacing();
         Interaction.endDragSafely();
+        Picking.reset();
         reset();
         Placements.setMode(Mode.SELECT);
         Sfx.play(Sfx.OPEN);

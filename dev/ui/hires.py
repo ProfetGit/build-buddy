@@ -348,9 +348,19 @@ def i_redo(c, m, d):
     curl(c, m, d, True)
 
 
+def i_wand(c, m, d):
+    """Smart Pick: a wand with a sparkle at its tip."""
+    c.stroke([(2.2, 12.0), (8.4, 5.8)], 1.9, m)
+    c.stroke([(2.2, 12.0), (3.6, 10.6)], 1.9, d)
+    sx, sy = 10.2, 3.8
+    c.poly([(sx, sy - 3.0), (sx + 0.9, sy - 0.9), (sx + 3.0, sy), (sx + 0.9, sy + 0.9), (sx, sy + 3.0), (sx - 0.9, sy + 0.9), (sx - 3.0, sy), (sx - 0.9, sy - 0.9)], m)
+    c.circle(3.6, 4.0, 0.8, fill=m)
+    c.circle(11.6, 10.8, 0.8, fill=m)
+
+
 ICONS = [("move", i_move), ("rotate", i_rotate), ("mirror", i_mirror), ("layers", i_layers), ("select", i_select), ("save", i_save),
          ("folder", i_folder), ("list", i_list), ("eye", i_eye), ("trash", i_trash), ("plus", i_plus), ("check", i_check),
-         ("cross", i_cross), ("arrow", i_arrow), ("undo", i_undo), ("redo", i_redo)]
+         ("cross", i_cross), ("arrow", i_arrow), ("undo", i_undo), ("redo", i_redo), ("wand", i_wand)]
 
 
 def make_gear():

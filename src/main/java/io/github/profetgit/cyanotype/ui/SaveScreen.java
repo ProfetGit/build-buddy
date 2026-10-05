@@ -37,7 +37,15 @@ public final class SaveScreen extends Screen {
     public static volatile Path lastSaved;
     public static volatile Blueprint lastBlueprint;
 
+    /** What a Smart Pick hands over: the picked cells, the ground under them, and how many parts they are. */
+    public record Pick(it.unimi.dsi.fastutil.longs.LongOpenHashSet cells, it.unimi.dsi.fastutil.longs.LongOpenHashSet ground, int parts, boolean unloaded) {
+        // parts: how many other parts of the structure were reached and are not in the pick
+    }
+
     private final SelectionBox box;
+    private final Runnable onSaved;
+    private final Pick pick;
+    private boolean withGround;
     private final long openedNs = System.nanoTime();
     private EditBox name, author, tags;
     private boolean trim = true, blockData = true;
@@ -48,9 +56,20 @@ public final class SaveScreen extends Screen {
     private int loadedColumns, totalColumns, sinceCount;
     private Path writing;
 
+    /** The Save area tool's box. */
     public SaveScreen(SelectionBox box) {
-        super(Component.literal("Save area"));
+        this(box, Selecting::finish, null);
+    }
+
+    /**
+     * @param onSaved what ends the tool that opened this once the file is written
+     * @param pick    set by Smart Pick: only these cells are saved, everything else in their box is left out
+     */
+    public SaveScreen(SelectionBox box, Runnable onSaved, Pick pick) {
+        super(Component.literal(pick != null ? "Save this build" : "Save area"));
         this.box = box;
+        this.onSaved = onSaved;
+        this.pick = pick;
     }
 
     @Override
@@ -118,6 +137,22 @@ public final class SaveScreen extends Screen {
         return px() + pw() - 10 - 90;
     }
 
+    /** The box round the pick, and the ground if it is asked for. */
+    private SelectionBox pickBox() {
+        int x0 = box.x0(), y0 = box.y0(), z0 = box.z0(), x1 = box.x1(), y1 = box.y1(), z1 = box.z1();
+        if (withGround) {
+            for (long c : pick.ground()) {
+                x0 = Math.min(x0, net.minecraft.core.BlockPos.getX(c));
+                y0 = Math.min(y0, net.minecraft.core.BlockPos.getY(c));
+                z0 = Math.min(z0, net.minecraft.core.BlockPos.getZ(c));
+                x1 = Math.max(x1, net.minecraft.core.BlockPos.getX(c));
+                y1 = Math.max(y1, net.minecraft.core.BlockPos.getY(c));
+                z1 = Math.max(z1, net.minecraft.core.BlockPos.getZ(c));
+            }
+        }
+        return new SelectionBox(x0, y0, z0, x1, y1, z1);
+    }
+
     private void countChunks() {
         var level = minecraft.level;
         totalColumns = box.chunkColumns();
@@ -157,7 +192,18 @@ public final class SaveScreen extends Screen {
         long now = System.currentTimeMillis();
         Blueprint.Metadata meta = new Blueprint.Metadata(title, author.getValue().trim(), "", now, now, 0);
         try {
-            job = new Capture.Job(new LevelSource(minecraft.level), box.x0(), box.y0(), box.z0(), box.x1(), box.y1(), box.z1(), new Capture.Options(trim, blockData), meta);
+            if (pick != null) {
+                var cells = pick.cells();
+                var ground = withGround ? pick.ground() : null;
+                SelectionBox b = pickBox();
+                Capture.Mask mask = (x, y, z) -> {
+                    long c = net.minecraft.core.BlockPos.asLong(x, y, z);
+                    return cells.contains(c) || ground != null && ground.contains(c);
+                };
+                job = new Capture.Job(new LevelSource(minecraft.level), b.x0(), b.y0(), b.z0(), b.x1(), b.y1(), b.z1(), new Capture.Options(true, blockData), meta, mask);
+            } else {
+                job = new Capture.Job(new LevelSource(minecraft.level), box.x0(), box.y0(), box.z0(), box.x1(), box.y1(), box.z1(), new Capture.Options(trim, blockData), meta);
+            }
         } catch (IllegalArgumentException e) {
             error = "This box is too big to save in one piece.";
             Sfx.play(Sfx.ERROR);
@@ -195,7 +241,7 @@ public final class SaveScreen extends Screen {
         lastSaved = file;
         lastBlueprint = bp;
         long unloaded = job.unloadedCells();
-        Selecting.finish();
+        onSaved.run();
         Sfx.play(Sfx.LOCK);
         minecraft.gui.setScreen(null);
         Interaction.say(minecraft, "Saved " + file.getFileName().toString().replaceFirst("(?i)\\.litematic$", "") + ": " + String.format(Locale.ROOT, "%,d", bp.totalBlocks())
@@ -223,13 +269,17 @@ public final class SaveScreen extends Screen {
         double t = System.nanoTime() / 1e9;
         boolean busy = state != State.EDITING;
 
-        Ui.text(g, "Save area", px + 10, py + 8, Ui.withAlpha(Ui.LINE, inner));
-        Ui.right(g, box.sizeText(), px + pw - 10, py + 8, Ui.withAlpha(Ui.CYAN, inner));
-        String info = String.format(Locale.ROOT, "%,d", box.volume()) + " cells in the box.";
+        Ui.text(g, getTitle().getString(), px + 10, py + 8, Ui.withAlpha(Ui.LINE, inner));
+        Ui.right(g, (pick != null ? pickBox() : box).sizeText(), px + pw - 10, py + 8, Ui.withAlpha(Ui.CYAN, inner));
+        String info = pick != null
+            ? String.format(Locale.ROOT, "%,d", pick.cells().size()) + " blocks picked" + (pick.parts() > 0 ? ", " + pick.parts() + (pick.parts() == 1 ? " other part nearby" : " other parts nearby") : "") + "."
+            : String.format(Locale.ROOT, "%,d", box.volume()) + " cells in the box.";
         int y = py + 21;
         Ui.text(g, info, px + 10, y, Ui.withAlpha(Ui.DIM, inner));
-        if (loadedColumns < totalColumns) {
-            for (String line : Ui.wrap((totalColumns - loadedColumns) + " of " + totalColumns + " chunks are not loaded: walk closer, or the save will have holes.", pw - 20, 2)) {
+        if (pick != null ? pick.unloaded() : loadedColumns < totalColumns) {
+            String warn = pick != null ? "Part of this build is in chunks that are not loaded: walk closer and pick again, or the save will have holes."
+                : (totalColumns - loadedColumns) + " of " + totalColumns + " chunks are not loaded: walk closer, or the save will have holes.";
+            for (String line : Ui.wrap(warn, pw - 20, 2)) {
                 y += 10;
                 Ui.text(g, line, px + 10, y, Ui.withAlpha(Ui.WARN, inner));
             }
@@ -242,7 +292,8 @@ public final class SaveScreen extends Screen {
         fieldRow(g, "Tags, separated by commas", tags, fx, fy + 56, inner, partial, mx, my, "house, medieval");
 
         int cy = fy + 86;
-        check(g, "sv#trim", fx, cy, TRIM, trim, mx, my, inner, busy);
+        if (pick != null) check(g, "sv#ground", fx, cy, GROUND, withGround, mx, my, inner, busy);
+        else check(g, "sv#trim", fx, cy, TRIM, trim, mx, my, inner, busy);
         check(g, "sv#data", fx, cy + 13, DATA, blockData, mx, my, inner, busy);
 
         int ly = py + ph - 44;
@@ -288,15 +339,16 @@ public final class SaveScreen extends Screen {
         return Ui.inside(mx, my, x, y, 12 + 6 + font.width(label), 11);
     }
 
-    private static final String TRIM = "Trim the empty space around the build", DATA = "Keep sign text, banners and heads";
+    private static final String TRIM = "Trim the empty space around the build", DATA = "Keep sign text, banners and heads", GROUND = "Include the ground under it";
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         int mx = (int) event.x(), my = (int) event.y();
         if (state == State.EDITING) {
             int cy = py() + 44 + 86, fx = px() + 10;
-            if (onCheck(mx, my, fx, cy, TRIM)) {
-                trim = !trim;
+            if (onCheck(mx, my, fx, cy, pick != null ? GROUND : TRIM)) {
+                if (pick != null) withGround = !withGround;
+                else trim = !trim;
                 Sfx.play(Sfx.PRESS, 1.1f);
                 return true;
             }
@@ -384,6 +436,10 @@ public final class SaveScreen extends Screen {
         return error;
     }
 
+    public boolean groundOn() {
+        return withGround;
+    }
+
     public boolean trimming() {
         return trim;
     }
@@ -397,7 +453,7 @@ public final class SaveScreen extends Screen {
         return switch (which) {
             case "save" -> new int[]{saveX() + 45, buttonY() + 8};
             case "back" -> new int[]{backX() + 35, buttonY() + 8};
-            case "trim" -> new int[]{px() + 20, py() + 44 + 86 + 5};
+            case "trim", "ground" -> new int[]{px() + 20, py() + 44 + 86 + 5};
             default -> new int[]{0, 0};
         };
     }

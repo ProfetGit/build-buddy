@@ -70,11 +70,11 @@ public final class Interaction {
     /** Dev demo only: which modifier keys the scroll sees (1 = shift, 2 = ctrl) instead of the real ones; -1 = the real keys. */
     public static volatile int testModifiers = -1;
 
-    private static boolean shift(Minecraft mc) {
+    static boolean shift(Minecraft mc) {
         return testModifiers >= 0 ? (testModifiers & 1) != 0 : mc.hasShiftDown();
     }
 
-    private static boolean ctrl(Minecraft mc) {
+    static boolean ctrl(Minecraft mc) {
         return testModifiers >= 0 ? (testModifiers & 2) != 0 : mc.hasControlDown();
     }
 
@@ -121,6 +121,7 @@ public final class Interaction {
         Placement p = Placements.active();
         if (mc.gui.screen() != null || GhostRenderer.hidden) return false;
         if (Placements.mode() == Mode.SELECT) return Selecting.onScroll(amount);
+        if (Placements.mode() == Mode.PICK) return Picking.onScroll(amount);
         if (Placements.mode() == Mode.LAYERS && p != null && p.locked) {
             scrollAcc += amount;
             int n = (int) scrollAcc;
@@ -153,6 +154,11 @@ public final class Interaction {
         Placement p = Placements.active();
         if (Placements.mode() == Mode.SELECT) {
             Selecting.onAttack(Minecraft.getInstance());
+            suppressAttack = true;
+            return true;
+        }
+        if (Placements.mode() == Mode.PICK) {
+            Picking.onAttack(Minecraft.getInstance());
             suppressAttack = true;
             return true;
         }
@@ -190,6 +196,10 @@ public final class Interaction {
             Selecting.onUse(Minecraft.getInstance());
             return true;
         }
+        if (Placements.mode() == Mode.PICK) {
+            Picking.onUse(Minecraft.getInstance());
+            return true;
+        }
         if (Placements.mode() == Mode.LAYERS) {
             endLayers(Minecraft.getInstance(), true);
             return true;
@@ -204,7 +214,7 @@ public final class Interaction {
 
     /** Whether holding the attack button should do nothing (it was used for a click or a drag, until it is let go). */
     public static boolean suppressHold() {
-        return suppressAttack || drag != null || !GhostRenderer.hidden && (Placements.mode() == Mode.PLACING || Placements.mode() == Mode.LAYERS || Placements.mode() == Mode.SELECT);
+        return suppressAttack || drag != null || !GhostRenderer.hidden && (Placements.mode() == Mode.PLACING || Placements.mode() == Mode.LAYERS || Placements.mode() == Mode.SELECT || Placements.mode() == Mode.PICK);
     }
 
     public static void tick(Minecraft mc) {
@@ -235,6 +245,7 @@ public final class Interaction {
         if (drag != null && (!down || screen)) endDrag();
         if (Selecting.dragging() && (!down || screen)) Selecting.endDrag();
         if (suppressAttack && !down) suppressAttack = false;
+        Picking.tick(mc);
         GhostRenderer.tickVerifiers(mc);
         PlacementStore.tick();
     }
@@ -399,6 +410,7 @@ public final class Interaction {
         suppressAttack = false;
         lift = 0;
         Selecting.reset();
+        Picking.reset();
     }
 
     // ---- per frame
@@ -432,6 +444,8 @@ public final class Interaction {
             }
         } else if (mode == Mode.SELECT) {
             Selecting.frame(mc, pos, look);
+        } else if (mode == Mode.PICK) {
+            Picking.frame(mc, pos, look);
         } else if (mode == Mode.EDIT) {
             if (p == null || !p.locked || !p.ready() || !GhostRenderer.drawn(p)) {
                 if (p == null || !p.locked) Placements.setMode(Mode.IDLE);
@@ -591,6 +605,7 @@ public final class Interaction {
             }
             case LAYERS -> endLayers(mc, false);
             case SELECT -> Selecting.cancel(mc);
+            case PICK -> Picking.cancel(mc);
             case IDLE -> {
                 Placement aimed = aimedPlacement(mc);
                 if (aimed == null) aimed = Placements.active();

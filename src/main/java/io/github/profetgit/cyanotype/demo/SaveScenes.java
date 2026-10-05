@@ -65,31 +65,35 @@ final class SaveScenes {
         return stem + ".litematic";
     }
 
-    private static void click() {
+    static void click() {
         act(() -> hold(mc().options.keyAttack));
         waitTicks(3);
         act(() -> release(mc().options.keyAttack));
         waitTicks(3);
     }
 
-    private static void rightClick() {
+    static void rightClick() {
         act(() -> tap(mc().options.keyUse));
         waitTicks(4);
     }
 
-    private static void aimCell(double x, double y, double z) {
+    static void aimCell(double x, double y, double z) {
         act(() -> aim(mc(), x + 0.5, y + 0.5, z + 0.5));
         waitTicks(4);
     }
 
     /** Opens the Save area tool the way a player does: hold the tool key, point at the segment, let go. */
-    private static void startThroughTheWheel() {
+    static void startThroughTheWheel() {
+        startThroughTheWheel(Tool.SAVE);
+    }
+
+    static void startThroughTheWheel(Tool tool) {
         act(() -> {
             WheelScreen.testHeld = true;
             Interaction.testMainDown = true;
         });
         waitTicks(8);
-        act(() -> Ui.testMouse = UiScenes.segmentPoint(Tool.SAVE.ordinal()));
+        act(() -> Ui.testMouse = UiScenes.segmentPoint(tool.ordinal()));
         waitTicks(8);
         act(() -> {
             WheelScreen.testHeld = false;

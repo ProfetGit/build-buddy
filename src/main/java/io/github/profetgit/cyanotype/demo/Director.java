@@ -224,6 +224,7 @@ public final class Director {
                 case "shapes" -> UiScenes.shapes();
                 case "library" -> UiScenes.library();
                 case "save" -> SaveScenes.save();
+                case "pick" -> PickScenes.pick();
                 case "materials" -> MaterialsScenes.materials();
                 case "settings" -> SettingsScenes.settings();
                 case "look" -> PlaceScenes.look();

@@ -11,7 +11,7 @@ import net.minecraft.world.level.storage.TagValueOutput;
 import org.jspecify.annotations.Nullable;
 
 /** The client's world as a capture reads it: what the client knows, which is the loaded chunks and the data the server sent. */
-public final class LevelSource implements Capture.Source {
+public final class LevelSource implements Capture.Source, io.github.profetgit.cyanotype.pick.Picker.Field {
     private final ClientLevel level;
     private final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
 

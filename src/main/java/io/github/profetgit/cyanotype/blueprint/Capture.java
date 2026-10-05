@@ -35,6 +35,11 @@ public final class Capture {
      * @param trim      cut the empty space off the box, so the blueprint is as small as the build
      * @param blockData keep the data blocks carry (sign text, banner patterns, head owners); container contents are never kept
      */
+    /** Which cells of the box belong to the capture; the others are saved as air (Smart Pick keeps a build and leaves what stands around it). */
+    public interface Mask {
+        boolean keep(int x, int y, int z);
+    }
+
     public record Options(boolean trim, boolean blockData) {
         public static final Options DEFAULT = new Options(true, true);
     }
@@ -48,6 +53,7 @@ public final class Capture {
         private final int x0, y0, z0, sx, sy, sz;
         private final Options options;
         private final Blueprint.Metadata meta;
+        private final @Nullable Mask mask;
         private final short[] cells;
         private final List<PaletteEntry> palette = new ArrayList<>();
         private final Map<BlockState, Integer> index = new HashMap<>();
@@ -60,7 +66,13 @@ public final class Capture {
 
         /** The box is given by two opposite corners, inclusive, in any order. */
         public Job(Source source, int ax, int ay, int az, int bx, int by, int bz, Options options, Blueprint.Metadata meta) {
+            this(source, ax, ay, az, bx, by, bz, options, meta, null);
+        }
+
+        /** As above, but only the cells the mask keeps are read; the rest are air. */
+        public Job(Source source, int ax, int ay, int az, int bx, int by, int bz, Options options, Blueprint.Metadata meta, @Nullable Mask mask) {
             this.source = source;
+            this.mask = mask;
             this.x0 = Math.min(ax, bx);
             this.y0 = Math.min(ay, by);
             this.z0 = Math.min(az, bz);
@@ -109,6 +121,10 @@ public final class Capture {
                 boolean loaded = true;
                 int chunkX = Integer.MIN_VALUE;
                 for (; x < rowEnd; x++, wx++) {
+                    if (mask != null && !mask.keep(wx, wy, wz)) {
+                        next++;
+                        continue;
+                    }
                     if ((wx >> 4) != chunkX) {
                         chunkX = wx >> 4;
                         loaded = source.loaded(wx, wz);

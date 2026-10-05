@@ -182,7 +182,7 @@ Auto-placing places blocks for the player from their inventory.
   - Ambiguous blocks (stone, dirt, cobblestone...) join only when enclosed by or touching built blocks.
   - Gaps of 1-2 blocks are bridged (windows, floating lanterns, chains). Thin ground-level links (paths) are cut so a village does not merge into one build.
   - The selection stops at the natural ground line; "include ground under it" is a toggle.
-- Refinement is the real feature: scroll grows/shrinks the tolerance, shift-click adds a detached part, alt-click removes a part, a confidence tint shows blocks the picker was unsure about.
+- Refinement is the real feature: scroll grows/shrinks the tolerance, shift-click adds a part, ctrl-click removes a part (alt-click is taken by KDE's window manager, decided 2026-10-05), a confidence tint shows blocks the picker was unsure about.
 - Output feeds 7.7 (Save your own) with the tight bounding box and interior air handled.
 - Limits: loaded chunks only, configurable block cap, heuristic (will mis-pick sometimes; manual refinement is the fallback).
 
@@ -199,7 +199,7 @@ Auto-placing places blocks for the player from their inventory.
 
 ## 8. Technical approach
 
-- **Platform:** Fabric Loader 0.19.5, Minecraft 26.3, Java 25, plain Loom, no Fabric API (same as Snappy Pistons / Seeing Red). Mod Menu optional for the settings entry. Client-only (`environment: client`).
+- **Platform:** Fabric Loader 0.19.5, Minecraft 26.3, Java 25, plain Loom, Fabric API is a declared dependency (its resource loader is what serves the mod's art, sounds and language; plain Fabric Loader serves no mod assets). Mod Menu optional for the settings entry. Client-only (`environment: client`).
 - **Format:** `.litematic` is gzip NBT: `Metadata`, `Regions` each with `BlockStatePalette`, bit-packed `BlockStates` (long array, variable bits per palette size), `Size`, `Position`, optional `TileEntities`. Parser reads into a dense per-region `BlockState` array plus a combined palette; writer mirrors it. Unknown palette entries (missing mods) become barrier-coloured placeholders and are reported.
 - **Core data model:** `Blueprint` (immutable, regions), `Placement` (blueprint ref, origin, rotation, mirror, visible, name), `PlacementWorld` (a lazily evaluated view that answers "what block should be at world position P"), `Verifier` (diff state per chunk section).
 - **Rendering:**
