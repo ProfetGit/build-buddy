@@ -234,6 +234,41 @@ final class UiScenes {
         return p.origin.getX() + " " + p.origin.getY() + " " + p.origin.getZ();
     }
 
+    /** Panes, bars, fences and walls written with plain states must show up connected. */
+    static void shapes() {
+        Director.clean();
+        act(() -> {
+            try {
+                java.nio.file.Path file = Director.OUT.resolve("shapes.litematic");
+                java.nio.file.Files.createDirectories(Director.OUT);
+                io.github.profetgit.cyanotype.blueprint.LitematicWriter.write(Samples.shapes(), file);
+                io.github.profetgit.cyanotype.blueprint.Blueprint bp = io.github.profetgit.cyanotype.blueprint.LitematicReader.read(file);
+                Placement p = Director.locked(new Placement("shapes", bp, "cyanotype:shapes.litematic", Director.DIM, new net.minecraft.core.BlockPos(0, G + 1, 6), io.github.profetgit.cyanotype.placement.Orientation.NONE));
+                Placements.add(p);
+                house = p;
+                // the pane in the middle of the first row, the fence in its row, the bars' centre
+                var pane = bp.regions.get(0).at(2, 1, 0).state();
+                var fence = bp.regions.get(0).at(3, 0, 2).state();
+                var bars = bp.regions.get(0).at(4, 0, 4).state();
+                check("shapes/a pane between pillars meets both sides", pane.getValue(net.minecraft.world.level.block.IronBarsBlock.EAST) && pane.getValue(net.minecraft.world.level.block.IronBarsBlock.WEST), pane.toString());
+                check("shapes/a fence meets the fences on both sides", fence.getValue(net.minecraft.world.level.block.FenceBlock.EAST) && fence.getValue(net.minecraft.world.level.block.FenceBlock.WEST), fence.toString());
+                check("shapes/the bars' crossing meets all four", bars.getValue(net.minecraft.world.level.block.IronBarsBlock.EAST) && bars.getValue(net.minecraft.world.level.block.IronBarsBlock.WEST)
+                    && bars.getValue(net.minecraft.world.level.block.IronBarsBlock.NORTH) && bars.getValue(net.minecraft.world.level.block.IronBarsBlock.SOUTH), bars.toString());
+            } catch (java.io.IOException e) {
+                check("shapes/read", false, e.toString());
+            }
+        });
+        camera(4.5, G + 3.5, 0.5, 0, 25);
+        until("shapes/baked", 400, GhostRenderer::settled);
+        waitTicks(6);
+        shot("shapes_front");
+        camera(-2.5, G + 7, 2.5, -55, 45);
+        waitTicks(12);
+        shot("shapes_above");
+        act(() -> Placements.remove(house));
+        waitTicks(4);
+    }
+
     /** The Layers tool must show the faces that the layers around it would have covered. */
     static void layerCaps() {
         Director.clean();

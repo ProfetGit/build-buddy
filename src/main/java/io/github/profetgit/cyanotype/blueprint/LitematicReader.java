@@ -38,16 +38,25 @@ public final class LitematicReader {
     }
 
     public static Blueprint read(InputStream in, String fallbackName) throws IOException {
+        return read(in, fallbackName, true);
+    }
+
+    /** @param fixShapes whether blocks that read their neighbours get the shape they have in place (see {@link ShapeFixer}); false keeps the file's states exactly */
+    public static Blueprint read(InputStream in, String fallbackName, boolean fixShapes) throws IOException {
         CompoundTag root;
         try {
             root = NbtIo.readCompressed(in, NbtAccounter.unlimitedHeap());
         } catch (IOException e) {
             throw new LitematicException("This is not a .litematic file (" + e.getMessage() + ")", e);
         }
-        return fromTag(root, fallbackName);
+        return fromTag(root, fallbackName, fixShapes);
     }
 
     public static Blueprint fromTag(CompoundTag root, String fallbackName) {
+        return fromTag(root, fallbackName, true);
+    }
+
+    public static Blueprint fromTag(CompoundTag root, String fallbackName, boolean fixShapes) {
         int version = root.getIntOr("Version", 0);
         if (version < 1) throw new LitematicException("This file has no schematic version, so it is not a .litematic.");
         if (version > NEWEST_KNOWN_VERSION) {
@@ -73,7 +82,9 @@ public final class LitematicReader {
         for (String regionName : regionsTag.keySet()) {
             regions.add(readRegion(regionName, regionsTag.getCompoundOrEmpty(regionName), fileData, current));
         }
-        return new Blueprint(meta, regions);
+        // blocks that read their neighbours (panes, fences, walls, stairs) get the shape they have where the blueprint puts them
+        Blueprint bp = new Blueprint(meta, regions);
+        return fixShapes ? ShapeFixer.fix(bp) : bp;
     }
 
     private static Region readRegion(String name, CompoundTag tag, int fileData, int current) {

@@ -221,6 +221,7 @@ public final class Director {
                 case "remove" -> UiScenes.remove();
                 case "undo" -> UiScenes.undo();
                 case "layer-caps" -> UiScenes.layerCaps();
+                case "shapes" -> UiScenes.shapes();
                 case "library" -> UiScenes.library();
                 case "materials" -> MaterialsScenes.materials();
                 case "settings" -> SettingsScenes.settings();
@@ -261,7 +262,22 @@ public final class Director {
                 Files.createDirectories(OUT);
                 LitematicWriter.write(bp, file);
                 Blueprint back = LitematicReader.read(file);
-                check("house/file round trip", same(bp, back), bp.totalBlocks() + " blocks, " + Files.size(file) + " bytes on disk");
+                check("house/file round trip (with the connections blocks get in place)", same(io.github.profetgit.cyanotype.blueprint.ShapeFixer.fix(bp), back), bp.totalBlocks() + " blocks, " + Files.size(file) + " bytes on disk");
+                // the sample house was made with plain panes and fences; once read they have the shape they have in place
+                boolean pane = false, fence = false, paneBefore = false;
+                for (io.github.profetgit.cyanotype.blueprint.PaletteEntry e : back.regions.get(0).palette) {
+                    var st = e.state();
+                    if (st.getBlock() instanceof net.minecraft.world.level.block.IronBarsBlock && (st.getValue(net.minecraft.world.level.block.IronBarsBlock.EAST) || st.getValue(net.minecraft.world.level.block.IronBarsBlock.WEST)
+                        || st.getValue(net.minecraft.world.level.block.IronBarsBlock.NORTH) || st.getValue(net.minecraft.world.level.block.IronBarsBlock.SOUTH))) pane = true;
+                    if (st.getBlock() instanceof net.minecraft.world.level.block.FenceBlock && (st.getValue(net.minecraft.world.level.block.FenceBlock.EAST) || st.getValue(net.minecraft.world.level.block.FenceBlock.WEST))) fence = true;
+                }
+                for (io.github.profetgit.cyanotype.blueprint.PaletteEntry e : bp.regions.get(0).palette) {
+                    var st = e.state();
+                    if (st.getBlock() instanceof net.minecraft.world.level.block.IronBarsBlock && (st.getValue(net.minecraft.world.level.block.IronBarsBlock.EAST) || st.getValue(net.minecraft.world.level.block.IronBarsBlock.NORTH)
+                        || st.getValue(net.minecraft.world.level.block.IronBarsBlock.WEST) || st.getValue(net.minecraft.world.level.block.IronBarsBlock.SOUTH))) paneBefore = true;
+                }
+                check("house/panes between blocks are panes, not posts", pane && !paneBefore, "connected panes after " + pane + ", before " + paneBefore);
+                check("house/fences meet the fence beside them", fence, "connected fence " + fence);
                 house = locked(new Placement("house", back, "cyanotype:house.litematic", DIM, new BlockPos(0, G + 1, 6), Orientation.NONE));
                 Placements.add(house);
             } catch (IOException e) {

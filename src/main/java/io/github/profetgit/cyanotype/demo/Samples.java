@@ -103,6 +103,26 @@ public final class Samples {
         return g.build("Cyanotype sample house");
     }
 
+    /** Rows of blocks that read their neighbours, written with their plain default states (the reader gives them their shape). */
+    static Blueprint shapes() {
+        Grid g = new Grid(9, 3, 7);
+        BlockState stone = Blocks.STONE_BRICKS.defaultBlockState();
+        // panes between stone pillars, two storeys
+        for (int y = 0; y < 3; y++) {
+            for (int x : new int[]{0, 4, 8}) g.set(x, y, 0, stone);
+            for (int x : new int[]{1, 2, 3, 5, 6, 7}) g.set(x, y, 0, Blocks.GLASS_PANE.defaultBlockState());
+        }
+        // a fence row with a post at each end, and one made of stained panes
+        for (int x = 0; x < 9; x++) g.set(x, 0, 2, Blocks.OAK_FENCE.defaultBlockState());
+        for (int x = 0; x < 9; x++) g.set(x, 1, 2, Blocks.OAK_FENCE.defaultBlockState());
+        // iron bars in a plus shape
+        for (int x = 1; x <= 7; x++) g.set(x, 0, 4, Blocks.IRON_BARS.defaultBlockState());
+        for (int z = 2; z <= 6; z++) if (z != 2 && z != 6) g.set(4, 0, z, Blocks.IRON_BARS.defaultBlockState());
+        // a cobblestone wall with a gap
+        for (int x = 0; x < 9; x++) if (x != 4) g.set(x, 0, 6, Blocks.COBBLESTONE_WALL.defaultBlockState());
+        return g.build("Cyanotype shapes");
+    }
+
     /** A cube of stone bricks, hollow. */
     static Blueprint shell(int side, int thickness) {
         Grid g = new Grid(side, side, side);

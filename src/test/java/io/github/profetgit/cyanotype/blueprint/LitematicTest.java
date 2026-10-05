@@ -176,7 +176,7 @@ class LitematicTest {
     private static Blueprint roundTrip(Blueprint bp) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         LitematicWriter.write(bp, out);
-        return LitematicReader.read(new ByteArrayInputStream(out.toByteArray()), "fallback");
+        return LitematicReader.read(new ByteArrayInputStream(out.toByteArray()), "fallback", false);
     }
 
     @Test
