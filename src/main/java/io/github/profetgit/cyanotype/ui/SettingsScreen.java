@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 import java.util.function.DoubleFunction;
 import java.util.function.DoubleSupplier;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -38,7 +39,11 @@ public final class SettingsScreen extends Screen {
     private record Slider(String id, String label, String desc, double min, double max, double step, DoubleSupplier get, DoubleConsumer set, DoubleFunction<String> format) implements Row {
     }
 
-    private record Action(String id, String label, String desc) implements Row {
+    /** A button with a line beside it; {@code run} is what a click does (null for the ones the screen handles itself: reset, local site). */
+    private record Action(String id, String label, String desc, Runnable run) implements Row {
+        Action(String id, String label, String desc) {
+            this(id, label, desc, null);
+        }
     }
 
     private record Note(String id, String title, String body) implements Row {
@@ -129,16 +134,46 @@ public final class SettingsScreen extends Screen {
                     : "None yet: the community website has no public address. To try a local copy, edit communityUrl in config/cyanotype.json or use the button below."));
                 r.add(new Action("localSite", "Local site", "Test site on this computer."));
             }
-            case AUTO -> r.add(new Note("auto", "Auto-placing is not in this version",
-                "A later version can place blocks for you from your inventory. On multiplayer servers it will stay off until you turn it on for that server."));
-            case SERVERS -> r.add(new Note("servers", "No servers to manage yet",
-                "When auto-placing arrives, the servers you have allowed or blocked will be listed here."));
+            case AUTO -> {
+                r.add(new Slider("autoRate", "Placing speed", "Blocks a second. Whatever the file says, the mod never goes above " + io.github.profetgit.cyanotype.auto.Rate.MAX + ".",
+                    io.github.profetgit.cyanotype.auto.Rate.MIN, io.github.profetgit.cyanotype.auto.Rate.MAX, 1, () -> d.autoRate, v -> d.autoRate = (int) v, v -> (int) v + " a second"));
+                r.add(new Toggle("autoTurn", "Turn to face", "Let it turn your view toward blocks that need a facing (stairs, logs, observers). Off: it places only what works the way you look.",
+                    () -> d.autoTurn, v -> d.autoTurn = v));
+                r.add(new Note("auto", "How to use it", "Choose Auto-place on the wheel: Assist places the ghost under your crosshair while you hold use, Sweep builds everything in reach, lowest layer first. "
+                    + "It stops when you are hurt, open any screen (Esc too) or run out of the blocks. On a multiplayer server it stays off until you say yes for that server."));
+            }
+            case SERVERS -> serverRows(r);
             case ADVANCED -> {
                 r.add(new Toggle("showNames", "Names over ghosts", "Show each placement's name above its ghost.", () -> d.showNames, v -> d.showNames = v));
                 r.add(new Action("reset", "Reset all", "Back to the defaults."));
             }
         }
         return r;
+    }
+
+    /** The servers the player has decided about, and the one they are on. */
+    private void serverRows(List<Row> r) {
+        io.github.profetgit.cyanotype.auto.ServerRules rules = io.github.profetgit.cyanotype.auto.ServerRules.get();
+        String here = io.github.profetgit.cyanotype.auto.AutoBuilder.serverKey(Minecraft.getInstance());
+        if (here == null) {
+            r.add(new Note("serversHere", "This world", "You are in a world of your own (singleplayer or a LAN world you host): auto-placing needs no warning here."));
+        } else if (rules.decision(here) == io.github.profetgit.cyanotype.auto.ServerRules.Decision.BLOCKED) {
+            r.add(new Action("blockHere", "Unblock", "Take " + here + " off the list.", () -> rules.unblock(here)));
+        } else {
+            r.add(new Action("blockHere", "Block", "Never allow auto-placing on " + here, () -> {
+                rules.block(here);
+                io.github.profetgit.cyanotype.auto.AutoBuilder.stop(Minecraft.getInstance(), "Auto-placing is blocked on this server");
+            }));
+        }
+        List<String> blocked = rules.blocked();
+        for (String b : blocked) r.add(new Action("unblock:" + b, "Unblock", "Blocked: " + b, () -> rules.unblock(b)));
+        for (var e : rules.remembered().entrySet()) {
+            String k = e.getKey();
+            r.add(new Action("forget:" + k, "Ask again", ("allowed".equals(e.getValue()) ? "Allowed: " : "Kept off: ") + k, () -> rules.forget(k)));
+        }
+        if (blocked.isEmpty() && rules.remembered().isEmpty()) {
+            r.add(new Note("servers", "No servers listed", "Servers you allow, keep off or block show up here. Blocked ones can never have auto-placing switched on."));
+        }
     }
 
     private int heightOf(Row row, int w) {
@@ -279,7 +314,7 @@ public final class SettingsScreen extends Screen {
         boolean confirm = System.nanoTime() - confirmNs < 3_000_000_000L;
         String label = confirm ? "Click again" : ac.label;
         Ui.button(g, "set#" + ac.id, l.x, l.y + 1, 90, 16, label, null, mx, my, down.equals(ac.id), true);
-        Ui.text(g, confirm ? "This puts every setting back." : ac.desc, l.x + 98, l.y + 5, Ui.withAlpha(confirm ? Ui.WARN : Ui.DIM, a));
+        Ui.text(g, Ui.fit(confirm ? "This puts every setting back." : ac.desc, l.w - 98), l.x + 98, l.y + 5, Ui.withAlpha(confirm ? Ui.WARN : Ui.DIM, a));
     }
 
     private void note(GuiGraphicsExtractor g, Note n, Laid l, float a) {
@@ -383,6 +418,13 @@ public final class SettingsScreen extends Screen {
             Sfx.play(Sfx.CLOSE);
             onClose();
             return true;
+        }
+        for (Laid l : laid()) {
+            if (l.row instanceof Action ac && ac.run() != null && ac.id().equals(was) && Ui.inside(mx, my, l.x, l.y + 1, 90, 16)) {
+                ac.run().run();
+                Sfx.play(Sfx.PRESS, 1.1f);
+                return true;
+            }
         }
         if (was.equals("localSite")) {
             for (Laid l : laid()) {

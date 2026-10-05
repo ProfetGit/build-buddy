@@ -1,5 +1,6 @@
 package io.github.profetgit.cyanotype.ui;
 
+import io.github.profetgit.cyanotype.auto.AutoBuilder;
 import io.github.profetgit.cyanotype.ghost.GhostRenderer;
 import io.github.profetgit.cyanotype.placement.Placement;
 import io.github.profetgit.cyanotype.placement.Placements;
@@ -23,7 +24,28 @@ public final class CyanotypeHud {
         if (mc.gui.hud.isHidden() || mc.level == null || mc.player == null) return;
         Motion.frame();
         progress(mc, g);
+        autoBadge(mc, g);
         Chips.draw(g);
+    }
+
+    /** "AUTO: ON" while auto-placing is running: always visible then, amber on a multiplayer server (PRD 7.8), with what it is doing. */
+    private static void autoBadge(Minecraft mc, GuiGraphicsExtractor g) {
+        boolean on = AutoBuilder.on();
+        float a = Motion.follow("hud#auto", on ? 1f : 0f, 0.12);
+        if (a < 0.02f) return;
+        boolean server = AutoBuilder.serverKey(mc) != null;
+        int w = 150, h = 29, x = g.guiWidth() - w - 6, y = 6;
+        double t = System.nanoTime() / 1e9;
+        float inner = Ui.panelOpening(g, x, y, w, h, Motion.reduced() ? 1 : Math.min(1.0, a));
+        if (inner < 0.05f) return;
+        int accent = server ? Ui.WARN : Ui.CYAN;
+        // a small pulse beside the words says it is live
+        float pulse = Motion.reduced() ? 1f : (float) (0.55 + 0.45 * Math.sin(t * 4));
+        g.fill(x + 8, y + 8, x + 13, y + 13, Ui.withAlpha(accent, inner * pulse));
+        String mode = AutoBuilder.mode() == AutoBuilder.Mode.SWEEP ? "Sweep" : "Assist";
+        Ui.text(g, "AUTO: ON", x + 18, y + 6, Ui.withAlpha(accent, inner));
+        Ui.right(g, mode + "  " + Settings.get().autoRate + "/s", x + w - 8, y + 6, Ui.withAlpha(Ui.LINE, inner));
+        Ui.text(g, Ui.fit(AutoBuilder.status(), w - 16), x + 8, y + 18, Ui.withAlpha(Ui.DIM, inner));
     }
 
     private static void progress(Minecraft mc, GuiGraphicsExtractor g) {

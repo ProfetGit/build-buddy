@@ -21,14 +21,29 @@ public final class Rate {
         return Math.max(MIN, Math.min(MAX, perSecond));
     }
 
-    /** Called once a tick that wants to place. @return whether a block may be placed this tick */
+    /** Called every tick auto-placing is running: fills the bucket for one tick. */
+    public void tick(int perSecond) {
+        double per = clamp(perSecond) / 20.0;
+        // never more than one block's worth saved and the part of a tick that came with it, so a pause buys no burst
+        bucket = Math.min(1.0 + per, bucket + per);
+    }
+
+    /** Whether a block may be placed now. */
+    public boolean ready() {
+        return bucket >= 1.0 - 1e-9;
+    }
+
+    /** Pays for a block that was placed. */
+    public void spend() {
+        bucket -= 1.0;
+    }
+
+    /** Convenience for one tick that places at most one block: fills, and spends when ready. @return whether a block may go this tick */
     public boolean take(int perSecond) {
-        bucket = Math.min(1.0, bucket + clamp(perSecond) / 20.0);
-        if (bucket >= 1.0 - 1e-9) {
-            bucket -= 1.0;
-            return true;
-        }
-        return false;
+        tick(perSecond);
+        if (!ready()) return false;
+        spend();
+        return true;
     }
 
     /** Forgets what was saved: the next block may go at once. */

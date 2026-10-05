@@ -209,6 +209,7 @@ public final class Interaction {
             suppressAttack = true;
             return true;
         }
+        if (Placements.mode() == Mode.IDLE && io.github.profetgit.cyanotype.auto.AutoBuilder.claimsUse(Minecraft.getInstance())) return true;
         return Placements.mode() == Mode.EDIT && hover != null;
     }
 
@@ -246,6 +247,7 @@ public final class Interaction {
         if (Selecting.dragging() && (!down || screen)) Selecting.endDrag();
         if (suppressAttack && !down) suppressAttack = false;
         Picking.tick(mc);
+        io.github.profetgit.cyanotype.auto.AutoBuilder.tick(mc);
         GhostRenderer.tickVerifiers(mc);
         PlacementStore.tick();
     }
@@ -411,6 +413,7 @@ public final class Interaction {
         lift = 0;
         Selecting.reset();
         Picking.reset();
+        io.github.profetgit.cyanotype.auto.AutoBuilder.reset();
     }
 
     // ---- per frame
@@ -453,6 +456,7 @@ public final class Interaction {
                 edit(mc, p, pos, look);
             }
         }
+        if (mode == Mode.IDLE) io.github.profetgit.cyanotype.auto.AutoBuilder.frame(mc);
         outlines(mc, pos);
     }
 

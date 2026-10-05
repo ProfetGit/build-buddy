@@ -226,6 +226,7 @@ public final class Director {
                 case "community" -> CommunityScenes.community();
                 case "save" -> SaveScenes.save();
                 case "pick" -> PickScenes.pick();
+                case "auto" -> AutoScenes.auto();
                 case "materials" -> MaterialsScenes.materials();
                 case "settings" -> SettingsScenes.settings();
                 case "look" -> PlaceScenes.look();

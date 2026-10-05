@@ -1,5 +1,6 @@
 package io.github.profetgit.cyanotype.ui;
 
+import io.github.profetgit.cyanotype.auto.AutoBuilder;
 import io.github.profetgit.cyanotype.ghost.GhostRenderer;
 import io.github.profetgit.cyanotype.interaction.Interaction;
 import io.github.profetgit.cyanotype.interaction.Picking;
@@ -40,6 +41,17 @@ public enum Tool {
         @Override
         boolean enabled(Minecraft mc) {
             return locked() != null;
+        }
+    },
+    AUTO("Auto-place", "hammer", "Place blocks for you from your inventory") {
+        @Override
+        void run(Minecraft mc) {
+            AutoBuilder.cycle(mc);
+        }
+
+        @Override
+        boolean enabled(Minecraft mc) {
+            return locked() != null || AutoBuilder.on();
         }
     },
     MATERIALS("Materials", "list", "What is still needed") {

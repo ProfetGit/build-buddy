@@ -358,9 +358,16 @@ def i_wand(c, m, d):
     c.circle(11.6, 10.8, 0.8, fill=m)
 
 
+def i_hammer(c, m, d):
+    """Auto-place: a hammer."""
+    c.stroke([(2.4, 12.2), (8.6, 6.0)], 1.9, m)
+    c.poly([(6.0, 4.6), (9.4, 1.4), (12.8, 4.8), (9.4, 8.2)], m)
+    c.stroke([(7.4, 4.6), (9.6, 2.6)], 0.9, d)
+
+
 ICONS = [("move", i_move), ("rotate", i_rotate), ("mirror", i_mirror), ("layers", i_layers), ("select", i_select), ("save", i_save),
          ("folder", i_folder), ("list", i_list), ("eye", i_eye), ("trash", i_trash), ("plus", i_plus), ("check", i_check),
-         ("cross", i_cross), ("arrow", i_arrow), ("undo", i_undo), ("redo", i_redo), ("wand", i_wand)]
+         ("cross", i_cross), ("arrow", i_arrow), ("undo", i_undo), ("redo", i_redo), ("wand", i_wand), ("hammer", i_hammer)]
 
 
 def make_gear():

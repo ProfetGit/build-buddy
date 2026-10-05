@@ -103,6 +103,41 @@ public final class Samples {
         return g.build("Cyanotype sample house");
     }
 
+    /**
+     * 5 wide (x), 4 tall (y), 3 deep (z) with the kinds auto-placing has to get right: a floor, a ring of walls with log corners,
+     * panes and a door, a torch on a wall, a hanging lantern, top and bottom slabs, and a roof of stairs facing all four ways.
+     */
+    public static Blueprint autoTest() {
+        Grid g = new Grid(5, 4, 3);
+        BlockState planks = Blocks.OAK_PLANKS.defaultBlockState();
+        BlockState logY = Blocks.OAK_LOG.defaultBlockState().setValue(RotatedPillarBlock.AXIS, Direction.Axis.Y);
+        BlockState pane = Blocks.GLASS_PANE.defaultBlockState();
+        g.fill(0, 0, 0, 4, 0, 2, Blocks.STONE_BRICKS.defaultBlockState());
+        for (int y = 1; y <= 2; y++) {
+            for (int x = 0; x <= 4; x++) {
+                g.set(x, y, 0, planks);
+                g.set(x, y, 2, planks);
+            }
+            g.set(0, y, 1, pane);
+            g.set(4, y, 1, pane);
+            for (int[] c : new int[][]{{0, 0}, {4, 0}, {0, 2}, {4, 2}}) g.set(c[0], y, c[1], logY);
+        }
+        g.set(2, 1, 0, Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.FACING, Direction.NORTH).setValue(DoorBlock.HALF, DoubleBlockHalf.LOWER));
+        g.set(2, 2, 0, Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.FACING, Direction.NORTH).setValue(DoorBlock.HALF, DoubleBlockHalf.UPPER));
+        g.set(1, 1, 1, Blocks.OAK_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.TOP));
+        g.set(3, 1, 1, Blocks.OAK_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.BOTTOM));
+        g.set(1, 2, 1, Blocks.WALL_TORCH.defaultBlockState().setValue(net.minecraft.world.level.block.WallTorchBlock.FACING, Direction.SOUTH));
+        g.set(2, 2, 1, Blocks.LANTERN.defaultBlockState().setValue(net.minecraft.world.level.block.LanternBlock.HANGING, true));
+        for (int x = 0; x <= 4; x++) {
+            g.set(x, 3, 0, Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.SOUTH).setValue(StairBlock.HALF, Half.BOTTOM));
+            g.set(x, 3, 2, Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.NORTH).setValue(StairBlock.HALF, Half.BOTTOM));
+        }
+        g.set(0, 3, 1, Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.EAST).setValue(StairBlock.HALF, Half.BOTTOM));
+        g.set(4, 3, 1, Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.WEST).setValue(StairBlock.HALF, Half.BOTTOM));
+        for (int x = 1; x <= 3; x++) g.set(x, 3, 1, Blocks.OAK_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.BOTTOM));
+        return g.build("Auto test");
+    }
+
     /** Rows of blocks that read their neighbours, written with their plain default states (the reader gives them their shape). */
     static Blueprint shapes() {
         Grid g = new Grid(9, 3, 7);

@@ -34,6 +34,9 @@ public final class Settings {
         public String community = "ask";
         /** Address of the community site; empty = the built-in one (CommunityConfig.DEFAULT_BASE_URL). */
         public String communityUrl = "";
+        // Auto-place
+        public int autoRate = io.github.profetgit.cyanotype.auto.Rate.DEFAULT;
+        public boolean autoTurn = false;
         // Advanced
         public boolean showNames = true;
         /** The author last typed on the Save screen; empty = the player's name. */
@@ -77,6 +80,7 @@ public final class Settings {
         data.opacity = Math.max(0.05f, Math.min(1f, data.opacity));
         data.range = Math.max(32, Math.min(512, data.range));
         data.wheelHoldMs = Math.max(80, Math.min(600, data.wheelHoldMs));
+        data.autoRate = io.github.profetgit.cyanotype.auto.Rate.clamp(data.autoRate);
         if (!"on".equals(data.community) && !"off".equals(data.community)) data.community = "ask";
         data.communityUrl = data.communityUrl == null ? "" : data.communityUrl.trim();
     }
