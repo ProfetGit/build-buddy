@@ -17,8 +17,10 @@ public final class OrientedRegion {
     public final int sx, sy, sz;
     public final short[] blocks;
     public final BlockState[] states;
+    /** Per palette slot: a block the game does not know (it stands in as a red block and can never be "correct"). */
+    public final boolean[] unknown;
 
-    private OrientedRegion(Region source, int ox, int oy, int oz, int sx, int sy, int sz, short[] blocks, BlockState[] states) {
+    private OrientedRegion(Region source, int ox, int oy, int oz, int sx, int sy, int sz, short[] blocks, BlockState[] states, boolean[] unknown) {
         this.source = source;
         this.ox = ox;
         this.oy = oy;
@@ -28,6 +30,7 @@ public final class OrientedRegion {
         this.sz = sz;
         this.blocks = blocks;
         this.states = states;
+        this.unknown = unknown;
     }
 
     public static OrientedRegion of(Blueprint bp, Region r, Orientation o) {
@@ -39,9 +42,11 @@ public final class OrientedRegion {
         int ox = Math.min(ax, bx), oz = Math.min(az, bz);
 
         BlockState[] states = new BlockState[r.palette.length];
+        boolean[] unknown = new boolean[r.palette.length];
         for (int i = 0; i < states.length; i++) {
             PaletteEntry e = r.palette[i];
             states[i] = e.isAir() ? Blocks.AIR.defaultBlockState() : o.state(e.state());
+            unknown[i] = e.unknown();
         }
         short[] blocks = new short[r.blocks.length];
         for (int y = 0; y < r.sy; y++) {
@@ -53,7 +58,13 @@ public final class OrientedRegion {
                 }
             }
         }
-        return new OrientedRegion(r, ox, ry, oz, osx, r.sy, osz, blocks, states);
+        return new OrientedRegion(r, ox, ry, oz, osx, r.sy, osz, blocks, states, unknown);
+    }
+
+    /** The palette slot at a local position, or -1 outside the box. */
+    public int paletteIndex(int lx, int ly, int lz) {
+        if (lx < 0 || ly < 0 || lz < 0 || lx >= sx || ly >= sy || lz >= sz) return -1;
+        return blocks[(ly * sz + lz) * sx + lx] & 0xFFFF;
     }
 
     /** The state at a position local to this region's turned box; air outside it. */

@@ -360,6 +360,47 @@ final class Handles {
         };
     }
 
+    // ---- layer focus
+
+    /** The frame of the layers being shown: a rectangle at the bottom and at the top of the range, joined at the corners. */
+    static void layerBorder(AABB footprint, double yLo, double yHi, int color) {
+        int c = alpha(mix(color, WHITE, 0.35f), 0.95);
+        double x0 = footprint.minX, x1 = footprint.maxX, z0 = footprint.minZ, z1 = footprint.maxZ;
+        for (double y : new double[]{yLo, yHi}) {
+            Vec3 a = new Vec3(x0, y, z0), b = new Vec3(x1, y, z0), d = new Vec3(x1, y, z1), e = new Vec3(x0, y, z1);
+            Gizmos.line(a, b, c, 3.2f);
+            Gizmos.line(b, d, c, 3.2f);
+            Gizmos.line(d, e, c, 3.2f);
+            Gizmos.line(e, a, c, 3.2f);
+        }
+        GizmoStyle plane = GizmoStyle.fill(alpha(color, 0.10));
+        Gizmos.rect(new Vec3(x0, yLo, z0), new Vec3(x1, yLo, z0), new Vec3(x1, yLo, z1), new Vec3(x0, yLo, z1), plane);
+        for (double[] corner : new double[][]{{x0, z0}, {x1, z0}, {x1, z1}, {x0, z1}}) {
+            Gizmos.line(new Vec3(corner[0], yLo, corner[1]), new Vec3(corner[0], yHi, corner[1]), alpha(c, 0.55), 1.8f);
+        }
+    }
+
+    // ---- next block marker
+
+    /** An animated marker on the next block to build: a pulsing outline, a beam rising from it and a label. */
+    static void nextMarker(Vec3 cell, String what, double distance, double time) {
+        double pulse = 0.5 + 0.5 * Math.sin(time * 5.0);
+        AABB box = new AABB(cell.x - 0.02 - 0.05 * pulse, cell.y - 0.02 - 0.05 * pulse, cell.z - 0.02 - 0.05 * pulse,
+            cell.x + 1.02 + 0.05 * pulse, cell.y + 1.02 + 0.05 * pulse, cell.z + 1.02 + 0.05 * pulse);
+        Gizmos.cuboid(box, GizmoStyle.strokeAndFill(alpha(WHITE, 0.7 + 0.3 * pulse), 3.5f, alpha(0xFFFFD866, 0.16 + 0.16 * pulse))).setAlwaysOnTop();
+        Vec3 top = new Vec3(cell.x + 0.5, cell.y + 1.0, cell.z + 0.5);
+        double beam = 5 + 2 * pulse;
+        Gizmos.line(top, top.add(0, beam, 0), alpha(0xFFFFD866, 0.85), 3.0f).setAlwaysOnTop();
+        // a small chevron at the end of the beam, pointing down at the block
+        double h = 0.5;
+        Vec3 tip = top.add(0, 0.6, 0), l = top.add(-h, 1.4, 0), r = top.add(h, 1.4, 0), f = top.add(0, 1.4, -h), b = top.add(0, 1.4, h);
+        Gizmos.line(tip, l, alpha(0xFFFFD866, 0.9), 3.0f).setAlwaysOnTop();
+        Gizmos.line(tip, r, alpha(0xFFFFD866, 0.9), 3.0f).setAlwaysOnTop();
+        Gizmos.line(tip, f, alpha(0xFFFFD866, 0.9), 3.0f).setAlwaysOnTop();
+        Gizmos.line(tip, b, alpha(0xFFFFD866, 0.9), 3.0f).setAlwaysOnTop();
+        label(top.add(0, beam + 0.7 + 0.04 * distance, 0), what, labelScale(distance, 0.9, 0.06), WHITE, alpha(0xFFFFD866, 1.0));
+    }
+
     // ---- placement outline
 
     /** The placement's box as corner brackets (the blueprint look) over a faint full outline for the one being edited. */

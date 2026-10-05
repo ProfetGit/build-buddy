@@ -132,6 +132,13 @@ public final class Samples {
         return g.build("Cyanotype solid " + side);
     }
 
+    /** A box of stone bricks, solid: what a mass fill can match exactly. */
+    static Blueprint uniform(int sx, int sy, int sz) {
+        Grid g = new Grid(sx, sy, sz);
+        g.fill(0, 0, 0, sx - 1, sy - 1, sz - 1, Blocks.STONE_BRICKS.defaultBlockState());
+        return g.build("Cyanotype uniform " + sx + "x" + sy + "x" + sz);
+    }
+
     /** A cube where each cell is filled with the given chance: nearly every block shows several faces, the worst case. */
     static Blueprint noise(int side, double density) {
         Grid g = new Grid(side, side, side);

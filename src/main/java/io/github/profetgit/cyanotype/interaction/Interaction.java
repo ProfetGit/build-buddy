@@ -7,6 +7,8 @@ import io.github.profetgit.cyanotype.placement.Placement;
 import io.github.profetgit.cyanotype.placement.PlacementStore;
 import io.github.profetgit.cyanotype.placement.Placements;
 import io.github.profetgit.cyanotype.placement.Placements.Mode;
+import io.github.profetgit.cyanotype.verify.Counts;
+import io.github.profetgit.cyanotype.verify.Verifier;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
@@ -185,6 +187,7 @@ public final class Interaction {
         boolean down = mc.options.keyAttack.isDown();
         if (drag != null && (!down || screen)) endDrag();
         if (suppressAttack && !down) suppressAttack = false;
+        GhostRenderer.tickVerifiers(mc);
         PlacementStore.tick();
     }
 
@@ -403,6 +406,13 @@ public final class Interaction {
 
     // ---- drawing the outlines
 
+    /** Whether the "next block" guide is on (see /cyanotype next). */
+    public static volatile boolean guide;
+    private static long guideTarget = Verifier.NO_TARGET;
+    private static long guideChanges = -1;
+    private static Verifier guideFor;
+    private static int guideFrames;
+
     private static void outlines(Minecraft mc, Vec3 camera) {
         Placement active = Placements.active();
         for (Placement p : Placements.all()) {
@@ -411,6 +421,10 @@ public final class Interaction {
             double y = GhostRenderer.visualY(p);
             AABB box = new AABB(p.vx, y, p.vz, p.vx + p.sizeX(), y + p.sizeY(), p.vz + p.sizeZ());
             Handles.outline(box, p.accent, strong);
+            if (p.layered()) {
+                int lo = Math.max(0, p.layerLo), hi = p.layerHi < 0 ? p.sizeY() - 1 : Math.min(p.sizeY() - 1, p.layerHi);
+                Handles.layerBorder(box, y + lo, y + hi + 1, p.accent);
+            }
             Vec3 c = box.getCenter();
             if (camera.distanceToSqr(c) < 96 * 96) {
                 double dist = camera.distanceTo(c);
@@ -427,10 +441,60 @@ public final class Interaction {
                 Handles.label(new Vec3(lx, box.maxY + lift + 0.5 * nameScale, lz), p.name, nameScale, 0xFFFFFFFF, p.accent);
                 if (strong) {
                     float dimScale = Handles.labelScale(dist, 0.55, 0.036);
-                    Handles.label(new Vec3(lx, box.maxY + lift - 0.2 * nameScale, lz), p.sizeX() + " x " + p.sizeY() + " x " + p.sizeZ(), dimScale, 0xFFB8D8FF, 0x66FFFFFF);
+                    String sizeText = p.sizeX() + " x " + p.sizeY() + " x " + p.sizeZ();
+                    Verifier v = GhostRenderer.verifierOf(p);
+                    if (v != null) sizeText += "   " + progressText(v.counts());
+                    Handles.label(new Vec3(lx, box.maxY + lift - 0.2 * nameScale, lz), sizeText, dimScale, 0xFFB8D8FF, 0x66FFFFFF);
                 }
             }
         }
+        if (guide) nextBlock(mc, camera, active);
+    }
+
+    /** "42%  310 to go" or "done". */
+    public static String progressText(Counts c) {
+        if (c.done()) return "done";
+        if (c.judged() == 0) return c.unloaded() > 0 ? c.unloaded() + " not loaded" : "-";
+        return Math.round(c.progress() * 100) + "%  " + c.todo() + " to go" + (c.unloaded() > 0 ? "  (" + c.unloaded() + " not loaded)" : "");
+    }
+
+    /** Marks the nearest block still to do in the lowest unfinished layer, and says where it is. */
+    private static void nextBlock(Minecraft mc, Vec3 camera, Placement active) {
+        if (active == null || !active.locked) return;
+        Verifier v = GhostRenderer.verifierOf(active);
+        if (v == null) return;
+        // looking for it costs a scan of one layer, so only when the build changed or after some frames
+        if (v != guideFor || v.changes() != guideChanges || ++guideFrames > 30) {
+            guideFor = v;
+            guideChanges = v.changes();
+            guideFrames = 0;
+            guideTarget = v.nextTarget(camera.x, camera.y, camera.z, active.layerLo, active.layerHi);
+        }
+        if (guideTarget == Verifier.NO_TARGET) {
+            hint(mc, "Nothing left to build here.");
+            return;
+        }
+        int x = BlockPos.getX(guideTarget), y = BlockPos.getY(guideTarget), z = BlockPos.getZ(guideTarget);
+        net.minecraft.world.level.block.state.BlockState want = v.expectedAt(x, y, z);
+        String name = want.getBlock().getName().getString();
+        byte st = v.statusAt(x, y, z);
+        double dist = camera.distanceTo(new Vec3(x + 0.5, y + 0.5, z + 0.5));
+        Handles.nextMarker(new Vec3(x, y, z), (st == Verifier.WRONG ? "Replace with " : "Place ") + name, dist, System.nanoTime() / 1e9);
+        net.minecraft.core.Vec3i d = new net.minecraft.core.Vec3i(x - mc.player.getBlockX(), y - mc.player.getBlockY(), z - mc.player.getBlockZ());
+        hint(mc, "Next: " + name + ", " + offsetWords(d));
+    }
+
+    /** "6 east, 2 up, 3 north". */
+    static String offsetWords(net.minecraft.core.Vec3i d) {
+        StringBuilder sb = new StringBuilder();
+        if (d.getX() != 0) sb.append(Math.abs(d.getX())).append(d.getX() > 0 ? " east" : " west");
+        if (d.getY() != 0) sb.append(sb.length() > 0 ? ", " : "").append(Math.abs(d.getY())).append(d.getY() > 0 ? " up" : " down");
+        if (d.getZ() != 0) sb.append(sb.length() > 0 ? ", " : "").append(Math.abs(d.getZ())).append(d.getZ() > 0 ? " south" : " north");
+        return sb.length() == 0 ? "right here" : sb.toString();
+    }
+
+    public static long guideTarget() {
+        return guideTarget;
     }
 
     // ---- small helpers

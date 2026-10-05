@@ -9,6 +9,8 @@ import io.github.profetgit.cyanotype.Cyanotype;
 import io.github.profetgit.cyanotype.blueprint.Blueprint;
 import io.github.profetgit.cyanotype.placement.Placement;
 import io.github.profetgit.cyanotype.placement.Placements;
+import io.github.profetgit.cyanotype.verify.Matcher;
+import io.github.profetgit.cyanotype.verify.Verifier;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.IdentityHashMap;
@@ -55,6 +57,12 @@ public final class GhostRenderer {
     private static final int UPLOAD_BYTES_PER_FRAME = 4 << 20;
     /** A placement that has not moved for this long gets a ghost baked for its true position (tints and offsets depend on it). */
     private static final long REBAKE_AFTER_NS = 250_000_000L;
+    /** Ghosts start to fade out this far into the draw range (as a share of it). */
+    private static final double FADE_FROM = 0.55;
+    /** Whether placements that are locked are compared with the world (the Verifier). */
+    public static volatile boolean verifyEnabled = true;
+    /** Whether ghosts fade out toward the edge of the draw range. */
+    public static volatile boolean fadeEnabled = true;
     private static Object lastModels;
     private static long lastFrameNs;
 
@@ -220,8 +228,11 @@ public final class GhostRenderer {
                 shift(g.placement, g, sh);
                 double[] mine = sh.clone();
                 int pending = 0;
+                Verifier v = g.verifier;
                 for (Ghost.Section sec : g.sections) {
                     if (distSq(sec.bounds, mine, cx, cy, cz) > rangeSq) continue;
+                    // the world changed under a section that is up to date: bake it again, drawing the old mesh meanwhile
+                    if (v != null && sec.state == Ghost.Section.UPLOADED && v.version(sec.part, sec.vsec) != sec.bakedVersion) sec.state = Ghost.Section.IDLE;
                     if (sec.state == Ghost.Section.IDLE || sec.state == Ghost.Section.BAKING || sec.state == Ghost.Section.BAKED) pending++;
                     candidates.add(sec);
                     shifts.add(mine);
@@ -234,7 +245,7 @@ public final class GhostRenderer {
         }
         Stats.sections = total;
 
-        // nearest first, for baking; the pending ghosts bake after what is on screen only when nothing else is waiting
+        // nearest first, for baking
         Integer[] order = new Integer[candidates.size()];
         for (int i = 0; i < order.length; i++) order[i] = i;
         final double[] cc = {cx, cy, cz};
@@ -243,7 +254,10 @@ public final class GhostRenderer {
         for (int i : order) {
             if (IN_FLIGHT.get() >= MAX_IN_FLIGHT) break;
             Ghost.Section sec = candidates.get(i);
-            if (sec.state == Ghost.Section.IDLE) startBake(sec);
+            if (sec.state != Ghost.Section.IDLE) continue;
+            // a verified ghost is first baked once the verifier has looked at that part of the world, so it never shows what is already built
+            if (sec.ghost.verifier != null && !sec.ghost.verifier.ready(sec.part, sec.vsec)) continue;
+            startBake(sec);
         }
         int budget = UPLOAD_BYTES_PER_FRAME;
         for (int i : order) {
@@ -260,24 +274,37 @@ public final class GhostRenderer {
         }
         List<Ghost.Section> draw = new ArrayList<>();
         List<double[]> drawShift = new ArrayList<>();
+        List<double[]> drawRange = new ArrayList<>();
+        double fadeStart = range * FADE_FROM;
         for (int i : order) {
             Ghost.Section sec = candidates.get(i);
-            if (sec.state != Ghost.Section.UPLOADED || sec.ghost.disposed) continue;
+            if (sec.buffer == null || sec.ghost.disposed) continue;
             // only what is on screen draws: a pending ghost waits until it swaps in
             if (!isCurrent(sec.ghost)) continue;
+            Placement pl = sec.ghost.placement;
+            // layer focus: a range of layers is a range of quads
+            int base = sec.region.oy + sec.y;
+            int a = pl.layerLo < 0 ? 0 : Math.max(0, pl.layerLo - base);
+            int b = pl.layerHi < 0 ? sec.h - 1 : Math.min(sec.h - 1, pl.layerHi - base);
+            if (a > b || sec.layerQuads == null) continue;
+            int q0 = sec.layerQuads[a], q1 = sec.layerQuads[b + 1];
+            if (q1 <= q0) continue;
             double[] m = shifts.get(i);
             AABB box = sec.bounds.move(m[0], m[1], m[2]);
-            if (cam.cullFrustum.isVisible(box)) {
-                draw.add(sec);
-                drawShift.add(m);
-            }
+            if (!cam.cullFrustum.isVisible(box)) continue;
+            double dist = Math.sqrt(distSq(sec.bounds, m, cx, cy, cz));
+            double fade = !fadeEnabled || dist <= fadeStart ? 1.0 : Math.max(0.0, 1.0 - (dist - fadeStart) / (range - fadeStart));
+            if (fade < 0.03) continue;
+            draw.add(sec);
+            drawShift.add(m);
+            drawRange.add(new double[]{q0, q1, fade});
         }
         Stats.drawn = draw.size();
         if (draw.isEmpty()) {
             Stats.quadsDrawn = 0;
             return;
         }
-        draw(cam, target, draw, drawShift);
+        draw(cam, target, draw, drawShift, drawRange);
     }
 
     private static boolean isCurrent(Ghost g) {
@@ -319,6 +346,50 @@ public final class GhostRenderer {
             s.current = pend;
             s.pending = null;
         }
+        attachVerifier(p, s.current);
+        attachVerifier(p, s.pending);
+    }
+
+    /** A locked placement's ghost, once it is baked for where the placement really is, gets a verifier. */
+    private static void attachVerifier(Placement p, Ghost g) {
+        if (g == null || g.verifier != null || g.sections == null || g.regions == null) return;
+        if (!verifyEnabled || !p.locked || !g.matches(p)) return;
+        g.verifier = new Verifier(g.regions, g.bakeOrigin.getX(), g.bakeOrigin.getY(), g.bakeOrigin.getZ(), Matcher.LENIENT);
+    }
+
+    /** The verifier of the ghost that is on screen for a placement, or null while it is being placed or not yet baked. */
+    public static Verifier verifierOf(Placement p) {
+        Slot s = SLOTS.get(p);
+        if (s == null) return null;
+        if (s.current != null && s.current.verifier != null) return s.current.verifier;
+        return s.pending == null ? null : s.pending.verifier;
+    }
+
+    /** A block changed in the client's world: every verifier that covers it is told. */
+    public static void onBlockChanged(long packedPos) {
+        for (Slot s : SLOTS.values()) {
+            if (s.current != null && s.current.verifier != null) s.current.verifier.markDirty(packedPos);
+            if (s.pending != null && s.pending.verifier != null) s.pending.verifier.markDirty(packedPos);
+        }
+    }
+
+    /** Called every client tick: lets each verifier do a slice of work, about a millisecond and a half in all. */
+    public static void tickVerifiers(Minecraft mc) {
+        if (mc.level == null || mc.player == null || SLOTS.isEmpty()) return;
+        int active = 0;
+        for (Slot s : SLOTS.values()) {
+            if (s.current != null && s.current.verifier != null) active++;
+            if (s.pending != null && s.pending.verifier != null) active++;
+        }
+        if (active == 0) return;
+        ClientWorldView view = new ClientWorldView(mc.level);
+        long budget = Math.max(200_000L, 1_500_000L / active);
+        double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
+        for (Slot s : SLOTS.values()) {
+            for (Ghost g : new Ghost[]{s.current, s.pending}) {
+                if (g != null && g.verifier != null) g.verifier.process(view, budget, px, py, pz);
+            }
+        }
     }
 
     private static double distSq(AABB b, double[] m, double cx, double cy, double cz) {
@@ -330,6 +401,10 @@ public final class GhostRenderer {
 
     private static void startBake(Ghost.Section s) {
         s.state = Ghost.Section.BAKING;
+        // what the world looked like when this bake started; a later change bumps the version and bakes the section again
+        Verifier v = s.ghost.verifier;
+        byte[] mask = v == null ? null : v.snapshot(s.part, s.x, s.y, s.z, s.w, s.h, s.d);
+        s.bakingVersion = v == null ? 0 : v.version(s.part, s.vsec);
         IN_FLIGHT.incrementAndGet();
         WORKERS.execute(() -> {
             long t0 = System.nanoTime();
@@ -338,14 +413,11 @@ public final class GhostRenderer {
                     s.state = Ghost.Section.IDLE;
                     return;
                 }
-                SectionMesher.Baked b = SectionMesher.bake(s.region, s.wx, s.wy, s.wz, s.x, s.y, s.z, s.w, s.h, s.d, s.ghost.level);
-                if (b == null) {
-                    s.state = Ghost.Section.EMPTY;
-                } else {
-                    s.baked = b;
-                    s.state = Ghost.Section.BAKED;
-                    if (s.ghost.disposed) s.release();
-                }
+                // null: nothing to draw in this box (all of it built, or empty); the section still counts as baked
+                SectionMesher.Baked b = SectionMesher.bake(s.region, s.wx, s.wy, s.wz, s.x, s.y, s.z, s.w, s.h, s.d, s.ghost.level, mask);
+                s.baked = b;
+                s.state = Ghost.Section.BAKED;
+                if (s.ghost.disposed && b != null) s.release();
             } catch (Throwable t) {
                 Cyanotype.LOG.error("Ghost section bake failed", t);
                 s.state = Ghost.Section.FAILED;
@@ -361,12 +433,25 @@ public final class GhostRenderer {
     private static int upload(Ghost.Section s) {
         SectionMesher.Baked b = s.baked;
         s.baked = null;
-        if (b == null) return 0;
+        s.bakedVersion = s.bakingVersion;
+        if (b == null) {
+            // nothing to show: drop any old buffer
+            if (s.buffer != null) s.buffer.close();
+            s.buffer = null;
+            s.indexCount = 0;
+            s.quads = 0;
+            s.layerQuads = null;
+            s.state = Ghost.Section.UPLOADED;
+            return 0;
+        }
         int bytes = b.mesh().vertexBuffer().remaining();
         try {
-            s.buffer = RenderSystem.getDevice().createBuffer(() -> "Cyanotype ghost section", GpuBuffer.USAGE_VERTEX, b.mesh().vertexBuffer());
+            GpuBuffer fresh = RenderSystem.getDevice().createBuffer(() -> "Cyanotype ghost section", GpuBuffer.USAGE_VERTEX, b.mesh().vertexBuffer());
+            if (s.buffer != null) s.buffer.close();
+            s.buffer = fresh;
             s.indexCount = b.mesh().drawState().indexCount();
             s.quads = b.quads();
+            s.layerQuads = b.layerQuads();
             RenderSystem.getSequentialBuffer(SectionMesher.renderType().primitiveTopology()).requestIndexCount(s.indexCount);
             s.state = Ghost.Section.UPLOADED;
             Stats.uploaded++;
@@ -377,7 +462,7 @@ public final class GhostRenderer {
         return bytes;
     }
 
-    private static void draw(CameraRenderState cam, RenderTarget target, List<Ghost.Section> sections, List<double[]> shifts) {
+    private static void draw(CameraRenderState cam, RenderTarget target, List<Ghost.Section> sections, List<double[]> shifts, List<double[]> ranges) {
         PreparedRenderType prepared = SectionMesher.renderType().prepare();
         RenderPipeline pipeline = prepared.pipeline();
         Matrix4f modelView = RenderSystem.getModelViewMatrixCopy();
@@ -392,7 +477,8 @@ public final class GhostRenderer {
             for (int i = 0; i < sections.size(); i++) {
                 Ghost.Section s = sections.get(i);
                 double[] m = shifts.get(i);
-                float opacity = s.ghost.placement.opacity;
+                double[] qr = ranges.get(i);
+                float opacity = (float) (s.ghost.placement.opacity * qr[2]);
                 var slice = RenderSystem.getDynamicUniforms().writeTransform(
                     modelView,
                     new Vector4f(tintR, tintG, tintB, opacity),
@@ -401,8 +487,9 @@ public final class GhostRenderer {
                 pass.setUniform("DynamicTransforms", slice);
                 pass.setVertexBuffer(0, s.buffer.slice());
                 pass.setIndexBuffer(index.getBuffer(s.indexCount), index.type());
-                pass.drawIndexed(s.indexCount, 1, 0, 0, 0);
-                quads += s.quads;
+                int q0 = (int) qr[0], q1 = (int) qr[1];
+                pass.drawIndexed((q1 - q0) * 6, 1, q0 * 6, 0, 0);
+                quads += q1 - q0;
             }
         }
         Stats.quadsDrawn = quads;

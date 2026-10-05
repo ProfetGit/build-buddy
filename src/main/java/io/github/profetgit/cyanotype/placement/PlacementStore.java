@@ -36,7 +36,7 @@ public final class PlacementStore {
     private static final long SAVE_DELAY_MS = 800;
 
     /** One saved placement, before its blueprint has been read. */
-    public record Entry(String name, String ref, String dimension, BlockPos origin, Orientation orientation, float opacity, boolean visible, boolean locked, int accent) {
+    public record Entry(String name, String ref, String dimension, BlockPos origin, Orientation orientation, float opacity, boolean visible, boolean locked, int accent, int layerLo, int layerHi) {
     }
 
     private static volatile long dirtyAtMs;
@@ -67,6 +67,12 @@ public final class PlacementStore {
             o.addProperty("visible", p.visible);
             o.addProperty("locked", p.locked);
             o.addProperty("accent", String.format(Locale.ROOT, "#%06X", p.accent & 0xFFFFFF));
+            if (p.layered()) {
+                JsonArray layers = new JsonArray();
+                layers.add(p.layerLo);
+                layers.add(p.layerHi);
+                o.add("layers", layers);
+            }
             list.add(o);
         }
         root.add("placements", list);
@@ -96,7 +102,8 @@ public final class PlacementStore {
                     o.get("name").getAsString(), o.get("file").getAsString(), o.has("dimension") ? o.get("dimension").getAsString() : "minecraft:overworld",
                     new BlockPos(at.get(0).getAsInt(), at.get(1).getAsInt(), at.get(2).getAsInt()), new Orientation(rotation, mirror),
                     o.has("opacity") ? Math.max(0.05f, Math.min(1f, o.get("opacity").getAsFloat())) : 0.6f,
-                    !o.has("visible") || o.get("visible").getAsBoolean(), !o.has("locked") || o.get("locked").getAsBoolean(), color));
+                    !o.has("visible") || o.get("visible").getAsBoolean(), !o.has("locked") || o.get("locked").getAsBoolean(), color,
+                    o.has("layers") ? o.getAsJsonArray("layers").get(0).getAsInt() : -1, o.has("layers") ? o.getAsJsonArray("layers").get(1).getAsInt() : -1));
             } catch (RuntimeException ex) {
                 Cyanotype.LOG.warn("Skipping a placement that cannot be read: {}", ex.toString());
             }
@@ -145,6 +152,8 @@ public final class PlacementStore {
             p.visible = e.visible;
             p.locked = e.locked;
             p.accent = e.accent;
+            p.layerLo = e.layerLo;
+            p.layerHi = e.layerHi;
             Placements.restore(p);
             Path bp = BlueprintLibrary.resolve(e.ref);
             BlueprintLibrary.load(bp, blueprint -> {

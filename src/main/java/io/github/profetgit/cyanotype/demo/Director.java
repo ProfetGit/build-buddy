@@ -213,6 +213,8 @@ public final class Director {
                 case "handles" -> PlaceScenes.handles();
                 case "safety" -> PlaceScenes.safety();
                 case "hints" -> PlaceScenes.hints();
+                case "verify" -> VerifyScenes.verify();
+                case "verify-perf" -> VerifyScenes.perf();
                 case "look" -> PlaceScenes.look();
                 case "persist" -> PlaceScenes.persist();
                 case "persist-leave" -> PlaceScenes.persistLeave();

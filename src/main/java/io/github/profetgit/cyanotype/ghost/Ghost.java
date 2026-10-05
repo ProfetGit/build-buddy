@@ -5,15 +5,18 @@ import io.github.profetgit.cyanotype.blueprint.Blueprint;
 import io.github.profetgit.cyanotype.blueprint.Region;
 import io.github.profetgit.cyanotype.placement.Orientation;
 import io.github.profetgit.cyanotype.placement.Placement;
-import net.minecraft.core.BlockPos;
+import io.github.profetgit.cyanotype.verify.Verifier;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
 
 /**
- * The render state of one placement: its regions turned into the placed orientation and cut into 16-block sections,
- * each baked on a worker thread, uploaded to its own GPU buffer, and drawn from there every frame.
+ * The render state of one placement as baked for one position and orientation: its regions turned into the placed
+ * orientation and cut into 16-block sections, each baked on a worker thread, uploaded to its own GPU buffer, and drawn
+ * from there every frame. Once the placement is locked a {@link Verifier} watches the world for this ghost, and the
+ * sections are baked without the blocks that are already right (and with the wrong ones tinted red).
  */
 public final class Ghost {
     static final int SECTION = 16;
@@ -26,9 +29,12 @@ public final class Ghost {
     final Orientation bakeOrientation;
     /** Null until the (worker-thread) preparation has finished. */
     volatile List<Section> sections;
+    volatile List<OrientedRegion> regions;
     volatile boolean disposed;
     /** Sections in range that still wait to be baked or uploaded; -1 until a frame has looked. */
     volatile int pendingInRange = -1;
+    /** Compares the world with this ghost's blueprint; null while the placement is still being placed. */
+    Verifier verifier;
 
     Ghost(Placement placement, Blueprint blueprint, ClientLevel level, BlockPos bakeOrigin, Orientation bakeOrientation) {
         this.placement = placement;
@@ -46,21 +52,32 @@ public final class Ghost {
         return bakeOrientation.sizeZ(blueprint.sizeX, blueprint.sizeZ);
     }
 
+    /** Whether this ghost was baked for where and how the placement is right now. */
+    boolean matches(Placement p) {
+        return bakeOrigin.equals(p.origin) && bakeOrientation.equals(p.orientation);
+    }
+
     /** Builds the turned regions and the section list; called on a worker thread. */
     void prepare() {
         List<Section> out = new ArrayList<>();
+        List<OrientedRegion> rs = new ArrayList<>();
         int ox = bakeOrigin.getX(), oy = bakeOrigin.getY(), oz = bakeOrigin.getZ();
         for (Region r : blueprint.regions) {
             OrientedRegion o = OrientedRegion.of(blueprint, r, bakeOrientation);
+            int part = rs.size();
+            rs.add(o);
             int wx = ox + o.ox, wy = oy + o.oy, wz = oz + o.oz;
+            int nx = (o.sx + SECTION - 1) / SECTION, nz = (o.sz + SECTION - 1) / SECTION;
             for (int y = 0; y < o.sy; y += SECTION) {
                 for (int z = 0; z < o.sz; z += SECTION) {
                     for (int x = 0; x < o.sx; x += SECTION) {
-                        out.add(new Section(this, o, wx, wy, wz, x, y, z, Math.min(SECTION, o.sx - x), Math.min(SECTION, o.sy - y), Math.min(SECTION, o.sz - z)));
+                        int vsec = ((y / SECTION) * nz + (z / SECTION)) * nx + (x / SECTION);
+                        out.add(new Section(this, o, part, vsec, wx, wy, wz, x, y, z, Math.min(SECTION, o.sx - x), Math.min(SECTION, o.sy - y), Math.min(SECTION, o.sz - z)));
                     }
                 }
             }
         }
+        regions = rs;
         sections = out;
     }
 
@@ -71,24 +88,36 @@ public final class Ghost {
         if (list != null) for (Section s : list) s.release();
     }
 
-    /** One 16-block box of one region. */
+    /**
+     * One 16-block box of one region. A section is IDLE until it is baked (or when it must be baked again because the
+     * world changed: it keeps drawing its old buffer meanwhile), BAKING while a worker has it, BAKED when a mesh waits
+     * to be uploaded, UPLOADED when the buffer (or nothing, for an empty section) is up to date.
+     */
     static final class Section {
-        static final int IDLE = 0, BAKING = 1, BAKED = 2, UPLOADED = 3, EMPTY = 4, FAILED = 5;
+        static final int IDLE = 0, BAKING = 1, BAKED = 2, UPLOADED = 3, FAILED = 5;
 
         final Ghost ghost;
         final OrientedRegion region;
+        /** Index of the region in {@link Ghost#regions} and of this section in the verifier's grid of it. */
+        final int part, vsec;
         final int wx, wy, wz;
         final int x, y, z, w, h, d;
         final AABB bounds;
         volatile int state = IDLE;
         volatile SectionMesher.Baked baked;
+        /** The verifier version the mesh in the buffer was made from, and the one being made. */
+        int bakedVersion = -1, bakingVersion;
         GpuBuffer buffer;
         int indexCount;
         int quads;
+        /** Quads emitted up to the end of each layer of the section (length h + 1): a range of layers is a range of quads. */
+        int[] layerQuads;
 
-        Section(Ghost ghost, OrientedRegion region, int wx, int wy, int wz, int x, int y, int z, int w, int h, int d) {
+        Section(Ghost ghost, OrientedRegion region, int part, int vsec, int wx, int wy, int wz, int x, int y, int z, int w, int h, int d) {
             this.ghost = ghost;
             this.region = region;
+            this.part = part;
+            this.vsec = vsec;
             this.wx = wx;
             this.wy = wy;
             this.wz = wz;

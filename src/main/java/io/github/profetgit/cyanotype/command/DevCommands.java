@@ -11,6 +11,8 @@ import io.github.profetgit.cyanotype.placement.Orientation;
 import io.github.profetgit.cyanotype.placement.Placement;
 import io.github.profetgit.cyanotype.placement.PlacementStore;
 import io.github.profetgit.cyanotype.placement.Placements;
+import io.github.profetgit.cyanotype.verify.Counts;
+import io.github.profetgit.cyanotype.verify.Verifier;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -66,6 +68,10 @@ public final class DevCommands {
                 case "rotate" -> rotate();
                 case "mirror" -> mirror(arg);
                 case "opacity" -> opacity(arg);
+                case "status" -> status();
+                case "layer" -> layer(arg);
+                case "next" -> next();
+                case "verify" -> verify(arg);
                 case "clear" -> clear();
                 case "info" -> info();
                 default -> help();
@@ -83,6 +89,7 @@ public final class DevCommands {
     private static void help() {
         say("Files: list | load <name> | sample | place [x y z]");
         say("Placements: placements | select <n or name> | show / hide / remove [n or name] | move x y z | rotate | mirror [x] | opacity 5-100 | info | clear");
+        say("Building: status | layer <n> [m] / up / down / all | next | verify on or off");
         say("Keys: V edit, H show or hide, Z undo (see Controls). Files go in " + BlueprintLibrary.ownDir() + " (Litematica's schematics folder works too).");
     }
 
@@ -245,6 +252,65 @@ public final class DevCommands {
         } catch (NumberFormatException e) {
             say("Use /cyanotype opacity 5 to 100.");
         }
+    }
+
+    private static void status() {
+        Placement p = target("");
+        if (p == null) return;
+        Verifier v = GhostRenderer.verifierOf(p);
+        if (v == null) {
+            say(p.locked ? "Not compared with the world yet (it is still being baked, or verifying is off)." : "Lock the placement first: the world is compared once it is placed.");
+            return;
+        }
+        Counts c = v.counts();
+        say(p.name + ": " + Math.round(c.progress() * 100) + "% built. " + c.correct() + " right, " + c.missing() + " missing, " + c.wrong() + " wrong"
+            + (c.unknown() > 0 ? ", " + c.unknown() + " unknown blocks" : "") + (c.unloaded() > 0 ? ", " + c.unloaded() + " in chunks that are not loaded" : "") + (v.settled() ? "." : " (still checking)."));
+        for (int l = 0; l < v.height; l++) {
+            int todo = v.layerCount(l, Verifier.MISSING) + v.layerCount(l, Verifier.WRONG);
+            if (todo > 0) {
+                say("First unfinished layer: " + (l + 1) + " of " + v.height + " (" + todo + " to do).");
+                break;
+            }
+        }
+    }
+
+    private static void layer(String arg) {
+        Placement p = target("");
+        if (p == null) return;
+        int h = p.sizeY();
+        String a = arg.trim().toLowerCase(Locale.ROOT);
+        if (a.isEmpty() || a.equals("all")) {
+            p.layerLo = p.layerHi = -1;
+            say("All " + h + " layers shown.");
+        } else if (a.equals("up") || a.equals("down")) {
+            int cur = p.layerLo >= 0 && p.layerLo == p.layerHi ? p.layerLo : (a.equals("up") ? -1 : h);
+            int next = Math.max(0, Math.min(h - 1, cur + (a.equals("up") ? 1 : -1)));
+            p.layerLo = p.layerHi = next;
+            say("Layer " + (next + 1) + " of " + h + ".");
+        } else {
+            String[] parts = a.split("\\s+");
+            try {
+                int lo = Integer.parseInt(parts[0]) - 1, hi = (parts.length > 1 ? Integer.parseInt(parts[1]) : Integer.parseInt(parts[0])) - 1;
+                p.layerLo = Math.max(0, Math.min(lo, hi));
+                p.layerHi = Math.min(h - 1, Math.max(lo, hi));
+                say(p.layerLo == p.layerHi ? "Layer " + (p.layerLo + 1) + " of " + h + "." : "Layers " + (p.layerLo + 1) + " to " + (p.layerHi + 1) + " of " + h + ".");
+            } catch (NumberFormatException e) {
+                say("Use /cyanotype layer 3, layer 3 5, layer up, layer down or layer all.");
+                return;
+            }
+        }
+        PlacementStore.markDirty();
+    }
+
+    private static void next() {
+        Interaction.guide = !Interaction.guide;
+        say(Interaction.guide ? "Showing the next block to build." : "Next-block guide off.");
+    }
+
+    private static void verify(String arg) {
+        String a = arg.trim().toLowerCase(Locale.ROOT);
+        GhostRenderer.verifyEnabled = a.isEmpty() ? !GhostRenderer.verifyEnabled : a.equals("on");
+        say("Comparing with the world: " + (GhostRenderer.verifyEnabled ? "on" : "off (applies to ghosts built from now on)"));
     }
 
     private static void clear() {

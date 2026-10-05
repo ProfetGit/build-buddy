@@ -37,6 +37,8 @@ public final class Placement {
     /** Ghost opacity 0..1. */
     public float opacity = 0.6f;
     public boolean visible = true;
+    /** Layer focus: only layers lo..hi (counted up from the base, 0 = the lowest) are shown; -1 leaves that end open. */
+    public int layerLo = -1, layerHi = -1;
     /** False while it still follows the crosshair. */
     public boolean locked;
     public int accent = ACCENTS[0];
@@ -56,6 +58,10 @@ public final class Placement {
         this.origin = origin;
         this.orientation = orientation;
         this.status = blueprint != null ? Status.READY : Status.LOADING;
+    }
+
+    public boolean layered() {
+        return layerLo >= 0 || layerHi >= 0;
     }
 
     public boolean ready() {
