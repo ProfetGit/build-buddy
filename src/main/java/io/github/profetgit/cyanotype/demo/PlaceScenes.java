@@ -44,6 +44,16 @@ final class PlaceScenes {
         KeyMapping.click(key(k));
     }
 
+    /** A tap with Ctrl held (and Shift too when asked): undo and redo need the modifier. */
+    static void ctrlTap(KeyMapping k, boolean shift) {
+        act(() -> {
+            Interaction.testModifiers = shift ? 3 : 2;
+            tap(k);
+        });
+        waitTicks(3);
+        act(() -> Interaction.testModifiers = -1);
+    }
+
     static void hold(KeyMapping k) {
         KeyMapping.set(key(k), true);
         KeyMapping.click(key(k));
@@ -311,13 +321,9 @@ final class PlaceScenes {
         act(() -> check("handles/flip arrow mirrors it", first.orientation.isMirrored(), "orientation " + first.orientation));
 
         // undo, three times: the flip, the turn, the lift
-        for (int i = 0; i < 3; i++) {
-            act(() -> tap(Keys.UNDO));
-            waitTicks(3);
-        }
+        for (int i = 0; i < 3; i++) ctrlTap(Keys.UNDO, false);
         act(() -> check("handles/undo walks back", first.origin.equals(new BlockPos(3, G + 1, 6)) && first.orientation.equals(Orientation.NONE), "origin " + at(first) + ", " + first.orientation));
-        act(() -> tap(Keys.UNDO));
-        waitTicks(3);
+        ctrlTap(Keys.UNDO, false);
         act(() -> check("handles/undo reaches the start", first.origin.equals(new BlockPos(0, G + 1, 6)), "origin " + at(first)));
         until("handles/settled again", 400, GhostRenderer::settled);
 

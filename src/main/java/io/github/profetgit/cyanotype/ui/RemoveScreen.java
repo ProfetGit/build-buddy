@@ -146,10 +146,10 @@ public final class RemoveScreen extends Screen {
 
     private void remove() {
         String name = target.name;
-        Placements.remove(target);
+        Placements.removeUndoable(target);
         Sfx.play(Sfx.CLOSE, 0.8f);
         onClose();
-        Interaction.say(minecraft, "Removed " + name + ".");
+        Interaction.say(minecraft, "Removed " + name + ". Ctrl+Z brings it back.");
     }
 
     /** Dev demo: the middle of a button on screen ("keep" or "remove"). */

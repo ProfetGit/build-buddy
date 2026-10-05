@@ -207,8 +207,8 @@ public final class DevCommands {
     private static void remove(String arg) {
         Placement p = target(arg);
         if (p == null) return;
-        Placements.remove(p);
-        say("Removed " + p.name + " (the file is untouched).");
+        Placements.removeUndoable(p);
+        say("Removed " + p.name + " (the file is untouched; Ctrl+Z brings it back).");
     }
 
     private static void move(String arg) {

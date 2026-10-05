@@ -130,8 +130,48 @@ public final class Ghost {
             this.bounds = new AABB(wx + x, wy + y, wz + z, wx + x + w, wy + y + h, wz + z + d);
         }
 
+        /** Cap meshes for the Layers tool, by {@code layer * 2 + (top ? 1 : 0)}; only exist while the placement is layered. Render thread only. */
+        final java.util.Map<Integer, Cap> caps = new java.util.HashMap<>();
+
         void release() {
             SectionMesher.Baked b = baked;
+            baked = null;
+            if (b != null) b.close();
+            if (buffer != null) {
+                buffer.close();
+                buffer = null;
+            }
+            for (Cap c : caps.values()) c.release();
+            caps.clear();
+        }
+    }
+
+    /**
+     * The faces of one layer of a section that its neighbour layer hides in the whole build and a layer cut would uncover
+     * (see {@link SectionMesher#bakeCap}). Baked and uploaded like a section, but small, and only for the layers at the edges
+     * of the window and the ones next to them, so scrolling the window finds them ready.
+     */
+    static final class Cap {
+        final boolean top;
+        /** The layer, counted from the section's bottom. */
+        final int layer;
+        volatile int state = Section.IDLE;
+        volatile SectionMesher.BakedCap baked;
+        volatile boolean dead;
+        /** Whether the window's edge is exactly this layer (those are drawn; the neighbours are only kept ready). */
+        boolean exact;
+        int bakedVersion = -1, bakingVersion;
+        GpuBuffer buffer;
+        int indexCount, quads;
+
+        Cap(boolean top, int layer) {
+            this.top = top;
+            this.layer = layer;
+        }
+
+        void release() {
+            dead = true;
+            SectionMesher.BakedCap b = baked;
             baked = null;
             if (b != null) b.close();
             if (buffer != null) {

@@ -211,12 +211,15 @@ public final class Interaction {
         while (Keys.REMOVE.consumeClick()) {
             if (!screen && !GhostRenderer.hidden) askRemove(mc);
         }
+        // Ctrl+Z undoes, Ctrl+Y and Ctrl+Shift+Z redo: the keys are rebindable, the Ctrl is not, so a stray tap does nothing
         while (Keys.UNDO.consumeClick()) {
-            if (screen) continue;
-            Placement back = Placements.undo();
-            say(mc, back == null ? "Nothing to undo" : "Undid the last move of " + back.name);
-            if (back != null) Sfx.play(Sfx.RELEASE, 0.8f);
-            else Sfx.play(Sfx.ERROR);
+            if (screen || GhostRenderer.hidden || !ctrl(mc)) continue;
+            if (shift(mc)) redo(mc);
+            else undo(mc);
+        }
+        while (Keys.REDO.consumeClick()) {
+            if (screen || GhostRenderer.hidden || !ctrl(mc)) continue;
+            redo(mc);
         }
         boolean down = mc.options.keyAttack.isDown();
         if (drag != null && (!down || screen)) endDrag();
@@ -335,6 +338,33 @@ public final class Interaction {
         }
     }
 
+    /** Reverts the last change (a move, turn, flip or removal) and says what it was. */
+    public static void undo(Minecraft mc) {
+        Placements.Change c = Placements.undo();
+        report(mc, c, "undo", "Undid");
+    }
+
+    /** Does again what the last undo reverted. */
+    public static void redo(Minecraft mc) {
+        Placements.Change c = Placements.redo();
+        report(mc, c, "redo", "Redid");
+    }
+
+    private static void report(Minecraft mc, Placements.@Nullable Change c, String verb, String past) {
+        if (c == null) {
+            Sfx.play(Sfx.ERROR);
+            say(mc, "Nothing to " + verb);
+            return;
+        }
+        String what = switch (c.kind()) {
+            case MOVE -> past + " the last move of " + c.placement().name;
+            case RESTORE -> past.equals("Undid") ? "Brought back " + c.placement().name : "Put " + c.placement().name + " back";
+            case DELETE -> "Removed " + c.placement().name + " again";
+        };
+        Sfx.play(Sfx.RELEASE, past.equals("Undid") ? 0.8f : 1.2f);
+        say(mc, what);
+    }
+
     /** The Delete key: asks whether to remove the selected placement (the one being edited, or the one the crosshair is on). */
     private static void askRemove(Minecraft mc) {
         Placement p = Placements.mode() == Mode.EDIT ? Placements.active() : Placements.mode() == Mode.IDLE ? aimedPlacement(mc) : null;
@@ -416,7 +446,7 @@ public final class Interaction {
             hover = handles.pick(camera, look);
             if (hover == null) {
                 chips(mc, new Chips.Chip("Drag arrow", "Move"), new Chips.Chip("Drag ring", "Turn"), new Chips.Chip("Click flip", "Mirror"),
-                    new Chips.Chip(Ui.keyName(Keys.UNDO), "Undo"), new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
+                    new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo"), new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
             } else {
                 chips(mc, switch (hover.kind) {
                     case MOVE -> new Chips.Chip("Drag", "Move " + axisWords(hover.axis));
@@ -512,7 +542,7 @@ public final class Interaction {
         Drag d = drag;
         drag = null;
         if (d != null && (d.steps != 0 || d.turns != 0)) PlacementStore.markDirty();
-        else if (d != null) Placements.undo();   // nothing moved: drop the snapshot taken at the grab
+        else if (d != null) Placements.forgetLast();   // nothing moved: drop the snapshot taken at the grab
     }
 
     // ---- actions

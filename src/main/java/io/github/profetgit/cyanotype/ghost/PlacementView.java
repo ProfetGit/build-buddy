@@ -5,6 +5,7 @@ import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.CardinalLighting;
 import net.minecraft.world.level.ColorResolver;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.lighting.LevelLightEngine;
@@ -19,6 +20,8 @@ final class PlacementView implements BlockAndTintGetter {
     private final OrientedRegion region;
     private final int wx, wy, wz;
     private final @Nullable ClientLevel level;
+    /** One cell that reads as air (see {@link #hide}): what a cap mesh needs to see a face the layer next to it would cover. */
+    private long hidden = Long.MIN_VALUE;
 
     PlacementView(OrientedRegion region, int wx, int wy, int wz, @Nullable ClientLevel level) {
         this.region = region;
@@ -28,8 +31,18 @@ final class PlacementView implements BlockAndTintGetter {
         this.level = level;
     }
 
+    /** Makes one cell read as air until {@link #unhide()}. */
+    void hide(BlockPos pos) {
+        hidden = pos.asLong();
+    }
+
+    void unhide() {
+        hidden = Long.MIN_VALUE;
+    }
+
     @Override
     public BlockState getBlockState(BlockPos pos) {
+        if (hidden != Long.MIN_VALUE && pos.asLong() == hidden) return Blocks.AIR.defaultBlockState();
         return region.state(pos.getX() - wx, pos.getY() - wy, pos.getZ() - wz);
     }
 

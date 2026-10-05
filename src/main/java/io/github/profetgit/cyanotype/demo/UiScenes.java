@@ -230,6 +230,137 @@ final class UiScenes {
         teardown();
     }
 
+    private static String at(Placement p) {
+        return p.origin.getX() + " " + p.origin.getY() + " " + p.origin.getZ();
+    }
+
+    /** The Layers tool must show the faces that the layers around it would have covered. */
+    static void layerCaps() {
+        Director.clean();
+        act(() -> {
+            Placement p = Director.locked(new Placement("slab", Samples.uniform(3, 2, 3), "cyanotype:caps.litematic", io.github.profetgit.cyanotype.demo.Director.DIM, new net.minecraft.core.BlockPos(0, G + 1, 6), io.github.profetgit.cyanotype.placement.Orientation.NONE));
+            Placements.add(p);
+            house = p;
+        });
+        camera(1.5, G + 6, 2.5, 0, 50);
+        until("caps/baked", 400, GhostRenderer::settled);
+        // a 3 x 2 x 3 solid box: a layer shows its four sides (12 quads) and one open face per block (9), whole or cut
+        act(() -> {
+            house.layerLo = house.layerHi = 0;
+        });
+        until("caps/the lower layer alone shows its top faces (12 sides + 9 bottoms + 9 tops)", 300, () -> GhostRenderer.Stats.quadsDrawn == 30);
+        waitTicks(6);
+        shot("caps_layer0");
+        act(() -> {
+            house.layerLo = house.layerHi = 1;
+        });
+        until("caps/the upper layer alone shows its bottom faces (12 sides + 9 tops + 9 bottoms)", 300, () -> GhostRenderer.Stats.quadsDrawn == 30);
+        waitTicks(6);
+        camera(1.5, G - 2, 2.5, 0, -50);
+        waitTicks(10);
+        shot("caps_layer1_from_below");
+        camera(1.5, G + 6, 2.5, 0, 50);
+        act(() -> {
+            house.layerLo = 0;
+            house.layerHi = 1;
+        });
+        until("caps/both layers: the faces between them stay hidden (12 + 12 sides, 9 tops, 9 bottoms)", 300, () -> GhostRenderer.Stats.quadsDrawn == 42);
+        act(() -> {
+            house.layerLo = house.layerHi = -1;
+        });
+        until("caps/no layer focus: the same 42", 300, () -> GhostRenderer.Stats.quadsDrawn == 42);
+        // moving the window by one finds the next caps ready
+        act(() -> {
+            house.layerLo = house.layerHi = 0;
+        });
+        until("caps/back to the lower layer", 300, () -> GhostRenderer.Stats.quadsDrawn == 30);
+        act(() -> {
+            house.layerLo = house.layerHi = -1;
+            Placements.remove(house);
+        });
+        waitTicks(4);
+    }
+
+    /** Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z in the real client: moves, a removal, redo, and the wheel's Undo and Redo. */
+    static void undo() {
+        setup();
+        act(() -> DevCommands.run("/cyanotype move 4 " + (G + 1) + " 6"));
+        waitTicks(4);
+        act(() -> check("undo/the move happened", house.origin.getX() == 4, at(house)));
+        // a plain Z does nothing: the Ctrl is part of the shortcut
+        act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.UNDO));
+        waitTicks(4);
+        act(() -> check("undo/a plain Z does nothing", house.origin.getX() == 4, at(house)));
+        PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, false);
+        act(() -> check("undo/Ctrl+Z puts it back", house.origin.getX() == 0, at(house)));
+        PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.REDO, false);
+        act(() -> check("undo/Ctrl+Y does the move again", house.origin.getX() == 4, at(house)));
+        PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, false);
+        PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, true);
+        act(() -> check("undo/Ctrl+Shift+Z redoes too", house.origin.getX() == 4, at(house)));
+        // a new change ends the redo history
+        PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, false);
+        act(() -> DevCommands.run("/cyanotype move 0 " + (G + 1) + " 9"));
+        waitTicks(3);
+        act(() -> check("undo/a new change ends redo", !Placements.canRedo() && house.origin.getZ() == 9, "can redo " + Placements.canRedo() + ", " + at(house)));
+        PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, false);
+
+        // a removal can be undone and redone
+        act(() -> Minecraft.getInstance().gui.setScreen(new io.github.profetgit.cyanotype.ui.RemoveScreen(house)));
+        waitTicks(4);
+        act(() -> key(com.mojang.blaze3d.platform.InputConstants.KEY_RIGHT));
+        act(() -> key(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN));
+        waitTicks(6);
+        act(() -> check("undo/removed", Placements.all().isEmpty(), "placements " + Placements.all().size()));
+        PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, false);
+        waitTicks(6);
+        act(() -> check("undo/Ctrl+Z brings the removed placement back, active and unlocked state kept", Placements.all().contains(house) && Placements.active() == house && house.locked, "placements " + Placements.all().size()));
+        until("undo/its ghost is drawn again and counted", 400, () -> GhostRenderer.verifierOf(house) != null && GhostRenderer.verifierOf(house).settled() && GhostRenderer.drawn(house));
+        shot("undo_restored");
+        PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.REDO, false);
+        act(() -> check("undo/Ctrl+Y removes it again", Placements.all().isEmpty(), "placements " + Placements.all().size()));
+        PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, false);
+        waitTicks(6);
+
+        // the wheel has them too, greyed out when there is nothing to do
+        act(() -> DevCommands.run("/cyanotype move 8 " + (G + 1) + " 6"));
+        waitTicks(4);
+        act(() -> {
+            WheelScreen.testHeld = true;
+            Interaction.testMainDown = true;
+        });
+        waitTicks(8);
+        act(() -> Ui.testMouse = segmentPoint(io.github.profetgit.cyanotype.ui.Tool.UNDO.ordinal()));
+        waitTicks(10);
+        shot("undo_wheel");
+        act(() -> {
+            WheelScreen.testHeld = false;
+            Interaction.testMainDown = false;
+        });
+        waitTicks(14);
+        act(() -> {
+            Ui.testMouse = null;
+            check("undo/the wheel's Undo tool takes the last change back", screen() == null && Placements.canRedo() && house.origin.getX() != 8, "screen " + screen() + ", can redo " + Placements.canRedo() + ", " + at(house));
+        });
+        act(() -> {
+            WheelScreen.testHeld = true;
+            Interaction.testMainDown = true;
+        });
+        waitTicks(8);
+        act(() -> Ui.testMouse = segmentPoint(io.github.profetgit.cyanotype.ui.Tool.REDO.ordinal()));
+        waitTicks(6);
+        act(() -> {
+            WheelScreen.testHeld = false;
+            Interaction.testMainDown = false;
+        });
+        waitTicks(14);
+        act(() -> {
+            Ui.testMouse = null;
+            check("undo/the wheel's Redo tool does it again", screen() == null && !Placements.canRedo() && house.origin.getX() == 8, "screen " + screen() + ", can redo " + Placements.canRedo() + ", " + at(house));
+        });
+        teardown();
+    }
+
     /** Removing a placement: the wheel's Remove tool, the question, Keep, and Remove with the keyboard. */
     static void remove() {
         setup();

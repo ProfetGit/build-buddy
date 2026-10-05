@@ -322,9 +322,35 @@ def i_arrow(c, m, d):
     c.poly([(7, 1.4), (12, 6.8), (8.4, 6.8), (8.4, 12.6), (5.6, 12.6), (5.6, 6.8), (2, 6.8)], m)
 
 
+def curl(c, m, d, flip):
+    """A curved arrow going back over the top (undo); flipped left to right it goes forward (redo)."""
+    def X(x):
+        return 14 - x if flip else x
+    cx, cy, r = 7.0, 8.0, 4.2
+    pts = []
+    for i in range(0, 41):
+        a = math.radians(35 - 215 * i / 40)
+        pts.append((X(cx + r * math.cos(a)), cy + r * math.sin(a)))
+    c.stroke(pts, 1.5, m)
+    end = math.radians(35 - 215)
+    ex, ey = cx + r * math.cos(end), cy + r * math.sin(end)
+    tx, ty = math.sin(end), -math.cos(end)
+    tx = -tx if flip else tx
+    arrowhead(c, X(ex) + tx * 0.6, ey + ty * 0.6, tx, ty, 2.7, m)
+    c.circle(X(cx + r * math.cos(math.radians(35))), cy + r * math.sin(math.radians(35)), 0.9, fill=d)
+
+
+def i_undo(c, m, d):
+    curl(c, m, d, False)
+
+
+def i_redo(c, m, d):
+    curl(c, m, d, True)
+
+
 ICONS = [("move", i_move), ("rotate", i_rotate), ("mirror", i_mirror), ("layers", i_layers), ("select", i_select), ("save", i_save),
          ("folder", i_folder), ("list", i_list), ("eye", i_eye), ("trash", i_trash), ("plus", i_plus), ("check", i_check),
-         ("cross", i_cross), ("arrow", i_arrow)]
+         ("cross", i_cross), ("arrow", i_arrow), ("undo", i_undo), ("redo", i_redo)]
 
 
 def make_gear():

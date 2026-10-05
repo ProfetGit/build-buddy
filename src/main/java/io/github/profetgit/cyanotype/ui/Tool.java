@@ -86,6 +86,28 @@ public enum Tool {
         boolean enabled(Minecraft mc) {
             return !Placements.all().isEmpty();
         }
+    },
+    UNDO("Undo", "undo", "Take back the last change (Ctrl+Z)") {
+        @Override
+        void run(Minecraft mc) {
+            Interaction.undo(mc);
+        }
+
+        @Override
+        boolean enabled(Minecraft mc) {
+            return Placements.canUndo();
+        }
+    },
+    REDO("Redo", "redo", "Do the undone change again (Ctrl+Y)") {
+        @Override
+        void run(Minecraft mc) {
+            Interaction.redo(mc);
+        }
+
+        @Override
+        boolean enabled(Minecraft mc) {
+            return Placements.canRedo();
+        }
     };
 
     public final String label, icon, hint;

@@ -23,13 +23,36 @@ public final class Placements {
         LAYERS
     }
 
-    private record Snapshot(Placement placement, BlockPos origin, Orientation orientation) {
+    /**
+     * One step of history. Applying an entry reverts a change and yields the entry that puts it back, so undo and redo are
+     * the same move in opposite directions: a {@link Move} sets a placement to an earlier spot, a {@link Restore} adds a
+     * removed placement back, a {@link Delete} takes one away again.
+     */
+    private sealed interface Entry permits Move, Restore, Delete {
+        Placement placement();
+    }
+
+    private record Move(Placement placement, BlockPos origin, Orientation orientation) implements Entry {
+    }
+
+    private record Restore(Placement placement, int index) implements Entry {
+    }
+
+    private record Delete(Placement placement) implements Entry {
+    }
+
+    public enum Kind {
+        MOVE, RESTORE, DELETE
+    }
+
+    /** What an undo or redo just did. */
+    public record Change(Kind kind, Placement placement) {
     }
 
     private static final int UNDO_LIMIT = 64;
 
     private static final List<Placement> ALL = new CopyOnWriteArrayList<>();
-    private static final Deque<Snapshot> UNDO = new ArrayDeque<>();
+    private static final Deque<Entry> UNDO = new ArrayDeque<>(), REDO = new ArrayDeque<>();
     private static volatile @Nullable Placement active;
     private static volatile Mode mode = Mode.IDLE;
     private static int nextAccent;
@@ -67,11 +90,26 @@ public final class Placements {
         ALL.add(p);
     }
 
+    /** Takes a placement away for good: its history goes with it. */
     public static void remove(Placement p) {
+        detach(p);
+        UNDO.removeIf(e -> e.placement() == p);
+        REDO.removeIf(e -> e.placement() == p);
+    }
+
+    /** Takes a placement away in a way Undo can bring back (what the player does with Remove or Delete). */
+    public static void removeUndoable(Placement p) {
+        int index = ALL.indexOf(p);
+        if (index < 0) return;
+        detach(p);
+        push(UNDO, new Restore(p, index));
+        REDO.clear();
+    }
+
+    private static void detach(Placement p) {
         ALL.remove(p);
         // a material highlight belongs to a placement's verifier: it goes with it
         io.github.profetgit.cyanotype.interaction.CellHighlight.clear();
-        UNDO.removeIf(s -> s.placement == p);
         if (active == p) {
             active = null;
             if (mode != Mode.IDLE) mode = Mode.IDLE;
@@ -87,6 +125,7 @@ public final class Placements {
         io.github.profetgit.cyanotype.interaction.CellHighlight.clear();
         ALL.clear();
         UNDO.clear();
+        REDO.clear();
         active = null;
         mode = Mode.IDLE;
         nextAccent = 0;
@@ -115,26 +154,77 @@ public final class Placements {
         return false;
     }
 
-    /** Remembers where a placement is, before a change, so Undo can put it back. */
-    public static void remember(Placement p) {
-        UNDO.push(new Snapshot(p, p.origin, p.orientation));
-        while (UNDO.size() > UNDO_LIMIT) UNDO.removeLast();
+    private static void push(Deque<Entry> stack, Entry e) {
+        stack.push(e);
+        while (stack.size() > UNDO_LIMIT) stack.removeLast();
     }
 
-    /** Puts the most recently moved placement back. @return the placement, or null if there was nothing to undo */
-    public static @Nullable Placement undo() {
-        while (!UNDO.isEmpty()) {
-            Snapshot s = UNDO.pop();
-            if (!ALL.contains(s.placement)) continue;
-            s.placement.set(s.origin, s.orientation);
-            active = s.placement;
-            PlacementStore.markDirty();
-            return s.placement;
+    /** Remembers where a placement is, before a change, so Undo can put it back. A new change ends the Redo history. */
+    public static void remember(Placement p) {
+        push(UNDO, new Move(p, p.origin, p.orientation));
+        REDO.clear();
+    }
+
+    /** Drops the snapshot just taken, when nothing changed after all (a grab without a move). */
+    public static void forgetLast() {
+        if (!UNDO.isEmpty() && UNDO.peek() instanceof Move) UNDO.pop();
+    }
+
+    /** Reverts the most recent change. @return what was done, or null if there is nothing to undo */
+    public static @Nullable Change undo() {
+        return step(UNDO, REDO);
+    }
+
+    /** Does again what the last Undo reverted. @return what was done, or null if there is nothing to redo */
+    public static @Nullable Change redo() {
+        return step(REDO, UNDO);
+    }
+
+    private static boolean valid(Entry e) {
+        return switch (e) {
+            case Move m -> ALL.contains(m.placement);
+            case Restore r -> !ALL.contains(r.placement);
+            case Delete d -> ALL.contains(d.placement);
+        };
+    }
+
+    private static @Nullable Change step(Deque<Entry> from, Deque<Entry> to) {
+        while (!from.isEmpty()) {
+            Entry e = from.pop();
+            if (!valid(e)) continue;
+            Placement p = e.placement();
+            switch (e) {
+                case Move m -> {
+                    push(to, new Move(p, p.origin, p.orientation));
+                    p.set(m.origin, m.orientation);
+                    active = p;
+                    PlacementStore.markDirty();
+                    return new Change(Kind.MOVE, p);
+                }
+                case Restore r -> {
+                    ALL.add(Math.min(r.index, ALL.size()), p);
+                    push(to, new Delete(p));
+                    active = p;
+                    mode = Mode.IDLE;
+                    PlacementStore.markDirty();
+                    return new Change(Kind.RESTORE, p);
+                }
+                case Delete d -> {
+                    int index = ALL.indexOf(p);
+                    detach(p);
+                    push(to, new Restore(p, index));
+                    return new Change(Kind.DELETE, p);
+                }
+            }
         }
         return null;
     }
 
     public static boolean canUndo() {
-        return UNDO.stream().anyMatch(s -> ALL.contains(s.placement));
+        return UNDO.stream().anyMatch(Placements::valid);
+    }
+
+    public static boolean canRedo() {
+        return REDO.stream().anyMatch(Placements::valid);
     }
 }

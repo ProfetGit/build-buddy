@@ -93,12 +93,83 @@ class PlacementsTest {
         Placements.remember(b);
         b.set(new BlockPos(0, 0, 4), new Orientation(Rotation.CLOCKWISE_180, Mirror.NONE));
         assertTrue(Placements.canUndo());
-        assertEquals(b, Placements.undo());
+        Placements.Change c = Placements.undo();
+        assertEquals(b, c.placement());
+        assertEquals(Placements.Kind.MOVE, c.kind());
         assertEquals(new BlockPos(0, 0, 0), b.origin);
         assertEquals(Orientation.NONE, b.orientation);
         Placements.remove(a);
         assertFalse(Placements.canUndo(), "a's snapshot went with it");
         assertNull(Placements.undo());
+    }
+
+    @Test
+    void redoDoesAgainWhatUndoRevertedAndANewChangeEndsIt() {
+        Placement a = make("a", 0, 0, 0);
+        Placements.add(a);
+        Placements.remember(a);
+        a.set(new BlockPos(5, 0, 0), Orientation.NONE);
+        Placements.remember(a);
+        a.set(new BlockPos(5, 0, 7), new Orientation(Rotation.CLOCKWISE_90, Mirror.NONE));
+        assertFalse(Placements.canRedo());
+        Placements.undo();
+        assertEquals(new BlockPos(5, 0, 0), a.origin);
+        assertTrue(Placements.canRedo());
+        Placements.undo();
+        assertEquals(new BlockPos(0, 0, 0), a.origin);
+        Placements.redo();
+        assertEquals(new BlockPos(5, 0, 0), a.origin);
+        Placements.redo();
+        assertEquals(new BlockPos(5, 0, 7), a.origin);
+        assertEquals(new Orientation(Rotation.CLOCKWISE_90, Mirror.NONE), a.orientation);
+        assertFalse(Placements.canRedo());
+        assertNull(Placements.redo());
+        // undo, then a different change: what was undone is gone
+        Placements.undo();
+        Placements.remember(a);
+        a.set(new BlockPos(1, 1, 1), Orientation.NONE);
+        assertFalse(Placements.canRedo(), "a new change ends the redo history");
+        assertNull(Placements.redo());
+    }
+
+    @Test
+    void aRemovalCanBeUndoneAndRedoneInPlace() {
+        Placement a = make("a", 0, 0, 0), b = make("b", 1, 0, 0), c = make("c", 2, 0, 0);
+        Placements.add(a);
+        Placements.add(b);
+        Placements.add(c);
+        Placements.remember(b);
+        b.set(new BlockPos(9, 0, 0), Orientation.NONE);
+        Placements.select(b);
+        Placements.setMode(Placements.Mode.EDIT);
+        Placements.removeUndoable(b);
+        assertEquals(List.of(a, c), Placements.all());
+        assertNull(Placements.active());
+        assertEquals(Placements.Mode.IDLE, Placements.mode());
+        Placements.Change back = Placements.undo();
+        assertEquals(Placements.Kind.RESTORE, back.kind());
+        assertEquals(List.of(a, b, c), Placements.all(), "it comes back where it was in the list");
+        assertEquals(b, Placements.active());
+        assertEquals(new BlockPos(9, 0, 0), b.origin);
+        // the move before the removal is still on the stack
+        Placements.undo();
+        assertEquals(new BlockPos(1, 0, 0), b.origin);
+        Placements.redo();
+        assertEquals(new BlockPos(9, 0, 0), b.origin);
+        Placements.Change gone = Placements.redo();
+        assertEquals(Placements.Kind.DELETE, gone.kind());
+        assertEquals(List.of(a, c), Placements.all());
+        Placements.undo();
+        assertEquals(List.of(a, b, c), Placements.all());
+    }
+
+    @Test
+    void forgettingTheLastSnapshotLeavesNothingToUndo() {
+        Placement a = make("a", 0, 0, 0);
+        Placements.add(a);
+        Placements.remember(a);
+        Placements.forgetLast();
+        assertFalse(Placements.canUndo());
     }
 
     @Test

@@ -251,6 +251,11 @@ public final class GhostRenderer {
         final double[] cc = {cx, cy, cz};
         java.util.Arrays.sort(order, Comparator.comparingDouble(i -> distSq(candidates.get(i).bounds, shifts.get(i), cc[0], cc[1], cc[2])));
 
+        // the Layers tool: the edge layers of the window need their cap meshes
+        for (int i : order) {
+            Ghost.Section sec = candidates.get(i);
+            if (isCurrent(sec.ghost)) syncCaps(sec);
+        }
         for (int i : order) {
             if (IN_FLIGHT.get() >= MAX_IN_FLIGHT) break;
             Ghost.Section sec = candidates.get(i);
@@ -259,6 +264,12 @@ public final class GhostRenderer {
             if (sec.ghost.verifier != null && !sec.ghost.verifier.ready(sec.part, sec.vsec)) continue;
             startBake(sec);
         }
+        for (boolean exactOnly : new boolean[]{true, false}) {
+            for (int i : order) {
+                Ghost.Section sec = candidates.get(i);
+                if (isCurrent(sec.ghost)) bakeCaps(sec, exactOnly);
+            }
+        }
         int budget = UPLOAD_BYTES_PER_FRAME;
         for (int i : order) {
             Ghost.Section sec = candidates.get(i);
@@ -266,19 +277,22 @@ public final class GhostRenderer {
             if (budget <= 0) break;
             budget -= upload(sec);
         }
+        for (int i : order) {
+            Ghost.Section sec = candidates.get(i);
+            for (Ghost.Cap c : sec.caps.values()) if (c.state == Ghost.Section.BAKED) uploadCap(c);
+        }
 
         if (hidden) {
             Stats.drawn = 0;
             Stats.quadsDrawn = 0;
             return;
         }
-        List<Ghost.Section> draw = new ArrayList<>();
-        List<double[]> drawShift = new ArrayList<>();
-        List<double[]> drawRange = new ArrayList<>();
+        List<DrawItem> draw = new ArrayList<>();
+        int sectionsDrawn = 0;
         double fadeStart = range * FADE_FROM;
         for (int i : order) {
             Ghost.Section sec = candidates.get(i);
-            if (sec.buffer == null || sec.ghost.disposed) continue;
+            if (sec.buffer == null && sec.caps.isEmpty() || sec.ghost.disposed) continue;
             // only what is on screen draws: a pending ghost waits until it swaps in
             if (!isCurrent(sec.ghost)) continue;
             Placement pl = sec.ghost.placement;
@@ -286,25 +300,136 @@ public final class GhostRenderer {
             int base = sec.region.oy + sec.y;
             int a = pl.layerLo < 0 ? 0 : Math.max(0, pl.layerLo - base);
             int b = pl.layerHi < 0 ? sec.h - 1 : Math.min(sec.h - 1, pl.layerHi - base);
-            if (a > b || sec.layerQuads == null) continue;
-            int q0 = sec.layerQuads[a], q1 = sec.layerQuads[b + 1];
-            if (q1 <= q0) continue;
+            if (a > b) continue;
             double[] m = shifts.get(i);
             AABB box = sec.bounds.move(m[0], m[1], m[2]);
             if (!cam.cullFrustum.isVisible(box)) continue;
             double dist = Math.sqrt(distSq(sec.bounds, m, cx, cy, cz));
             double fade = !fadeEnabled || dist <= fadeStart ? 1.0 : Math.max(0.0, 1.0 - (dist - fadeStart) / (range - fadeStart));
             if (fade < 0.03) continue;
-            draw.add(sec);
-            drawShift.add(m);
-            drawRange.add(new double[]{q0, q1, fade});
+            if (sec.buffer != null && sec.layerQuads != null) {
+                int q0 = sec.layerQuads[a], q1 = sec.layerQuads[b + 1];
+                if (q1 > q0) {
+                    draw.add(new DrawItem(sec, sec.buffer, sec.indexCount, m, q0, q1, fade));
+                    sectionsDrawn++;
+                }
+            }
+            // the faces the cut layers would have covered
+            for (Ghost.Cap c : sec.caps.values()) {
+                if (c.exact && c.buffer != null && c.quads > 0) draw.add(new DrawItem(sec, c.buffer, c.indexCount, m, 0, c.quads, fade));
+            }
         }
-        Stats.drawn = draw.size();
+        Stats.drawn = sectionsDrawn;
         if (draw.isEmpty()) {
             Stats.quadsDrawn = 0;
             return;
         }
-        draw(cam, target, draw, drawShift, drawRange);
+        draw(cam, target, draw);
+    }
+
+    /** One buffer to draw: a section's mesh (a range of its quads) or one of its cap meshes. */
+    private record DrawItem(Ghost.Section s, GpuBuffer buffer, int indexCount, double[] shift, int q0, int q1, double fade) {
+    }
+
+    // ---- caps for the Layers tool
+
+    /** Decides which cap meshes a section needs for its placement's layer window, makes them, and drops the rest. */
+    private static void syncCaps(Ghost.Section sec) {
+        Placement pl = sec.ghost.placement;
+        if (!pl.layered() || sec.state != Ghost.Section.UPLOADED) {
+            if (!sec.caps.isEmpty()) {
+                for (Ghost.Cap c : sec.caps.values()) c.release();
+                sec.caps.clear();
+            }
+            return;
+        }
+        int base = sec.region.oy + sec.y;
+        java.util.Set<Integer> keep = new java.util.HashSet<>();
+        if (pl.layerHi >= 0) wantCap(sec, true, pl.layerHi - base, keep);
+        if (pl.layerLo > 0) wantCap(sec, false, pl.layerLo - base, keep);
+        sec.caps.entrySet().removeIf(e -> {
+            if (keep.contains(e.getKey())) return false;
+            e.getValue().release();
+            return true;
+        });
+        Verifier v = sec.ghost.verifier;
+        if (v != null) {
+            int version = v.version(sec.part, sec.vsec);
+            for (Ghost.Cap c : sec.caps.values()) if (c.state == Ghost.Section.UPLOADED && c.bakedVersion != version) c.state = Ghost.Section.IDLE;
+        }
+    }
+
+    /** The cap at the window's edge layer (drawn) and the layers next to it (ready for when the window moves). */
+    private static void wantCap(Ghost.Section sec, boolean top, int edge, java.util.Set<Integer> keep) {
+        for (int dl = -1; dl <= 1; dl++) {
+            int ly = edge + dl;
+            if (ly < 0 || ly >= sec.h) continue;
+            int key = ly * 2 + (top ? 1 : 0);
+            keep.add(key);
+            Ghost.Cap c = sec.caps.computeIfAbsent(key, k -> new Ghost.Cap(top, ly));
+            c.exact = dl == 0;
+        }
+    }
+
+    private static void bakeCaps(Ghost.Section sec, boolean exactOnly) {
+        if (sec.caps.isEmpty()) return;
+        Verifier v = sec.ghost.verifier;
+        if (v != null && !v.ready(sec.part, sec.vsec)) return;
+        for (Ghost.Cap c : sec.caps.values()) {
+            if (c.state != Ghost.Section.IDLE || exactOnly && !c.exact) continue;
+            if (IN_FLIGHT.get() >= MAX_IN_FLIGHT) return;
+            startCapBake(sec, c);
+        }
+    }
+
+    private static void startCapBake(Ghost.Section s, Ghost.Cap c) {
+        c.state = Ghost.Section.BAKING;
+        Verifier v = s.ghost.verifier;
+        byte[] mask = v == null ? null : v.snapshot(s.part, s.x, s.y, s.z, s.w, s.h, s.d);
+        c.bakingVersion = v == null ? 0 : v.version(s.part, s.vsec);
+        IN_FLIGHT.incrementAndGet();
+        WORKERS.execute(() -> {
+            try {
+                if (s.ghost.disposed || c.dead) {
+                    c.state = Ghost.Section.IDLE;
+                    return;
+                }
+                SectionMesher.BakedCap b = SectionMesher.bakeCap(s.region, s.wx, s.wy, s.wz, s.x, s.y, s.z, s.w, s.h, s.d, c.layer, c.top, s.ghost.level, mask);
+                c.baked = b;
+                c.state = Ghost.Section.BAKED;
+                if (c.dead || s.ghost.disposed) c.release();
+            } catch (Throwable t) {
+                Cyanotype.LOG.error("Ghost cap bake failed", t);
+                c.state = Ghost.Section.FAILED;
+            } finally {
+                IN_FLIGHT.decrementAndGet();
+            }
+        });
+    }
+
+    private static void uploadCap(Ghost.Cap c) {
+        SectionMesher.BakedCap b = c.baked;
+        c.baked = null;
+        c.bakedVersion = c.bakingVersion;
+        if (b == null) {
+            if (c.buffer != null) c.buffer.close();
+            c.buffer = null;
+            c.indexCount = 0;
+            c.quads = 0;
+            c.state = Ghost.Section.UPLOADED;
+            return;
+        }
+        try {
+            GpuBuffer fresh = RenderSystem.getDevice().createBuffer(() -> "Cyanotype ghost cap", GpuBuffer.USAGE_VERTEX, b.mesh().vertexBuffer());
+            if (c.buffer != null) c.buffer.close();
+            c.buffer = fresh;
+            c.indexCount = b.mesh().drawState().indexCount();
+            c.quads = b.quads();
+            RenderSystem.getSequentialBuffer(SectionMesher.renderType().primitiveTopology()).requestIndexCount(c.indexCount);
+            c.state = Ghost.Section.UPLOADED;
+        } finally {
+            b.close();
+        }
     }
 
     private static boolean isCurrent(Ghost g) {
@@ -462,7 +587,7 @@ public final class GhostRenderer {
         return bytes;
     }
 
-    private static void draw(CameraRenderState cam, RenderTarget target, List<Ghost.Section> sections, List<double[]> shifts, List<double[]> ranges) {
+    private static void draw(CameraRenderState cam, RenderTarget target, List<DrawItem> items) {
         PreparedRenderType prepared = SectionMesher.renderType().prepare();
         RenderPipeline pipeline = prepared.pipeline();
         Matrix4f modelView = RenderSystem.getModelViewMatrixCopy();
@@ -474,22 +599,20 @@ public final class GhostRenderer {
             RenderSystem.bindDefaultUniforms(pass);
             pass.setPipeline(RenderSystem.getCompiledPipeline(pipeline));
             for (PreparedRenderType.Texture t : prepared.textures()) pass.setUniform(t.name(), t.textureView(), t.sampler());
-            for (int i = 0; i < sections.size(); i++) {
-                Ghost.Section s = sections.get(i);
-                double[] m = shifts.get(i);
-                double[] qr = ranges.get(i);
-                float opacity = (float) (s.ghost.placement.opacity * qr[2]);
+            for (DrawItem it : items) {
+                Ghost.Section s = it.s();
+                double[] m = it.shift();
+                float opacity = (float) (s.ghost.placement.opacity * it.fade());
                 var slice = RenderSystem.getDynamicUniforms().writeTransform(
                     modelView,
                     new Vector4f(tintR, tintG, tintB, opacity),
                     new Vector3f((float) (s.wx + s.x + m[0] - cam.pos.x), (float) (s.wy + s.y + m[1] - cam.pos.y), (float) (s.wz + s.z + m[2] - cam.pos.z)),
                     texture);
                 pass.setUniform("DynamicTransforms", slice);
-                pass.setVertexBuffer(0, s.buffer.slice());
-                pass.setIndexBuffer(index.getBuffer(s.indexCount), index.type());
-                int q0 = (int) qr[0], q1 = (int) qr[1];
-                pass.drawIndexed((q1 - q0) * 6, 1, q0 * 6, 0, 0);
-                quads += q1 - q0;
+                pass.setVertexBuffer(0, it.buffer().slice());
+                pass.setIndexBuffer(index.getBuffer(it.indexCount()), index.type());
+                pass.drawIndexed((it.q1() - it.q0()) * 6, 1, it.q0() * 6, 0, 0);
+                quads += it.q1() - it.q0();
             }
         }
         Stats.quadsDrawn = quads;
