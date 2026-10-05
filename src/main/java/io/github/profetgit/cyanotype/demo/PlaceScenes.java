@@ -186,7 +186,7 @@ final class PlaceScenes {
         shot("handles_idle");
 
         // hover each handle by aiming at it
-        for (String id : List.of("move+x", "move-x", "move+y", "move+z", "ring", "flipx", "flipz")) {
+        for (String id : List.of("move+x", "move-x", "move+y", "ring", "flip")) {
             act(() -> {
                 Minecraft mc = Minecraft.getInstance();
                 Vec3 a = Interaction.handleAnchor(id);
@@ -198,10 +198,28 @@ final class PlaceScenes {
             });
             waitTicks(4);
             act(() -> {
-                String want = id.startsWith("move") ? "move" + id.substring(id.length() - 1) : id.startsWith("flip") ? id : "ringy";
-                check("handles/hover " + id, Interaction.hoverName().equals(want), "hover '" + Interaction.hoverName() + "'");
+                String want = id.startsWith("move") ? "move" + id.substring(id.length() - 1) : id.startsWith("flip") ? "flip" : "ringy";
+                check("handles/hover " + id, Interaction.hoverName().startsWith(want), "hover '" + Interaction.hoverName() + "'");
             });
         }
+
+        // an arrow pointing straight along the view is hidden and cannot be grabbed; from the side it can
+        act(() -> {
+            Vec3 a = Interaction.handleAnchor("move+z");
+            if (a != null) aim(Minecraft.getInstance(), a.x, a.y, a.z);
+        });
+        waitTicks(4);
+        act(() -> check("handles/an end-on arrow is not grabbable", Interaction.hoverName().isEmpty(), "hover '" + Interaction.hoverName() + "'"));
+        camera(-16, G + 6, 12.5, -90, 6);
+        waitTicks(10);
+        act(() -> {
+            Vec3 a = Interaction.handleAnchor("move+z");
+            if (a != null) aim(Minecraft.getInstance(), a.x, a.y, a.z);
+        });
+        waitTicks(5);
+        act(() -> check("handles/the same arrow from the side is", Interaction.hoverName().equals("movez"), "hover '" + Interaction.hoverName() + "'"));
+        camera(5.5, G + 9, -12, 0, 12);
+        waitTicks(10);
 
         // drag the +x arrow three blocks east
         act(() -> {
@@ -282,7 +300,7 @@ final class PlaceScenes {
 
         // a flip arrow flips on click
         act(() -> {
-            Vec3 a = Interaction.handleAnchor("flipx");
+            Vec3 a = Interaction.handleAnchor("flip");
             aim(Minecraft.getInstance(), a.x, a.y, a.z);
         });
         waitTicks(4);
@@ -326,6 +344,81 @@ final class PlaceScenes {
         act(() -> tap(Keys.TOGGLE));
         waitTicks(3);
         act(() -> check("handles/H shows them again", !GhostRenderer.hidden, "hidden " + GhostRenderer.hidden));
+        act(() -> {
+            for (Placement p : List.copyOf(Placements.all())) Placements.remove(p);
+        });
+    }
+
+    // ---- scene: look (stills of the handles for design review: idle, hovered, mid-drag, from a few distances)
+
+    static void aimAtHandle(String id) {
+        act(() -> {
+            Vec3 a = Interaction.handleAnchor(id);
+            if (a != null) aim(Minecraft.getInstance(), a.x, a.y, a.z);
+        });
+        waitTicks(8);
+    }
+
+    static void look() {
+        Director.clean();
+        act(() -> {
+            DevCommands.run("/cyanotype sample");
+        });
+        until("look/blueprint loaded", 200, () -> DevCommands.loadedBlueprint() != null);
+        act(() -> {
+            DevCommands.run("/cyanotype place 0 " + (G + 1) + " 6");
+            first = active();
+            Placements.setMode(Placements.Mode.EDIT);
+        });
+        until("look/baked", 300, GhostRenderer::settled);
+        camera(5.5, G + 9, -24, 0, 9);
+        waitTicks(14);
+        shot("look_far");
+        camera(5.5, G + 6, -11, 0, 8);
+        waitTicks(14);
+        shot("look_mid");
+        camera(-13, G + 8, -9, -38, 17);
+        waitTicks(14);
+        shot("look_angle");
+        camera(5.5, G + 6, -11, 0, 8);
+        waitTicks(10);
+        aimAtHandle("move+x");
+        shot("look_hover_arrow");
+        aimAtHandle("ring");
+        shot("look_hover_ring");
+        aimAtHandle("flip");
+        shot("look_hover_flip");
+        // mid-drag: the +x arrow two blocks out
+        aimAtHandle("move+x");
+        act(() -> hold(Minecraft.getInstance().options.keyAttack));
+        waitTicks(3);
+        Vec3[] grab = new Vec3[1];
+        act(() -> grab[0] = Interaction.handleAnchor("move+x"));
+        for (int k = 1; k <= 2; k++) {
+            int step = k;
+            act(() -> aim(Minecraft.getInstance(), grab[0].x + step, grab[0].y, grab[0].z));
+            waitTicks(5);
+        }
+        shot("look_drag_move");
+        act(() -> release(Minecraft.getInstance().options.keyAttack));
+        waitTicks(4);
+        aimAtHandle("ring");
+        act(() -> hold(Minecraft.getInstance().options.keyAttack));
+        waitTicks(3);
+        double[][] ring = new double[1][];
+        act(() -> ring[0] = Interaction.ringGeometry());
+        for (int deg = 15; deg <= 90; deg += 15) {
+            int d = deg;
+            act(() -> {
+                double a = Math.toRadians(d);
+                double[] r = ring[0];
+                aim(Minecraft.getInstance(), r[0] + Math.cos(a) * r[3], r[1], r[2] + Math.sin(a) * r[3]);
+            });
+            waitTicks(3);
+        }
+        shot("look_drag_turn");
+        act(() -> release(Minecraft.getInstance().options.keyAttack));
+        waitTicks(4);
         act(() -> {
             for (Placement p : List.copyOf(Placements.all())) Placements.remove(p);
         });

@@ -15,7 +15,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gizmos.Gizmos;
 import net.minecraft.gizmos.GizmoStyle;
-import net.minecraft.gizmos.TextGizmo;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.level.ClipContext;
@@ -51,7 +50,7 @@ public final class Interaction {
         double t0;
         int steps;
         // ring
-        double ringY, cx, cz, prevAngle, total;
+        double ringY, cx, cz, prevAngle, total, startAngle;
         int turns;
 
         Drag(Placement p, Handles.Handle handle) {
@@ -191,6 +190,7 @@ public final class Interaction {
 
     /** Forgets everything in progress (the world changed). */
     public static void reset() {
+        Handles.forget();
         drag = null;
         hover = null;
         handles = null;
@@ -204,6 +204,7 @@ public final class Interaction {
     public static void frame(Minecraft mc, CameraRenderState cam) {
         if (mc.level == null || mc.player == null) return;
         Vec3 pos = cam.pos;
+        Handles.camera.set(cam.orientation);
         Vector3f f = new Vector3f(0, 0, -1).rotate(cam.orientation);
         Vec3 look = new Vec3(f.x, f.y, f.z);
         Placement p = Placements.active();
@@ -235,7 +236,7 @@ public final class Interaction {
 
     private static void edit(Minecraft mc, Placement p, Vec3 camera, Vec3 look) {
         double y = GhostRenderer.visualY(p);
-        handles = new Handles(p.vx, y, p.vz, p.sizeX(), p.sizeY(), p.sizeZ(), camera);
+        handles = new Handles(p.vx, y, p.vz, p.sizeX(), p.sizeY(), p.sizeZ(), camera, look);
         if (drag != null) {
             updateDrag(mc, camera, look);
             hover = drag.handle;
@@ -249,7 +250,32 @@ public final class Interaction {
                     case FLIP -> "Click to flip " + (hover.axis == Direction.Axis.X ? "east-west" : "north-south");
                 });
         }
-        handles.emit(hover);
+        handles.animate(hover, drag == null ? null : drag.handle, dt());
+        handles.emit();
+        if (drag != null && drag.armed) dragGuides(handles, p);
+    }
+
+    private static long lastFrameNs;
+
+    /** Seconds since the previous frame, for the eased hover. */
+    private static double dt() {
+        long now = System.nanoTime();
+        double d = lastFrameNs == 0 ? 0.016 : Math.min(0.1, (now - lastFrameNs) / 1e9);
+        lastFrameNs = now;
+        return d;
+    }
+
+    /** What the drag in progress shows besides the handle itself: the travel line with block ticks, or the swept angle. */
+    private static void dragGuides(Handles h, Placement p) {
+        Drag d = drag;
+        if (d.handle.kind == Handles.Kind.MOVE) {
+            Vec3 center = new Vec3(d.startOrigin.getX() + d.startSx / 2.0, d.startOrigin.getY() + p.sizeY() / 2.0, d.startOrigin.getZ() + d.startSz / 2.0);
+            AABB start = new AABB(d.startOrigin.getX(), d.startOrigin.getY(), d.startOrigin.getZ(), d.startOrigin.getX() + d.startSx, d.startOrigin.getY() + p.sizeY(), d.startOrigin.getZ() + d.startSz);
+            Vec3 tip = d.handle.from.add(d.handle.to).scale(0.5);
+            Handles.moveGuide(center, d.handle.axis, d.steps, d.handle.color, start, tip, h.distance);
+        } else if (d.handle.kind == Handles.Kind.RING) {
+            Handles.turnGuide(d.cx, d.ringY, d.cz, h.ring.radius(), d.startAngle, d.turns, h.distance);
+        }
     }
 
     private static void updateDrag(Minecraft mc, Vec3 camera, Vec3 look) {
@@ -287,6 +313,7 @@ public final class Interaction {
             double angle = HandleMath.angle(camera.x + look.x * t, camera.z + look.z * t, d.cx, d.cz);
             if (!d.armed) {
                 d.prevAngle = angle;
+                d.startAngle = angle;
                 d.armed = true;
             }
             d.total += HandleMath.angleDelta(d.prevAngle, angle);
@@ -380,13 +407,28 @@ public final class Interaction {
         Placement active = Placements.active();
         for (Placement p : Placements.all()) {
             if (!p.visible || !p.ready() || !GhostRenderer.drawn(p) || GhostRenderer.hidden) continue;
-            boolean on = p == active && Placements.mode() != Mode.IDLE || p == active && p.locked;
+            boolean strong = p == active && (Placements.mode() != Mode.IDLE || p.locked);
             double y = GhostRenderer.visualY(p);
             AABB box = new AABB(p.vx, y, p.vz, p.vx + p.sizeX(), y + p.sizeY(), p.vz + p.sizeZ());
-            int color = on ? p.accent : (p.accent & 0x00FFFFFF) | 0x88000000;
-            Gizmos.cuboid(box, GizmoStyle.stroke(color, on ? 3.0f : 2.0f));
-            if (camera.distanceToSqr(box.getCenter()) < 96 * 96) {
-                Gizmos.billboardText(p.name, new Vec3(box.getCenter().x, box.maxY + 0.9, box.getCenter().z), TextGizmo.Style.forColorAndCentered(p.accent).withScale(0.36f)).setAlwaysOnTop();
+            Handles.outline(box, p.accent, strong);
+            Vec3 c = box.getCenter();
+            if (camera.distanceToSqr(c) < 96 * 96) {
+                double dist = camera.distanceTo(c);
+                double lift = 0.7 + 0.05 * dist;
+                float nameScale = Handles.labelScale(dist, 0.8, 0.055);
+                double lx = c.x, lz = c.z;
+                if (strong) {
+                    // while editing, the arrows own the middle of the top: the label moves to the top left, as the view sees it
+                    org.joml.Vector3f right = new org.joml.Vector3f(1, 0, 0).rotate(Handles.camera);
+                    double halfW = Math.abs(right.x) * p.sizeX() / 2 + Math.abs(right.z) * p.sizeZ() / 2;
+                    lx -= right.x * (halfW + 1.2 * nameScale);
+                    lz -= right.z * (halfW + 1.2 * nameScale);
+                }
+                Handles.label(new Vec3(lx, box.maxY + lift + 0.5 * nameScale, lz), p.name, nameScale, 0xFFFFFFFF, p.accent);
+                if (strong) {
+                    float dimScale = Handles.labelScale(dist, 0.55, 0.036);
+                    Handles.label(new Vec3(lx, box.maxY + lift - 0.2 * nameScale, lz), p.sizeX() + " x " + p.sizeY() + " x " + p.sizeZ(), dimScale, 0xFFB8D8FF, 0x66FFFFFF);
+                }
             }
         }
     }
@@ -433,7 +475,7 @@ public final class Interaction {
             String name = switch (handle.kind) {
                 case MOVE -> "move" + (handle.dir.getAxisDirection() == Direction.AxisDirection.POSITIVE ? "+" : "-") + handle.axis.getName();
                 case RING -> "ring";
-                case FLIP -> "flip" + handle.axis.getName();
+                case FLIP -> "flip";
             };
             if (!name.equals(id)) continue;
             if (handle.kind == Handles.Kind.RING) {
