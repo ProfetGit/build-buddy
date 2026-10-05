@@ -2,6 +2,7 @@ package io.github.profetgit.cyanotype.ui;
 
 import io.github.profetgit.cyanotype.ghost.GhostRenderer;
 import io.github.profetgit.cyanotype.interaction.Interaction;
+import io.github.profetgit.cyanotype.interaction.Selecting;
 import io.github.profetgit.cyanotype.placement.Placement;
 import io.github.profetgit.cyanotype.placement.Placements;
 import net.minecraft.client.Minecraft;
@@ -46,16 +47,10 @@ public enum Tool {
             mc.gui.setScreen(new MaterialsScreen());
         }
     },
-    SAVE("Save area", "save", "Coming with the next update") {
+    SAVE("Save area", "save", "Pick a box of your build and save it") {
         @Override
         void run(Minecraft mc) {
-            Sfx.play(Sfx.ERROR);
-            Interaction.say(mc, "Saving your own builds comes in a later version.");
-        }
-
-        @Override
-        boolean enabled(Minecraft mc) {
-            return false;
+            Selecting.start(mc);
         }
     },
     SETTINGS("Settings", "gear", "Look, feel and defaults") {

@@ -20,7 +20,9 @@ public final class Placements {
         /** The active, locked placement shows its handles. */
         EDIT,
         /** Scroll moves the window of layers shown (the Layers tool). */
-        LAYERS
+        LAYERS,
+        /** The Save area tool: corners are picked and the box is sized (see Selecting). */
+        SELECT
     }
 
     /**

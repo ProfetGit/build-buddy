@@ -550,15 +550,15 @@ final class UiScenes {
         waitTicks(3);
         act(() -> check("wheel/right click shows all layers", Placements.mode() == Placements.Mode.IDLE && !house.layered(), "layers " + house.layerLo + "-" + house.layerHi));
 
-        // the Save tool is not available yet: choosing it does nothing
+        // Redo has nothing to redo here: choosing it does nothing
         act(() -> {
             WheelScreen.testHeld = true;
             Interaction.testMainDown = true;
         });
         waitTicks(8);
-        act(() -> Ui.testMouse = segmentPoint(5));
+        act(() -> Ui.testMouse = segmentPoint(io.github.profetgit.cyanotype.ui.Tool.REDO.ordinal()));
         waitTicks(6);
-        shot("wheel_save_disabled");
+        shot("wheel_redo_disabled");
         act(() -> {
             WheelScreen.testHeld = false;
             Interaction.testMainDown = false;

@@ -66,6 +66,11 @@ final class Handles {
     private static Direction.Axis flipAxis = Direction.Axis.X;
 
     Handles(double x0, double y0, double z0, double sx, double sy, double sz, Vec3 camera, Vec3 look) {
+        this(x0, y0, z0, sx, sy, sz, camera, look, false);
+    }
+
+    /** @param facesOnly only the six arrows, no turn ring and no flip arrow (the Save area box is resized, not turned) */
+    Handles(double x0, double y0, double z0, double sx, double sy, double sz, Vec3 camera, Vec3 look, boolean facesOnly) {
         this.look = look;
         this.x0 = x0;
         this.y0 = y0;
@@ -89,6 +94,7 @@ final class Handles {
 
         double radius = Math.hypot(sx, sz) / 2 + 0.9 * scale;
         ring = new Ring(cx, cz, y0 + 0.05, radius, 0.45 * scale);
+        if (facesOnly) return;
         handles.add(new Handle(Kind.RING, null, Direction.Axis.Y, RING_COLOR, Vec3.ZERO, Vec3.ZERO, new double[0][]));
 
         // one flip arrow, across the view: its axis follows where the player looks (like ctrl+scroll), with some

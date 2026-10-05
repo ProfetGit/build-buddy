@@ -32,6 +32,8 @@ public final class Settings {
         public boolean groupVariants = false;
         // Advanced
         public boolean showNames = true;
+        /** The author last typed on the Save screen; empty = the player's name. */
+        public String author = "";
     }
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();

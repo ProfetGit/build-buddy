@@ -120,6 +120,7 @@ public final class Interaction {
         Minecraft mc = Minecraft.getInstance();
         Placement p = Placements.active();
         if (mc.gui.screen() != null || GhostRenderer.hidden) return false;
+        if (Placements.mode() == Mode.SELECT) return Selecting.onScroll(amount);
         if (Placements.mode() == Mode.LAYERS && p != null && p.locked) {
             scrollAcc += amount;
             int n = (int) scrollAcc;
@@ -150,6 +151,11 @@ public final class Interaction {
         // hidden ghosts and handles are not there to click
         if (GhostRenderer.hidden) return false;
         Placement p = Placements.active();
+        if (Placements.mode() == Mode.SELECT) {
+            Selecting.onAttack(Minecraft.getInstance());
+            suppressAttack = true;
+            return true;
+        }
         if (Placements.mode() == Mode.LAYERS) {
             endLayers(Minecraft.getInstance(), false);
             suppressAttack = true;
@@ -180,6 +186,10 @@ public final class Interaction {
     public static boolean onUse() {
         if (GhostRenderer.hidden) return false;
         Placement p = Placements.active();
+        if (Placements.mode() == Mode.SELECT) {
+            Selecting.onUse(Minecraft.getInstance());
+            return true;
+        }
         if (Placements.mode() == Mode.LAYERS) {
             endLayers(Minecraft.getInstance(), true);
             return true;
@@ -194,7 +204,7 @@ public final class Interaction {
 
     /** Whether holding the attack button should do nothing (it was used for a click or a drag, until it is let go). */
     public static boolean suppressHold() {
-        return suppressAttack || drag != null || !GhostRenderer.hidden && (Placements.mode() == Mode.PLACING || Placements.mode() == Mode.LAYERS);
+        return suppressAttack || drag != null || !GhostRenderer.hidden && (Placements.mode() == Mode.PLACING || Placements.mode() == Mode.LAYERS || Placements.mode() == Mode.SELECT);
     }
 
     public static void tick(Minecraft mc) {
@@ -223,6 +233,7 @@ public final class Interaction {
         }
         boolean down = mc.options.keyAttack.isDown();
         if (drag != null && (!down || screen)) endDrag();
+        if (Selecting.dragging() && (!down || screen)) Selecting.endDrag();
         if (suppressAttack && !down) suppressAttack = false;
         GhostRenderer.tickVerifiers(mc);
         PlacementStore.tick();
@@ -306,7 +317,7 @@ public final class Interaction {
         return true;
     }
 
-    private static void endDragSafely() {
+    static void endDragSafely() {
         endDrag();
     }
 
@@ -387,6 +398,7 @@ public final class Interaction {
         handles = null;
         suppressAttack = false;
         lift = 0;
+        Selecting.reset();
     }
 
     // ---- per frame
@@ -418,6 +430,8 @@ public final class Interaction {
                 chips(mc, new Chips.Chip("Scroll", "Move up / down"), new Chips.Chip("Shift+Scroll", "Thicker / thinner"), new Chips.Chip("Click", "Done"),
                     new Chips.Chip("Right click", "Show all layers"));
             }
+        } else if (mode == Mode.SELECT) {
+            Selecting.frame(mc, pos, look);
         } else if (mode == Mode.EDIT) {
             if (p == null || !p.locked || !p.ready() || !GhostRenderer.drawn(p)) {
                 if (p == null || !p.locked) Placements.setMode(Mode.IDLE);
@@ -463,7 +477,7 @@ public final class Interaction {
     private static long lastFrameNs;
 
     /** Seconds since the previous frame, for the eased hover. */
-    private static double dt() {
+    static double dt() {
         long now = System.nanoTime();
         double d = lastFrameNs == 0 ? 0.016 : Math.min(0.1, (now - lastFrameNs) / 1e9);
         lastFrameNs = now;
@@ -557,7 +571,7 @@ public final class Interaction {
         say(mc, p.name + " placed. Drag the arrows to adjust it, V when done.");
     }
 
-    private static void cancelPlacing() {
+    static void cancelPlacing() {
         Placement p = Placements.active();
         if (Placements.mode() == Mode.PLACING && p != null && !p.locked) Placements.remove(p);
         Placements.setMode(Mode.IDLE);
@@ -576,6 +590,7 @@ public final class Interaction {
                 say(mc, "Done editing");
             }
             case LAYERS -> endLayers(mc, false);
+            case SELECT -> Selecting.cancel(mc);
             case IDLE -> {
                 Placement aimed = aimedPlacement(mc);
                 if (aimed == null) aimed = Placements.active();
@@ -731,7 +746,7 @@ public final class Interaction {
     }
 
     /** Shows cursor chips, or the same words on the action bar when chips are switched off. */
-    private static void chips(Minecraft mc, Chips.Chip... chips) {
+    static void chips(Minecraft mc, Chips.Chip... chips) {
         if (Settings.get().chips) Chips.show(chips);
         else say(mc, Chips.line(chips));
     }

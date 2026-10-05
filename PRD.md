@@ -39,7 +39,7 @@ Both newcomers already have auto-placing and wide format support, so neither is 
 - Not a world editor (no WorldEdit-style fill, copy-paste into the world, brush tools).
 - No server-side component. It works as a client-only mod on any server.
 - No multi-version support beyond Fabric 26.3 at first (26.2 and backports are a later question).
-- No schematic marketplace or online sharing.
+- No schematic marketplace or online sharing inside the mod. (A separate community site exists since 2026-10-05: `~/Projects/cyanotype-community`. The mod does not talk to it yet. The site has a read-only API v1 ready for an in-game browser, see that project's CLAUDE.md; using it would change this non-goal.)
 - No features that hide the player from server rules: no spoofing of the client brand, no attempts to defeat anti-cheat, no placing through walls or beyond normal reach.
 
 ## 5. Users
