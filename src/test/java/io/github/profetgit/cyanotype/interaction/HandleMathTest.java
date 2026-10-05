@@ -59,4 +59,21 @@ class HandleMathTest {
         assertTrue(Double.isNaN(HandleMath.rayPlaneY(10, 1, 0)));
         assertTrue(Double.isNaN(HandleMath.rayPlaneY(10, 0, 0)));
     }
+
+    @Test
+    void theViewAxisIsTheOneLookedAlongTheMost() {
+        assertEquals(2, HandleMath.dominantAxis(0.1, -0.2, -0.97, 0));
+        assertEquals(0, HandleMath.dominantAxis(0.9, 0.1, 0.2, 2));
+        assertEquals(1, HandleMath.dominantAxis(0.1, -0.95, 0.2, 2));
+    }
+
+    @Test
+    void theViewAxisDoesNotFlickerWhereTwoAreAboutEqual() {
+        // looking at 45 degrees between x and z: whichever was chosen stays
+        assertEquals(0, HandleMath.dominantAxis(0.70, 0, 0.71, 0));
+        assertEquals(2, HandleMath.dominantAxis(0.71, 0, 0.70, 2));
+        // until the other is clearly stronger
+        assertEquals(2, HandleMath.dominantAxis(0.6, 0, 0.8, 0));
+        assertEquals(0, HandleMath.dominantAxis(0.8, 0, 0.6, 2));
+    }
 }

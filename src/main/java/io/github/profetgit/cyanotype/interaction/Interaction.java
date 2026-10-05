@@ -129,6 +129,11 @@ public final class Interaction {
             if (n != 0) layerScroll(mc, p, n);
             return true;
         }
+        if (Placements.mode() == Mode.EDIT && p != null && p.locked) {
+            // the wheel moves the build along the axis the player looks along; mid-drag it is not wanted, but must not change the hotbar either
+            if (drag == null) editScroll(mc, p, amount);
+            return true;
+        }
         if (Placements.mode() != Mode.PLACING || p == null || p.locked) return false;
         scrollAcc += amount;
         int steps = (int) scrollAcc;
@@ -476,20 +481,147 @@ public final class Interaction {
             chips(mc, new Chips.Chip("Release", "Drop it here"));
         } else {
             hover = handles.pick(camera, look);
+            nudgeDir = scrollDirection(look);
             if (hover == null) {
-                chips(mc, new Chips.Chip("Drag arrow", "Move"), new Chips.Chip("Drag ring", "Turn"), new Chips.Chip("Click flip", "Mirror"),
-                    new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo"), new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
+                chips(mc, new Chips.Chip("Scroll", "Push " + word(nudgeDir)), new Chips.Chip("Ctrl+Scroll", "Turn"), new Chips.Chip("Drag arrow", "Move"),
+                    new Chips.Chip("Click flip", "Mirror"), new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo"),
+                    new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
             } else {
                 chips(mc, switch (hover.kind) {
                     case MOVE -> new Chips.Chip("Drag", "Move " + axisWords(hover.axis));
                     case RING -> new Chips.Chip("Drag", "Turn in quarter turns");
                     case FLIP -> new Chips.Chip("Click", "Flip " + (hover.axis == Direction.Axis.X ? "east-west" : "north-south"));
-                });
+                }, new Chips.Chip("Scroll", "Push " + word(nudgeDir)));
             }
         }
-        handles.animate(hover, drag == null ? null : drag.handle, dt());
+        handles.animate(hover, drag == null ? null : drag.handle, dt(), drag == null ? nudgeDir.getAxis() : null);
         handles.emit();
         if (drag != null && drag.armed) dragGuides(handles, p);
+        if (drag == null) nudgeGuide(p, handles);
+    }
+
+    // ---- the scroll wheel in Edit mode: push along the axis the player looks along
+
+    /** Blocks a scroll step moves with Shift held. */
+    static final int NUDGE_FAST = 5;
+    private static final long GESTURE_NS = 700_000_000L, SHOW_NS = 1_800_000_000L;
+    private static Direction nudgeDir = Direction.NORTH;
+    private static Direction.Axis viewAxis = Direction.Axis.Z;
+    private static Vec3 editLook = new Vec3(0, 0, -1);
+    private static Placement gesturePlacement;
+    private static int gestureKind;
+    private static Direction gestureDir = Direction.NORTH;
+    private static int gestureTotal;
+    private static long gestureNs;
+    private static AABB gestureStart;
+
+    /**
+     * Which way one scroll step pushes: along the arrow the mouse is on, else along the axis the player looks along the
+     * most, away from them (so looking north, scrolling up pushes the build north). The axis only changes when another one
+     * clearly takes over, so it does not flicker at 45 degrees.
+     */
+    private static Direction scrollDirection(Vec3 look) {
+        editLook = look;
+        if (hover != null && hover.kind == Handles.Kind.MOVE) return hover.dir;
+        double[] c = {look.x, look.y, look.z};
+        int cur = HandleMath.dominantAxis(look.x, look.y, look.z, viewAxis.ordinal());
+        viewAxis = Direction.Axis.values()[cur];
+        return Direction.fromAxisAndDirection(viewAxis, c[cur] >= 0 ? Direction.AxisDirection.POSITIVE : Direction.AxisDirection.NEGATIVE);
+    }
+
+    static String word(Direction d) {
+        return switch (d) {
+            case NORTH -> "north";
+            case SOUTH -> "south";
+            case EAST -> "east";
+            case WEST -> "west";
+            case UP -> "up";
+            case DOWN -> "down";
+        };
+    }
+
+    private static AABB boundsOf(Placement p) {
+        return new AABB(p.origin.getX(), p.origin.getY(), p.origin.getZ(), p.origin.getX() + p.sizeX(), p.origin.getY() + p.sizeY(), p.origin.getZ() + p.sizeZ());
+    }
+
+    /**
+     * Starts a new undo step, unless this is the same kind of scroll as a moment ago on the same placement: a run of
+     * scroll steps is one thing to undo.
+     * @return true when it is a new gesture
+     */
+    private static boolean gesture(Placement p, int kind, Direction.Axis axis) {
+        long now = System.nanoTime();
+        boolean fresh = gesturePlacement != p || gestureKind != kind || now - gestureNs > GESTURE_NS || kind == 1 && gestureDir.getAxis() != axis || kind == 3;
+        gestureNs = now;
+        if (fresh) {
+            Placements.remember(p);
+            gesturePlacement = p;
+            gestureKind = kind;
+        }
+        return fresh;
+    }
+
+    private static void editScroll(Minecraft mc, Placement p, double amount) {
+        scrollAcc += amount;
+        int n = (int) scrollAcc;
+        scrollAcc -= n;
+        if (n == 0) return;
+        boolean ctrl = ctrl(mc), shift = shift(mc);
+        if (ctrl && shift) flipByScroll(mc, p);
+        else if (ctrl) turnByScroll(mc, p, n);
+        else nudge(mc, p, n * (shift ? NUDGE_FAST : 1));
+    }
+
+    /** Moves the placement {@code n} blocks along the scroll direction (negative n goes the other way). */
+    private static void nudge(Minecraft mc, Placement p, int n) {
+        Direction d = nudgeDir;
+        if (gesture(p, 1, d.getAxis())) {
+            gestureStart = boundsOf(p);
+            gestureTotal = 0;
+            gestureDir = d;
+        }
+        gestureTotal += d == gestureDir ? n : -n;
+        p.set(p.origin.offset(d.getStepX() * n, d.getStepY() * n, d.getStepZ() * n), p.orientation);
+        PlacementStore.markDirty();
+        Sfx.play(Sfx.SNAP, 1.0f + 0.04f * Math.min(12, Math.abs(gestureTotal)));
+        String where = "   now at " + p.origin.getX() + " " + p.origin.getY() + " " + p.origin.getZ();
+        say(mc, gestureTotal == 0 ? "Back where it was" + where : "Moved " + Math.abs(gestureTotal) + " " + word(gestureTotal > 0 ? gestureDir : gestureDir.getOpposite()) + where);
+    }
+
+    private static void turnByScroll(Minecraft mc, Placement p, int n) {
+        gesture(p, 2, null);
+        Orientation o = p.orientation;
+        for (int i = 0; i < Math.abs(n); i++) o = o.rotated(n > 0 ? Rotation.CLOCKWISE_90 : Rotation.COUNTERCLOCKWISE_90);
+        Blueprint bp = p.blueprint;
+        if (bp == null) return;
+        int[] xz = Moves.keepCenter(p.origin.getX(), p.origin.getZ(), p.sizeX(), p.sizeZ(), o.sizeX(bp.sizeX, bp.sizeZ), o.sizeZ(bp.sizeX, bp.sizeZ));
+        p.set(new BlockPos(xz[0], p.origin.getY(), xz[1]), o);
+        PlacementStore.markDirty();
+        Sfx.play(Sfx.SNAP, 1.25f);
+        say(mc, "Turned " + (n > 0 ? "clockwise" : "anticlockwise") + " about its middle");
+    }
+
+    private static void flipByScroll(Minecraft mc, Placement p) {
+        gesture(p, 3, null);
+        p.set(p.origin, p.orientation.flipped(Math.abs(editLook.x) > Math.abs(editLook.z) ? Direction.Axis.Z : Direction.Axis.X));
+        PlacementStore.markDirty();
+        Sfx.play(Sfx.PRESS, 1.2f);
+        say(mc, "Flipped");
+    }
+
+    /** For a moment after a scroll push: where the build was, and how far it has gone, by the arrow it went toward. */
+    private static void nudgeGuide(Placement p, Handles h) {
+        if (gesturePlacement != p || gestureKind != 1 || gestureStart == null || gestureTotal == 0) return;
+        long since = System.nanoTime() - gestureNs;
+        if (since > SHOW_NS) return;
+        Gizmos.cuboid(gestureStart, GizmoStyle.stroke(0x66FFFFFF, 1.6f)).setAlwaysOnTop();
+        Direction shown = gestureTotal > 0 ? gestureDir : gestureDir.getOpposite();
+        for (Handles.Handle a : h.handles) {
+            if (a.kind != Handles.Kind.MOVE || a.dir != shown) continue;
+            Vec3 tip = a.to;
+            Handles.label(tip.add(0, 0.12 * h.distance + 0.9, 0), (gestureTotal > 0 ? "+" : "") + gestureTotal + "  " + word(gestureDir), Handles.labelScale(h.distance, 1.1, 0.1), 0xFFFFFFFF, 0xFFFFFFFF);
+            break;
+        }
     }
 
     private static long lastFrameNs;
@@ -506,7 +638,8 @@ public final class Interaction {
     private static void dragGuides(Handles h, Placement p) {
         Drag d = drag;
         if (d.handle.kind == Handles.Kind.MOVE) {
-            Vec3 center = new Vec3(d.startOrigin.getX() + d.startSx / 2.0, d.startOrigin.getY() + p.sizeY() / 2.0, d.startOrigin.getZ() + d.startSz / 2.0);
+            // the ticks run along the line the arrow is dragged on, by the arrow, where the player is looking
+            Vec3 center = d.linePoint;
             AABB start = new AABB(d.startOrigin.getX(), d.startOrigin.getY(), d.startOrigin.getZ(), d.startOrigin.getX() + d.startSx, d.startOrigin.getY() + p.sizeY(), d.startOrigin.getZ() + d.startSz);
             Vec3 tip = d.handle.from.add(d.handle.to).scale(0.5);
             Handles.moveGuide(center, d.handle.axis, d.steps, d.handle.color, start, tip, h.distance);
@@ -522,7 +655,9 @@ public final class Interaction {
             if (!d.armed) {
                 Direction dir = Direction.fromAxisAndDirection(d.handle.axis, Direction.AxisDirection.POSITIVE);
                 d.axis = new Vec3(dir.getStepX(), dir.getStepY(), dir.getStepZ());
-                d.linePoint = new Vec3(d.startOrigin.getX() + d.startSx / 2.0, d.startOrigin.getY() + p.sizeY() / 2.0, d.startOrigin.getZ() + d.startSz / 2.0);
+                // the line is the one through the arrow itself, not through the middle of the build: the arrow stands where the player
+                // is, and a line a hundred blocks away would turn every pixel of mouse movement into blocks
+                d.linePoint = d.handle.from;
             }
             double t = HandleMath.closestOnLine(camera.x, camera.y, camera.z, look.x, look.y, look.z,
                 d.linePoint.x, d.linePoint.y, d.linePoint.z, d.axis.x, d.axis.y, d.axis.z);

@@ -33,8 +33,10 @@ final class Handles {
         final Vec3 from, to;
         final double[][] boxes;
         final String id;
+        /** How big this handle is drawn: a face arrow is sized by its own distance from the camera, so it stays easy to hit on a huge build. */
+        final double scale;
 
-        Handle(Kind kind, Direction dir, Direction.Axis axis, int color, Vec3 from, Vec3 to, double[][] boxes) {
+        Handle(Kind kind, Direction dir, Direction.Axis axis, int color, Vec3 from, Vec3 to, double[][] boxes, double scale) {
             this.kind = kind;
             this.dir = dir;
             this.axis = axis;
@@ -42,6 +44,7 @@ final class Handles {
             this.from = from;
             this.to = to;
             this.boxes = boxes;
+            this.scale = scale;
             this.id = kind == Kind.FLIP ? "FLIP" : kind + ":" + (axis == null ? "" : axis.getName()) + ":" + (dir == null ? "" : dir.getName());
         }
     }
@@ -64,6 +67,8 @@ final class Handles {
     /** Distance to the camera, for text that has to stay readable. */
     final double distance;
     private static Direction.Axis flipAxis = Direction.Axis.X;
+    /** The most a face arrow is scaled up for distance: further away it stays this size and the build is just far. */
+    static final double MAX_ARROW_SCALE = 8.0;
 
     Handles(double x0, double y0, double z0, double sx, double sy, double sz, Vec3 camera, Vec3 look) {
         this(x0, y0, z0, sx, sy, sz, camera, look, false);
@@ -82,30 +87,89 @@ final class Handles {
         double dist = camera.distanceTo(new Vec3(cx, cy, cz));
         this.distance = dist;
         this.scale = Math.max(1.0, Math.min(12.0, dist / 14.0));
-        double gap = 0.45 * scale, len = 2.8 * scale, pick = 0.45 * scale;
+        double pick = 0.45 * scale;
 
-        double[] half = {sx / 2, sy / 2, sz / 2};
+        // a face arrow stands on the point of its face nearest the camera, not at the face's middle: on a build a hundred
+        // blocks tall the middle of the top is out of sight and out of reach, the nearest point never is
+        double[] lo = {x0, y0, z0}, size = {sx, sy, sz}, cam = {camera.x, camera.y, camera.z};
         for (Direction d : Direction.values()) {
-            Vec3 face = new Vec3(cx + d.getStepX() * half[0], cy + d.getStepY() * half[1], cz + d.getStepZ() * half[2]);
+            int a = d.getAxis().ordinal();
+            double[] at = new double[3];
+            for (int i = 0; i < 3; i++) {
+                if (i == a) {
+                    at[i] = lo[i] + (d.getAxisDirection() == Direction.AxisDirection.POSITIVE ? size[i] : 0);
+                } else {
+                    double inset = Math.min(1.0, size[i] / 2);
+                    at[i] = Math.max(lo[i] + inset, Math.min(lo[i] + size[i] - inset, cam[i]));
+                }
+            }
+            Vec3 face = new Vec3(at[0], at[1], at[2]);
+            // on a tall build the top and bottom are out of reach whatever the camera does: the up and down arrows then stand
+            // beside the nearest wall at eye level instead
+            if (d.getAxis() == Direction.Axis.Y && tall(camera, face, sy)) face = sideMount(camera, d, lo, size);
+            double s = Math.max(1.0, Math.min(MAX_ARROW_SCALE, camera.distanceTo(face) / 14.0));
+            double gap = 0.45 * s, len = 2.8 * s, spick = 0.45 * s;
             Vec3 from = face.add(d.getStepX() * gap, d.getStepY() * gap, d.getStepZ() * gap);
             Vec3 to = from.add(d.getStepX() * len, d.getStepY() * len, d.getStepZ() * len);
-            handles.add(new Handle(Kind.MOVE, d, d.getAxis(), axisColor(d.getAxis()), from, to, new double[][]{box(from, to, pick)}));
+            handles.add(new Handle(Kind.MOVE, d, d.getAxis(), axisColor(d.getAxis()), from, to, new double[][]{box(from, to, spick)}, s));
         }
 
         double radius = Math.hypot(sx, sz) / 2 + 0.9 * scale;
         ring = new Ring(cx, cz, y0 + 0.05, radius, 0.45 * scale);
         if (facesOnly) return;
-        handles.add(new Handle(Kind.RING, null, Direction.Axis.Y, RING_COLOR, Vec3.ZERO, Vec3.ZERO, new double[0][]));
+        handles.add(new Handle(Kind.RING, null, Direction.Axis.Y, RING_COLOR, Vec3.ZERO, Vec3.ZERO, new double[0][], scale));
 
         // one flip arrow, across the view: its axis follows where the player looks (like ctrl+scroll), with some
         // hysteresis so it does not jump back and forth at 45 degrees
         double ax = Math.abs(look.x), az = Math.abs(look.z);
         if (ax > az * 1.15) flipAxis = Direction.Axis.Z;
         else if (az > ax * 1.15) flipAxis = Direction.Axis.X;
+        double fscale = scale, fpick = pick;
         double fy = y0 + sy + 1.4 * scale, span = 1.5 * scale, off = 3.4 * scale;
-        Vec3 fa = flipAxis == Direction.Axis.X ? new Vec3(cx + off - span, fy, cz) : new Vec3(cx, fy, cz + off - span);
-        Vec3 fb = flipAxis == Direction.Axis.X ? new Vec3(cx + off + span, fy, cz) : new Vec3(cx, fy, cz + off + span);
-        handles.add(new Handle(Kind.FLIP, null, flipAxis, axisColor(flipAxis), fa, fb, new double[][]{box(fa, fb, pick)}));
+        Vec3 fcx = new Vec3(cx + off, fy, cz);
+        Vec3 topPoint = new Vec3(Math.max(x0, Math.min(x0 + sx, camera.x)), y0 + sy, Math.max(z0, Math.min(z0 + sz, camera.z)));
+        if (tall(camera, topPoint, sy)) {
+            // out of reach on top: beside the up and down arrows, at eye level
+            Vec3 m = sideMount(camera, Direction.UP, lo, size);
+            fcx = new Vec3(m.x, m.y, m.z);
+            fscale = Math.max(1.0, Math.min(MAX_ARROW_SCALE, camera.distanceTo(m) / 14.0));
+            fpick = 0.45 * fscale;
+            span = 1.5 * fscale;
+            fcx = fcx.add(tangentOf(camera, lo, size).scale(2.8 * fscale));
+        }
+        Vec3 fa = flipAxis == Direction.Axis.X ? new Vec3(fcx.x - span, fcx.y, fcx.z) : new Vec3(fcx.x, fcx.y, fcx.z - span);
+        Vec3 fb = flipAxis == Direction.Axis.X ? new Vec3(fcx.x + span, fcx.y, fcx.z) : new Vec3(fcx.x, fcx.y, fcx.z + span);
+        handles.add(new Handle(Kind.FLIP, null, flipAxis, axisColor(flipAxis), fa, fb, new double[][]{box(fa, fb, fpick)}, fscale));
+    }
+
+    /** Whether a face point is too far above or below the camera to be a good place for an arrow: a build over 16 blocks tall, with the point more than 20 away. */
+    static boolean tall(Vec3 camera, Vec3 point, double height) {
+        return height > 16 && camera.distanceTo(point) > 20;
+    }
+
+    /** The wall of the box nearest the camera's horizontal position: {outward x, outward z, tangent x, tangent z, wall x, wall z}. */
+    private static double[] nearestWall(Vec3 camera, double[] lo, double[] size) {
+        double qx = Math.max(lo[0], Math.min(lo[0] + size[0], camera.x)), qz = Math.max(lo[2], Math.min(lo[2] + size[2], camera.z));
+        double dxLo = qx - lo[0], dxHi = lo[0] + size[0] - qx, dzLo = qz - lo[2], dzHi = lo[2] + size[2] - qz;
+        double m = Math.min(Math.min(dxLo, dxHi), Math.min(dzLo, dzHi));
+        if (m == dxLo) return new double[]{-1, 0, 0, 1, lo[0], qz};
+        if (m == dxHi) return new double[]{1, 0, 0, 1, lo[0] + size[0], qz};
+        if (m == dzLo) return new double[]{0, -1, 1, 0, qx, lo[2]};
+        return new double[]{0, 1, 1, 0, qx, lo[2] + size[2]};
+    }
+
+    private static Vec3 tangentOf(Vec3 camera, double[] lo, double[] size) {
+        double[] w = nearestWall(camera, lo, size);
+        return new Vec3(w[2], 0, w[3]);
+    }
+
+    /** Where an up or down arrow stands on a tall build: just outside the nearest wall at the camera's height, up to the left, down to the right. */
+    private static Vec3 sideMount(Vec3 camera, Direction d, double[] lo, double[] size) {
+        double[] w = nearestWall(camera, lo, size);
+        double y = Math.max(lo[1] + 1, Math.min(lo[1] + size[1] - 1, camera.y));
+        double s = Math.max(1.0, Math.min(MAX_ARROW_SCALE, camera.distanceTo(new Vec3(w[4], y, w[5])) / 14.0));
+        double side = (d == Direction.UP ? 1 : -1) * 1.6 * s, out = 1.2 * s;
+        return new Vec3(w[4] + w[0] * out + w[2] * side, y, w[5] + w[1] * out + w[3] * side);
     }
 
     static int axisColor(Direction.Axis a) {
@@ -149,10 +213,16 @@ final class Handles {
 
     /** Eases every handle's hover and press toward where the mouse is now. {@code grabbed} is the handle being dragged, or null. */
     void animate(Handle hovered, Handle grabbed, double dt) {
+        animate(hovered, grabbed, dt, null);
+    }
+
+    /** As above; the arrows of {@code emphasis} glow a little (the axis the scroll wheel moves along). */
+    void animate(Handle hovered, Handle grabbed, double dt, Direction.Axis emphasis) {
         double k = 1 - Math.exp(-dt / HOVER_SECONDS);
         for (Handle h : handles) {
             float hv = HOVER.getOrDefault(h.id, 0f), pr = PRESS.getOrDefault(h.id, 0f);
-            float ht = h == hovered || h == grabbed ? 1f : 0f, pt = h == grabbed ? 1f : 0f;
+            float glow = emphasis != null && h.kind == Kind.MOVE && h.axis == emphasis ? 0.5f : 0f;
+            float ht = h == hovered || h == grabbed ? 1f : glow, pt = h == grabbed ? 1f : 0f;
             hv += (ht - hv) * (float) k;
             pr += (pt - pr) * (float) k;
             if (Math.abs(ht - hv) < 0.004f) hv = ht;
@@ -177,14 +247,14 @@ final class Handles {
                 case MOVE -> {
                     if (endOn(h)) continue;
                     Vec3 dir = h.to.subtract(h.from).normalize();
-                    arrow(h.from, dir, h.from.distanceTo(h.to), k, h.color, e, along(dir, e));
+                    arrow(h.from, dir, h.from.distanceTo(h.to), k, h.color, e, along(dir, e), h.scale);
                 }
                 case FLIP -> {
                     Vec3 mid = h.from.add(h.to).scale(0.5);
                     Vec3 dir = h.to.subtract(h.from).normalize();
                     double half = h.from.distanceTo(h.to) / 2;
-                    arrow(mid, dir, half, k, h.color, e, 1f);
-                    arrow(mid, dir.scale(-1), half, k, h.color, e, 1f);
+                    arrow(mid, dir, half, k, h.color, e, 1f, h.scale);
+                    arrow(mid, dir.scale(-1), half, k, h.color, e, 1f, h.scale);
                 }
                 case RING -> ring(e, p);
             }
@@ -248,7 +318,7 @@ final class Handles {
      * A solid arrow: a square shaft and a pyramid head, translucent fill under a crisp outline. {@code length} is the
      * whole arrow from {@code from} along the axis-aligned {@code dir}; {@code k} scales its thickness (the swell on hover).
      */
-    private void arrow(Vec3 from, Vec3 dir, double length, double k, int color, float hover, float visible) {
+    private void arrow(Vec3 from, Vec3 dir, double length, double k, int color, float hover, float visible, double scale) {
         double unit = scale * k;
         double w = 0.15 * unit, headHalf = 0.46 * unit, headLen = Math.min(1.2 * unit, length * 0.45);
         Vec3 headBase = from.add(dir.scale(length - headLen));

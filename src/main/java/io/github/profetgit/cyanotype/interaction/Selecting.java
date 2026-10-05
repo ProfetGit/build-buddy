@@ -242,8 +242,8 @@ public final class Selecting {
         Direction.Axis axis = dragHandle.axis;
         Direction plus = Direction.fromAxisAndDirection(axis, Direction.AxisDirection.POSITIVE);
         if (!dragArmed) {
-            AABB a = dragStart.aabb();
-            dragCenter = a.getCenter();
+            // through the arrow itself, so the box follows the mouse one to one however big it is
+            dragCenter = dragHandle.from;
         }
         double t = HandleMath.closestOnLine(camera.x, camera.y, camera.z, look.x, look.y, look.z,
             dragCenter.x, dragCenter.y, dragCenter.z, plus.getStepX(), plus.getStepY(), plus.getStepZ());

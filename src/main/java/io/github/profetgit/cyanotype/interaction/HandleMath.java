@@ -78,4 +78,15 @@ public final class HandleMath {
     public static int quarterTurns(double radians) {
         return (int) Math.round(radians / (Math.PI / 2));
     }
+
+    /**
+     * The axis (0 x, 1 y, 2 z) a view direction points along the most. The current axis is kept until another one is more
+     * than 15 % stronger, so the choice does not flicker where two are about equal (at 45 degrees).
+     */
+    public static int dominantAxis(double lx, double ly, double lz, int current) {
+        double[] c = {Math.abs(lx), Math.abs(ly), Math.abs(lz)};
+        int best = 0;
+        for (int i = 1; i < 3; i++) if (c[i] > c[best]) best = i;
+        return best != current && c[best] > c[current] * 1.15 ? best : current;
+    }
 }
