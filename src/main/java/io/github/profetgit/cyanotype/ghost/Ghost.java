@@ -1,8 +1,11 @@
 package io.github.profetgit.cyanotype.ghost;
 
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import io.github.profetgit.cyanotype.blueprint.Blueprint;
 import io.github.profetgit.cyanotype.blueprint.Region;
+import io.github.profetgit.cyanotype.placement.Orientation;
 import io.github.profetgit.cyanotype.placement.Placement;
+import net.minecraft.core.BlockPos;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -17,21 +20,38 @@ public final class Ghost {
 
     public final Placement placement;
     final ClientLevel level;
+    final Blueprint blueprint;
+    /** Where and how it was baked: the meshes are in world coordinates of this origin, turned by this orientation. */
+    final BlockPos bakeOrigin;
+    final Orientation bakeOrientation;
     /** Null until the (worker-thread) preparation has finished. */
     volatile List<Section> sections;
     volatile boolean disposed;
+    /** Sections in range that still wait to be baked or uploaded; -1 until a frame has looked. */
+    volatile int pendingInRange = -1;
 
-    Ghost(Placement placement, ClientLevel level) {
+    Ghost(Placement placement, Blueprint blueprint, ClientLevel level, BlockPos bakeOrigin, Orientation bakeOrientation) {
         this.placement = placement;
+        this.blueprint = blueprint;
         this.level = level;
+        this.bakeOrigin = bakeOrigin;
+        this.bakeOrientation = bakeOrientation;
+    }
+
+    int sizeX() {
+        return bakeOrientation.sizeX(blueprint.sizeX, blueprint.sizeZ);
+    }
+
+    int sizeZ() {
+        return bakeOrientation.sizeZ(blueprint.sizeX, blueprint.sizeZ);
     }
 
     /** Builds the turned regions and the section list; called on a worker thread. */
     void prepare() {
         List<Section> out = new ArrayList<>();
-        int ox = placement.origin.getX(), oy = placement.origin.getY(), oz = placement.origin.getZ();
-        for (Region r : placement.blueprint.regions) {
-            OrientedRegion o = OrientedRegion.of(placement.blueprint, r, placement.orientation);
+        int ox = bakeOrigin.getX(), oy = bakeOrigin.getY(), oz = bakeOrigin.getZ();
+        for (Region r : blueprint.regions) {
+            OrientedRegion o = OrientedRegion.of(blueprint, r, bakeOrientation);
             int wx = ox + o.ox, wy = oy + o.oy, wz = oz + o.oz;
             for (int y = 0; y < o.sy; y += SECTION) {
                 for (int z = 0; z < o.sz; z += SECTION) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs the scripted ghost scenes in the real client, off-screen (headless KWin via ModTest/client.py): stills, checks, frame times.
 # Usage: dev/demo/run.sh <out> [scene,scene...]   (scenes: house, perf)
-# Env: PERF (perf builds, e.g. "solid:80,shell:160:2,noise:100"), MEASURE (frames per timing, 300), FPS (260 = unlimited),
+# Env: PERF (perf builds, e.g. "solid:80,shell:160:2,noise:100"), PERF_EDIT=1 (measure with the handles showing), MEASURE (frames per timing, 300), FPS (260 = unlimited),
 #      WIDTH/HEIGHT (1280x720), XMX (3G; big builds need more), MODS (extra jars, colon-separated), FABRIC_API=1,
 #      WORK_TAG (own game dir, for parallel runs), SKIP_BUILD=1, TIMEOUT (s), PROFILE=1 (the user's Fabric 26.3 mods;
 #      EXCLUDE=regex drops some), SHADERS=1 (Complementary Reimagined, with PROFILE=1 for Iris).
@@ -21,6 +21,7 @@ args=(26.3 fabric "$OUT" --game "$HERE/.work/game${WORK_TAG:+-$WORK_TAG}" --jar 
       --opt "fps=${FPS:-260}" --opt volume=0.0001 --opt render_distance=8 --opt "xmx=${XMX:-3G}" --width "${WIDTH:-1280}" --height "${HEIGHT:-720}"
       --user Builder --log-errors "Cyanotype.*(cannot|failed|error)" --timeout "${TIMEOUT:-900}" --label "cyanotype $SCENES")
 [ -n "${PERF:-}" ] && args+=(-D "cyanotype.demo.perf=$PERF")
+[ -n "${PERF_EDIT:-}" ] && args+=(-D "cyanotype.demo.perf.edit=true")
 [ -n "${FABRIC_API:-}" ] && args+=(--fabric-api)
 if [ -n "${MODS:-}" ]; then IFS=: read -ra extra <<< "$MODS"; for m in "${extra[@]}"; do args+=(--mod "$m"); done; fi
 if [ -n "${SHADERS:-}" ]; then args+=(--shaders "$HOME/.local/share/ModrinthApp/profiles/Fabric 26.3/shaderpacks/ComplementaryReimagined_r5.8.1.zip"); fi

@@ -6,7 +6,9 @@
   "client": [
     "ChatScreenMixin",
     "LevelRendererMixin",
-    "MinecraftMixin"
+    "MinecraftMixin",
+    "MouseHandlerMixin",
+    "OptionsMixin"
   ],
   "injectors": {
     "defaultRequire": 1

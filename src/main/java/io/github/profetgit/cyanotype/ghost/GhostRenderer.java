@@ -1,17 +1,21 @@
 package io.github.profetgit.cyanotype.ghost;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import io.github.profetgit.cyanotype.Cyanotype;
+import io.github.profetgit.cyanotype.blueprint.Blueprint;
 import io.github.profetgit.cyanotype.placement.Placement;
+import io.github.profetgit.cyanotype.placement.Placements;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -20,18 +24,26 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.world.phys.AABB;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
 /**
- * Draws the ghosts. Everything here runs on the render thread except the bake jobs. Each frame: notice a changed
- * level or resource reload (rebuild), start bake jobs for the nearest unbaked sections, upload finished meshes
- * (bounded per frame), then draw every visible uploaded section in one render pass, nearest first, with the block
- * pipeline's translucent variant so fog, lightmap and shader packs treat it as terrain.
+ * Draws the ghosts of every placement. Everything here runs on the render thread except the bake jobs. Each frame:
+ * ease each placement's drawn position, notice a changed level or resource reload (rebuild), keep a ghost baked for
+ * where each placement really is (a new one is baked beside the old and swapped in when it is ready, so edits never
+ * flicker), start bake jobs for the nearest unbaked sections, upload finished meshes (bounded per frame), then draw
+ * every visible uploaded section in one render pass, nearest first, with the block pipeline's translucent variant so
+ * fog, lightmap and shader packs treat it as terrain.
  */
 public final class GhostRenderer {
-    private static final List<Ghost> GHOSTS = new CopyOnWriteArrayList<>();
+    /** One placement's ghost: the one on screen, and the next one while it bakes. */
+    private static final class Slot {
+        Ghost current, pending;
+    }
+
+    private static final Map<Placement, Slot> SLOTS = new IdentityHashMap<>();
     private static final AtomicInteger IN_FLIGHT = new AtomicInteger();
     private static final ExecutorService WORKERS = Executors.newFixedThreadPool(Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 4)), r -> {
         Thread t = new Thread(r, "Cyanotype baker");
@@ -41,7 +53,13 @@ public final class GhostRenderer {
     });
     private static final int MAX_IN_FLIGHT = 8;
     private static final int UPLOAD_BYTES_PER_FRAME = 4 << 20;
+    /** A placement that has not moved for this long gets a ghost baked for its true position (tints and offsets depend on it). */
+    private static final long REBAKE_AFTER_NS = 250_000_000L;
     private static Object lastModels;
+    private static long lastFrameNs;
+
+    /** The quick toggle: ghosts keep baking but are not drawn (nor are their handles). */
+    public static volatile boolean hidden;
 
     /** How far from the camera sections are baked and drawn, in blocks. */
     public static volatile double range = 192;
@@ -58,133 +76,255 @@ public final class GhostRenderer {
     private GhostRenderer() {
     }
 
-    public static Ghost show(Placement placement) {
-        Minecraft mc = Minecraft.getInstance();
-        Ghost g = new Ghost(placement, mc.level);
-        GHOSTS.add(g);
-        pendingInRange = -1;
-        prepare(g);
-        return g;
-    }
-
-    public static void hide(Placement placement) {
-        for (Ghost g : GHOSTS) {
-            if (g.placement == placement) {
-                GHOSTS.remove(g);
-                g.dispose();
-            }
-        }
-    }
-
+    /** Frees every ghost; the next frame rebuilds those that should be drawn. */
     public static void clear() {
-        for (Ghost g : GHOSTS) g.dispose();
-        GHOSTS.clear();
+        for (Slot s : SLOTS.values()) disposeSlot(s);
+        SLOTS.clear();
     }
 
-    /** Rebuilds a placement's ghost after its origin, orientation or blueprint changed. */
-    public static void rebuild(Placement placement) {
-        hide(placement);
-        if (placement.visible) show(placement);
-    }
-
+    /** Ghosts currently on screen, one per drawn placement (dev checks). */
     public static List<Ghost> ghosts() {
-        return GHOSTS;
+        List<Ghost> out = new ArrayList<>();
+        for (Slot s : SLOTS.values()) if (s.current != null) out.add(s.current);
+        return out;
     }
 
-    private static void prepare(Ghost g) {
+    /** The drawn offset of a ghost from where it was baked, as the renderer applies it. */
+    private static void shift(Placement p, Ghost g, double[] out) {
+        double y = p.vy + liftOffset(p) - g.bakeOrigin.getY();
+        if (g.bakeOrientation.equals(p.orientation)) {
+            out[0] = p.vx - g.bakeOrigin.getX();
+            out[2] = p.vz - g.bakeOrigin.getZ();
+        } else {
+            // a turned placement still shows its old ghost for a moment: keep it centred where the new one will be
+            double cx = p.vx + p.sizeX() / 2.0, cz = p.vz + p.sizeZ() / 2.0;
+            out[0] = cx - (g.bakeOrigin.getX() + g.sizeX() / 2.0);
+            out[2] = cz - (g.bakeOrigin.getZ() + g.sizeZ() / 2.0);
+        }
+        out[1] = y;
+    }
+
+    /** Whether the placement has a ghost on screen right now. */
+    public static boolean drawn(Placement p) {
+        Slot s = SLOTS.get(p);
+        return s != null && s.current != null;
+    }
+
+    /** The height the placement is drawn at: its eased position plus the lift of a held ghost. */
+    public static double visualY(Placement p) {
+        return p.vy + liftOffset(p);
+    }
+
+    /** How far above its place the ghost is drawn: held while following the crosshair, a spring after the lock. */
+    static double liftOffset(Placement p) {
+        if (!p.locked && Placements.active() == p && Placements.mode() == Placements.Mode.PLACING) return Feel.LIFT;
+        if (p.settleStartNs != 0) {
+            double t = (System.nanoTime() - p.settleStartNs) / 1e9;
+            if (t >= Feel.SETTLE_SECONDS) {
+                p.settleStartNs = 0;
+                return 0;
+            }
+            return Feel.LIFT * Feel.spring(t);
+        }
+        return 0;
+    }
+
+    /** Whether every ghost has finished baking what is in range and has swapped in its latest version (dev checks). */
+    public static boolean settled() {
+        boolean any = false;
+        for (Placement p : Placements.all()) {
+            if (!wantsDraw(p, Minecraft.getInstance().level)) continue;
+            any = true;
+            Slot s = SLOTS.get(p);
+            if (s == null || s.current == null || s.pending != null) return false;
+            if (s.current.sections == null || s.current.pendingInRange != 0) return false;
+            if (!s.current.bakeOrientation.equals(p.orientation)) return false;
+        }
+        return any;
+    }
+
+    static boolean wantsDraw(Placement p, ClientLevel level) {
+        return level != null && p.visible && p.ready() && p.dimension.equals(level.dimension().identifier().toString());
+    }
+
+    private static void disposeSlot(Slot s) {
+        if (s.current != null) s.current.dispose();
+        if (s.pending != null) s.pending.dispose();
+        s.current = s.pending = null;
+    }
+
+    private static Ghost newGhost(Placement p, Blueprint bp, ClientLevel level) {
+        Ghost g = new Ghost(p, bp, level, p.origin, p.orientation);
         WORKERS.execute(() -> {
             try {
                 g.prepare();
             } catch (Throwable t) {
-                Cyanotype.LOG.error("Could not prepare ghost of {}", g.placement.name, t);
+                Cyanotype.LOG.error("Could not prepare ghost of {}", p.name, t);
             }
         });
-    }
-
-    /** Sections in range that still wait to be baked or uploaded; -1 until a frame has looked. */
-    private static volatile int pendingInRange = -1;
-
-    /** Whether every section within range of the camera has finished baking and uploading (dev checks). */
-    public static boolean settled() {
-        return pendingInRange == 0 && !GHOSTS.isEmpty() && GHOSTS.stream().allMatch(g -> g.sections != null);
+        return g;
     }
 
     /** Called once per frame from the level renderer, after the main pass has composed the scene. */
-    public static void render(Minecraft mc, CameraRenderState cam, com.mojang.blaze3d.pipeline.RenderTarget target) {
-        if (GHOSTS.isEmpty()) return;
+    public static void render(Minecraft mc, CameraRenderState cam, RenderTarget target) {
         long t0 = System.nanoTime();
         try {
             renderTimed(mc, cam, target);
         } finally {
-            Stats.cpuNanos += System.nanoTime() - t0;
-            Stats.frames++;
+            if (!SLOTS.isEmpty()) {
+                Stats.cpuNanos += System.nanoTime() - t0;
+                Stats.frames++;
+            }
         }
     }
 
-    private static void renderTimed(Minecraft mc, CameraRenderState cam, com.mojang.blaze3d.pipeline.RenderTarget target) {
+    private static void renderTimed(Minecraft mc, CameraRenderState cam, RenderTarget target) {
         ClientLevel level = mc.level;
+        long now = System.nanoTime();
+        double dt = lastFrameNs == 0 ? 0.016 : Math.min(0.1, (now - lastFrameNs) / 1e9);
+        lastFrameNs = now;
+
         Object models = mc.getModelManager().getBlockStateModelSet();
         boolean reloaded = lastModels != null && models != lastModels;
         lastModels = models;
-        for (Ghost g : GHOSTS) {
-            boolean otherLevel = g.level != level;
-            if (reloaded || otherLevel) {
-                GHOSTS.remove(g);
-                g.dispose();
-                // a resource reload changes the baked UVs: rebuild in place; another world's ghost is dropped
-                if (reloaded && !otherLevel && g.placement.visible) show(g.placement);
+        if (reloaded) clear();
+        // placements that are gone, or whose ghost belongs to another level
+        SLOTS.entrySet().removeIf(e -> {
+            Placement p = e.getKey();
+            Slot s = e.getValue();
+            boolean gone = !Placements.all().contains(p);
+            boolean otherLevel = (s.current != null && s.current.level != level) || (s.pending != null && s.pending.level != level);
+            if (gone || otherLevel || !wantsDraw(p, level)) {
+                disposeSlot(s);
+                return true;
             }
+            return false;
+        });
+
+        for (Placement p : Placements.all()) {
+            if (!wantsDraw(p, level)) continue;
+            animate(p, dt);
+            maintain(p, SLOTS.computeIfAbsent(p, k -> new Slot()), p.blueprint, level, now);
         }
-        if (level == null) return;
+        if (level == null || SLOTS.isEmpty()) return;
 
         double cx = cam.pos.x, cy = cam.pos.y, cz = cam.pos.z;
         double rangeSq = range * range;
+        double[] sh = new double[3];
         List<Ghost.Section> candidates = new ArrayList<>();
+        List<double[]> shifts = new ArrayList<>();
         int total = 0;
-        for (Ghost g : GHOSTS) {
-            List<Ghost.Section> list = g.sections;
-            if (list == null || !g.placement.visible) continue;
-            total += list.size();
-            for (Ghost.Section s : list) {
-                if (distSq(s, cx, cy, cz) <= rangeSq) candidates.add(s);
+        for (Slot s : SLOTS.values()) {
+            for (Ghost g : new Ghost[]{s.pending, s.current}) {
+                if (g == null || g.sections == null) continue;
+                shift(g.placement, g, sh);
+                double[] mine = sh.clone();
+                int pending = 0;
+                for (Ghost.Section sec : g.sections) {
+                    if (distSq(sec.bounds, mine, cx, cy, cz) > rangeSq) continue;
+                    if (sec.state == Ghost.Section.IDLE || sec.state == Ghost.Section.BAKING || sec.state == Ghost.Section.BAKED) pending++;
+                    candidates.add(sec);
+                    shifts.add(mine);
+                }
+                g.pendingInRange = pending;
+                if (g == s.current) total += g.sections.size();
             }
+            if (s.current != null && s.current.sections == null) s.current.pendingInRange = -1;
+            if (s.pending != null && s.pending.sections == null) s.pending.pendingInRange = -1;
         }
         Stats.sections = total;
-        int pending = 0;
-        for (Ghost.Section s : candidates) {
-            if (s.state == Ghost.Section.IDLE || s.state == Ghost.Section.BAKING || s.state == Ghost.Section.BAKED) pending++;
-        }
-        for (Ghost g : GHOSTS) if (g.sections == null) pending++;
-        pendingInRange = pending;
-        candidates.sort(Comparator.comparingDouble(s -> distSq(s, cx, cy, cz)));
 
-        for (Ghost.Section s : candidates) {
+        // nearest first, for baking; the pending ghosts bake after what is on screen only when nothing else is waiting
+        Integer[] order = new Integer[candidates.size()];
+        for (int i = 0; i < order.length; i++) order[i] = i;
+        final double[] cc = {cx, cy, cz};
+        java.util.Arrays.sort(order, Comparator.comparingDouble(i -> distSq(candidates.get(i).bounds, shifts.get(i), cc[0], cc[1], cc[2])));
+
+        for (int i : order) {
             if (IN_FLIGHT.get() >= MAX_IN_FLIGHT) break;
-            if (s.state == Ghost.Section.IDLE) startBake(s);
+            Ghost.Section sec = candidates.get(i);
+            if (sec.state == Ghost.Section.IDLE) startBake(sec);
         }
         int budget = UPLOAD_BYTES_PER_FRAME;
-        for (Ghost.Section s : candidates) {
-            if (s.state != Ghost.Section.BAKED) continue;
+        for (int i : order) {
+            Ghost.Section sec = candidates.get(i);
+            if (sec.state != Ghost.Section.BAKED) continue;
             if (budget <= 0) break;
-            budget -= upload(s);
+            budget -= upload(sec);
         }
 
+        if (hidden) {
+            Stats.drawn = 0;
+            Stats.quadsDrawn = 0;
+            return;
+        }
         List<Ghost.Section> draw = new ArrayList<>();
-        for (Ghost.Section s : candidates) {
-            if (s.state == Ghost.Section.UPLOADED && cam.cullFrustum.isVisible(s.bounds)) draw.add(s);
+        List<double[]> drawShift = new ArrayList<>();
+        for (int i : order) {
+            Ghost.Section sec = candidates.get(i);
+            if (sec.state != Ghost.Section.UPLOADED || sec.ghost.disposed) continue;
+            // only what is on screen draws: a pending ghost waits until it swaps in
+            if (!isCurrent(sec.ghost)) continue;
+            double[] m = shifts.get(i);
+            AABB box = sec.bounds.move(m[0], m[1], m[2]);
+            if (cam.cullFrustum.isVisible(box)) {
+                draw.add(sec);
+                drawShift.add(m);
+            }
         }
         Stats.drawn = draw.size();
         if (draw.isEmpty()) {
             Stats.quadsDrawn = 0;
             return;
         }
-        draw(cam, target, draw);
+        draw(cam, target, draw, drawShift);
     }
 
-    private static double distSq(Ghost.Section s, double cx, double cy, double cz) {
-        double dx = Math.max(Math.max(s.bounds.minX - cx, 0), cx - s.bounds.maxX);
-        double dy = Math.max(Math.max(s.bounds.minY - cy, 0), cy - s.bounds.maxY);
-        double dz = Math.max(Math.max(s.bounds.minZ - cz, 0), cz - s.bounds.maxZ);
+    private static boolean isCurrent(Ghost g) {
+        Slot s = SLOTS.get(g.placement);
+        return s != null && s.current == g;
+    }
+
+    /** Eases the drawn position toward the real one. */
+    private static void animate(Placement p, double dt) {
+        if (!p.visualReady) {
+            p.vx = p.origin.getX();
+            p.vy = p.origin.getY();
+            p.vz = p.origin.getZ();
+            p.visualReady = true;
+            return;
+        }
+        p.vx = Feel.ease(p.vx, p.origin.getX(), dt, Feel.FOLLOW);
+        p.vy = Feel.ease(p.vy, p.origin.getY(), dt, Feel.FOLLOW);
+        p.vz = Feel.ease(p.vz, p.origin.getZ(), dt, Feel.FOLLOW);
+    }
+
+    /** Whether a ghost still serves a placement: same blueprint and turn, and baked where it is (or still moving, when the offset hides the difference). */
+    private static boolean fits(Ghost g, Placement p, Blueprint bp, boolean idle) {
+        return g.blueprint == bp && g.bakeOrientation.equals(p.orientation) && (g.bakeOrigin.equals(p.origin) || !idle);
+    }
+
+    /** Keeps a ghost baked for where the placement really is, and swaps a finished one in. */
+    private static void maintain(Placement p, Slot s, Blueprint bp, ClientLevel level, long now) {
+        boolean idle = now - p.lastMoveNs >= REBAKE_AFTER_NS;
+        Ghost newest = s.pending != null ? s.pending : s.current;
+        if (newest == null || !fits(newest, p, bp, idle)) {
+            // a newer wish than what is baking or showing: start over for it, keeping what is on screen until it is ready
+            if (s.pending != null) s.pending.dispose();
+            s.pending = newGhost(p, bp, level);
+        }
+        Ghost pend = s.pending;
+        if (pend != null && pend.sections != null && pend.pendingInRange == 0) {
+            if (s.current != null) s.current.dispose();
+            s.current = pend;
+            s.pending = null;
+        }
+    }
+
+    private static double distSq(AABB b, double[] m, double cx, double cy, double cz) {
+        double dx = Math.max(Math.max(b.minX + m[0] - cx, 0), cx - (b.maxX + m[0]));
+        double dy = Math.max(Math.max(b.minY + m[1] - cy, 0), cy - (b.maxY + m[1]));
+        double dz = Math.max(Math.max(b.minZ + m[2] - cz, 0), cz - (b.maxZ + m[2]));
         return dx * dx + dy * dy + dz * dz;
     }
 
@@ -237,7 +377,7 @@ public final class GhostRenderer {
         return bytes;
     }
 
-    private static void draw(CameraRenderState cam, com.mojang.blaze3d.pipeline.RenderTarget target, List<Ghost.Section> sections) {
+    private static void draw(CameraRenderState cam, RenderTarget target, List<Ghost.Section> sections, List<double[]> shifts) {
         PreparedRenderType prepared = SectionMesher.renderType().prepare();
         RenderPipeline pipeline = prepared.pipeline();
         Matrix4f modelView = RenderSystem.getModelViewMatrixCopy();
@@ -249,12 +389,14 @@ public final class GhostRenderer {
             RenderSystem.bindDefaultUniforms(pass);
             pass.setPipeline(RenderSystem.getCompiledPipeline(pipeline));
             for (PreparedRenderType.Texture t : prepared.textures()) pass.setUniform(t.name(), t.textureView(), t.sampler());
-            for (Ghost.Section s : sections) {
+            for (int i = 0; i < sections.size(); i++) {
+                Ghost.Section s = sections.get(i);
+                double[] m = shifts.get(i);
                 float opacity = s.ghost.placement.opacity;
                 var slice = RenderSystem.getDynamicUniforms().writeTransform(
                     modelView,
                     new Vector4f(tintR, tintG, tintB, opacity),
-                    new Vector3f((float) (s.wx + s.x - cam.pos.x), (float) (s.wy + s.y - cam.pos.y), (float) (s.wz + s.z - cam.pos.z)),
+                    new Vector3f((float) (s.wx + s.x + m[0] - cam.pos.x), (float) (s.wy + s.y + m[1] - cam.pos.y), (float) (s.wz + s.z + m[2] - cam.pos.z)),
                     texture);
                 pass.setUniform("DynamicTransforms", slice);
                 pass.setVertexBuffer(0, s.buffer.slice());

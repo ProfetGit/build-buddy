@@ -9,6 +9,7 @@ import io.github.profetgit.cyanotype.command.DevCommands;
 import io.github.profetgit.cyanotype.ghost.GhostRenderer;
 import io.github.profetgit.cyanotype.placement.Orientation;
 import io.github.profetgit.cyanotype.placement.Placement;
+import io.github.profetgit.cyanotype.placement.Placements;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
@@ -208,6 +209,13 @@ public final class Director {
                 case "house" -> houseScene();
                 case "perf" -> perfScenes();
                 case "commands" -> commandScene();
+                case "place" -> PlaceScenes.place();
+                case "handles" -> PlaceScenes.handles();
+                case "safety" -> PlaceScenes.safety();
+                case "hints" -> PlaceScenes.hints();
+                case "persist" -> PlaceScenes.persist();
+                case "persist-leave" -> PlaceScenes.persistLeave();
+                case "persist-return" -> PlaceScenes.persistReturn();
                 default -> {
                     String s = scene;
                     act(() -> check("scene " + s, false, "unknown scene"));
@@ -216,9 +224,24 @@ public final class Director {
         }
     }
 
+    static final String DIM = "minecraft:overworld";
     static Placement house;
 
+    static Placement locked(Placement p) {
+        p.locked = true;
+        return p;
+    }
+
+    /** Persistence restores the last run's placements at world join; scenes that count ghosts start without them. */
+    static void clean() {
+        act(() -> {
+            for (Placement p : java.util.List.copyOf(Placements.all())) Placements.remove(p);
+        });
+        waitTicks(4);
+    }
+
     static void houseScene() {
+        clean();
         act(() -> {
             try {
                 Blueprint bp = Samples.house();
@@ -227,8 +250,8 @@ public final class Director {
                 LitematicWriter.write(bp, file);
                 Blueprint back = LitematicReader.read(file);
                 check("house/file round trip", same(bp, back), bp.totalBlocks() + " blocks, " + Files.size(file) + " bytes on disk");
-                house = new Placement("house", back, new BlockPos(0, G + 1, 6), Orientation.NONE);
-                GhostRenderer.show(house);
+                house = locked(new Placement("house", back, "cyanotype:house.litematic", DIM, new BlockPos(0, G + 1, 6), Orientation.NONE));
+                Placements.add(house);
             } catch (IOException e) {
                 check("house/file round trip", false, e.toString());
             }
@@ -241,28 +264,27 @@ public final class Director {
         };
         shootViews("house", views);
         act(() -> {
-            house.orientation = new Orientation(Rotation.CLOCKWISE_90, Mirror.NONE);
-            GhostRenderer.rebuild(house);
+            house.set(house.origin, new Orientation(Rotation.CLOCKWISE_90, Mirror.NONE));
         });
         until("house/rotated rebaked", 600, GhostRenderer::settled);
         shootViews("house_cw90", new double[][]{views[0], views[1], views[2]});
         act(() -> {
-            house.orientation = new Orientation(Rotation.NONE, Mirror.LEFT_RIGHT);
-            GhostRenderer.rebuild(house);
+            house.set(house.origin, new Orientation(Rotation.NONE, Mirror.LEFT_RIGHT));
         });
         until("house/mirrored rebaked", 600, GhostRenderer::settled);
         shootViews("house_mirror", new double[][]{views[0], views[1]});
-        act(() -> {
-            GhostRenderer.hide(house);
-            check("house/hidden", GhostRenderer.ghosts().isEmpty(), "ghosts left " + GhostRenderer.ghosts().size());
-        });
+        act(() -> Placements.remove(house));
+        waitTicks(4);
+        act(() -> check("house/hidden", GhostRenderer.ghosts().isEmpty(), "ghosts left " + GhostRenderer.ghosts().size()));
     }
 
     /** The chat commands, run through the same handler the chat screen calls. */
     static void commandScene() {
+        clean();
         double[][] views = {{5, G + 4, -10, 0, 12}, {5, G + 4, -10, 0, 12}};
+        act(() -> DevCommands.run("/cyanotype sample"));
+        waitTicks(10);
         act(() -> {
-            DevCommands.run("/cyanotype sample");
             DevCommands.run("/cyanotype place 0 " + (G + 1) + " 6");
             DevCommands.run("/cyanotype opacity 35");
         });
@@ -307,7 +329,7 @@ public final class Director {
                     case "shell" -> Samples.shell(side, p.length > 2 ? Integer.parseInt(p[2]) : 1);
                     default -> Samples.noise(side, 0.5);
                 };
-                pl[0] = new Placement(kind, bp[0], new BlockPos(-side / 2, G + 1, 20), Orientation.NONE);
+                pl[0] = locked(new Placement(kind, bp[0], "cyanotype:" + kind + ".litematic", DIM, new BlockPos(-side / 2, G + 1, 20), Orientation.NONE));
                 System.out.println("[cydemo] perf " + kind + ": " + bp[0].totalBlocks() + " blocks");
             });
             String label = kind.replace(':', '_');
@@ -317,7 +339,7 @@ public final class Director {
             measure(label + " baseline");
             act(() -> {
                 long t0 = System.nanoTime();
-                GhostRenderer.show(pl[0]);
+                Placements.add(pl[0]);
                 GhostRenderer.Stats.bakeNanos.reset();
                 GhostRenderer.Stats.bakedSections.reset();
                 GhostRenderer.Stats.bytesUploaded.reset();
@@ -331,17 +353,21 @@ public final class Director {
                 check(label + " bake", true, ms + " ms wall, " + GhostRenderer.Stats.bakedSections.sum() + " sections, " + String.format(Locale.ROOT, "%.1f MiB", GhostRenderer.Stats.bytesUploaded.sum() / 1048576.0));
             });
             waitTicks(20);
-            measure(label + " in view");
+            if (EDIT) act(() -> Placements.setMode(Placements.Mode.EDIT));
+            waitTicks(10);
+            measure(label + (EDIT ? " in view, editing" : " in view"));
             shot("perf_" + label);
+            act(() -> Placements.setMode(Placements.Mode.IDLE));
             camera(0, G + 1 + side * 0.4, 20 - side * 0.9, 180, 8);
             waitTicks(30);
             measure(label + " out of view");
-            act(() -> GhostRenderer.hide(pl[0]));
+            act(() -> Placements.remove(pl[0]));
             waitTicks(20);
         }
     }
 
     static final long[] bakeStart = new long[1];
+    static final boolean EDIT = Boolean.getBoolean("cyanotype.demo.perf.edit");
 
     /** Times FRAMES frames and records the average frame time and the ghost's own render-thread cost per frame. */
     static void measure(String label) {
