@@ -39,7 +39,7 @@ Both newcomers already have auto-placing and wide format support, so neither is 
 - Not a world editor (no WorldEdit-style fill, copy-paste into the world, brush tools).
 - No server-side component. It works as a client-only mod on any server.
 - No multi-version support beyond Fabric 26.3 at first (26.2 and backports are a later question).
-- No schematic marketplace or online sharing inside the mod. (A separate community site exists since 2026-10-05: `~/Projects/cyanotype-community`. The mod does not talk to it yet. The site has a read-only API v1 ready for an in-game browser, see that project's CLAUDE.md; using it would change this non-goal.)
+- No marketplace or uploading inside the mod. Decided 2026-10-05 (the author's call, replacing "no online sharing"): the Library has a read-only Community tab that browses and downloads builds from the separate community website (`~/Projects/cyanotype-community`, API v1, see 7.1b). Sharing a build (accounts, upload, moderation) stays on the website; the mod never sends the player's files or any account data.
 - No features that hide the player from server rules: no spoofing of the client brand, no attempts to defeat anti-cheat, no placing through walls or beyond normal reach.
 
 ## 5. Users
@@ -112,6 +112,12 @@ Premium feel comes from timing, easing and sound, not from baked frames. Rule: *
 - Search and sort (recent, name, size).
 - Importing: drag a file onto the game window copies it into the folder.
 - Formats: see 7.1a.
+
+### 7.1b Community tab (decided 2026-10-05)
+- A second tab in the Library, "Community": builds that other players shared on the community website, read through its public read-only API v1 (no account, no key). Search, category chips, sort (newest, most downloaded), pages, cards with the server-drawn preview, title, author, size label and downloads.
+- A card opens a detail view: preview, facts, description, materials, and a Download button. Download saves the file into `config/cyanotype/blueprints` after checking size, checksum and that the reader can open it; it never replaces a file (same name rule as Save area: "name 2"); the file then appears in the normal Library, tagged `community`, with a tags file that remembers the site and build id. Only `.litematic` can be downloaded until the mod reads `.schem`/`.nbt`; other builds say so and link to their page.
+- First use asks once before anything is sent ("This tab contacts <site>: your searches and your internet address are visible to it"). Settings > Community switches it off or on; off sends nothing. The address is a setting (`communityUrl`; default is a constant that stays empty until the site has a public host, https only except for localhost).
+- Network work never runs on the render thread; the tab has loading, empty, offline and error states; requests stay under the site's limits (120 API calls and 30 downloads a minute), answers are cached for the site's max-age.
 
 ### 7.2 Placement
 - Selecting a blueprint attaches a ghost to the crosshair; the ghost's origin snaps to the block grid.
@@ -230,6 +236,7 @@ Auto-placing places blocks for the player from their inventory.
 | M4 | UI pass | Tool wheel, library, material panel, tooltips and chips using kit B, with the motion and sounds from 6b (reduce-motion setting included). |
 | M5 | Save area | Selection box tool, write `.litematic`, reload test. |
 | M5b | Smart Pick | Click-to-select picks a test set of builds (house, duck, village house, cave cabin) with correct bounds; refinement tools work; no frame hitch while it runs. |
+| M5c | Community tab | Library tab against the community site's API v1: first-run notice and off switch (nothing sent before the answer), list with search/chips/sort/paging, detail with materials, Download into `config/cyanotype/blueprints` (checksum-checked, never overwrites), file shows up in Mine; loading/empty/offline states; JUnit for parsing, paging, file-name safety and no-overwrite; real-client scene against a local site. |
 | M6 | Auto-placing | Assist and Sweep modes, limits, server disclaimer and per-server memory, blocked-server list, HUD badge. |
 | M6b | Tool Ponders | Viewport + timeline engine, recorder, scenes for the first set of tools. |
 | M7 | Polish and release | Sodium/Iris matrix, performance pass, docs, icon/banner, Modrinth page (with the standard AI disclosure), repo. |

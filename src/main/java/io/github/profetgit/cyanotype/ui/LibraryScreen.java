@@ -44,6 +44,65 @@ public final class LibraryScreen extends Screen {
     private String toast = "";
     private String down = "";
     private LibraryModel.Entry downCard;
+    private enum Tab {
+        MINE, COMMUNITY
+    }
+
+    private Tab tab = Tab.MINE;
+    private String mineText = "", communityText = "";
+    private boolean swapping;
+    private final CommunityPane community = new CommunityPane(new CommunityPane.Host() {
+        @Override
+        public void place(Path file) {
+            onClose();
+            String title = file.getFileName().toString().replaceFirst("(?i)\\.litematic$", ""), ref = BlueprintLibrary.refOf(file);
+            BlueprintLibrary.load(file, bp -> Interaction.startPlacing(title, bp, ref), why -> Interaction.say(minecraft, "Could not open " + file.getFileName() + ": " + why));
+        }
+
+        @Override
+        public void showMine() {
+            switchTab(Tab.MINE);
+        }
+
+        @Override
+        public void say(String text) {
+            LibraryScreen.this.say(text);
+        }
+
+        @Override
+        public void rescan() {
+            model.rescan();
+            lastQuery = null;
+        }
+
+        @Override
+        public void openSettings() {
+            minecraft.gui.setScreen(new SettingsScreen());
+        }
+    });
+
+    private static int tabWidth(Tab t) {
+        return t == Tab.MINE ? 40 : 66;
+    }
+
+    private static String tabLabel(Tab t) {
+        return t == Tab.MINE ? "Mine" : "Community";
+    }
+
+    private void switchTab(Tab to) {
+        if (to == tab) return;
+        swapping = true;
+        if (tab == Tab.MINE) mineText = search.getValue();
+        else communityText = search.getValue();
+        tab = to;
+        search.setValue(to == Tab.MINE ? mineText : communityText);
+        swapping = false;
+        if (to == Tab.MINE) {
+            model.rescan();
+            lastQuery = null;
+        }
+        Sfx.play(Sfx.PRESS, 1.1f);
+    }
 
     public LibraryScreen() {
         super(Component.literal("Library"));
@@ -56,6 +115,9 @@ public final class LibraryScreen extends Screen {
         search.setBordered(false);
         search.setMaxLength(40);
         search.setTextColor(Ui.WHITE);
+        search.setResponder(text -> {
+            if (!swapping && tab == Tab.COMMUNITY) community.typed(text);
+        });
         addRenderableWidget(search);
         setInitialFocus(search);
         Sfx.play(Sfx.OPEN);
@@ -73,6 +135,7 @@ public final class LibraryScreen extends Screen {
 
     @Override
     public void removed() {
+        community.removed();
         for (DynamicTexture t : owned.values()) t.close();
         for (Identifier id : textures.values()) minecraft.getTextureManager().release(id);
         owned.clear();
@@ -167,12 +230,37 @@ public final class LibraryScreen extends Screen {
 
         // header
         Ui.text(g, "Library", px + 10, py + 8, Ui.withAlpha(Ui.LINE, inner));
+        int mainX = px + 56;
+        for (Tab tb : Tab.values()) {
+            Ui.tab(g, "lib#main" + tb, mainX, py + 5, tabWidth(tb), tabLabel(tb), tab == tb, mx, my);
+            mainX += tabWidth(tb) + 2;
+        }
+        boolean searchable = tab == Tab.MINE || community.searchable();
+        search.setEditable(searchable);
+        if (community.clearSearchBox) {
+            community.clearSearchBox = false;
+            swapping = true;
+            search.setValue("");
+            swapping = false;
+        }
         int sbx = px + pw - 10 - 124;
-        Ui.inset(g, sbx, py + 5, 124, 14);
-        search.setX(sbx + 4);
-        search.setY(py + 7);
-        search.extractRenderState(g, mx, my, partial);
-        if (search.getValue().isEmpty()) Ui.text(g, "Name or tag", sbx + 12, py + 8, Ui.withAlpha(Ui.DIM, inner * 0.8f));
+        if (searchable) {
+            Ui.inset(g, sbx, py + 5, 124, 14);
+            search.setX(sbx + 4);
+            search.setY(py + 7);
+            search.extractRenderState(g, mx, my, partial);
+            if (search.getValue().isEmpty()) Ui.text(g, tab == Tab.MINE ? "Name or tag" : "Search builds", sbx + 12, py + 8, Ui.withAlpha(Ui.DIM, inner * 0.8f));
+        }
+
+        if (tab == Tab.COMMUNITY) {
+            community.render(g, px, py, pw, ph, mx, my, inner, t);
+            int cfy = py + ph - 24;
+            Ui.button(g, "lib#close", px + pw - 10 - 52, cfy, 52, 16, "Close", null, mx, my, down.equals("close"), true);
+            if (!toast.isEmpty() && System.nanoTime() - toastNs < 3_500_000_000L) {
+                Ui.centered(g, toast, px + pw / 2, py + 8, Ui.withAlpha(Ui.WARN, inner));
+            }
+            return;
+        }
 
         // sort tabs
         int tx = px + 10;
@@ -288,6 +376,20 @@ public final class LibraryScreen extends Screen {
         if (super.mouseClicked(event, doubleClick)) return true;
         int mx = (int) event.x(), my = (int) event.y();
         int pw = panelW(), px = px(), py = py(), fy = py + panelH() - 24;
+        int hx = px + 56;
+        for (Tab tb : Tab.values()) {
+            if (Ui.inside(mx, my, hx, py + 5, tabWidth(tb), 13)) {
+                switchTab(tb);
+                return true;
+            }
+            hx += tabWidth(tb) + 2;
+        }
+        if (Ui.inside(mx, my, px + pw - 10 - 52, fy, 52, 16)) {
+            down = "close";
+            Sfx.play(Sfx.PRESS);
+            return true;
+        }
+        if (tab == Tab.COMMUNITY) return community.mouseClicked(mx, my);
         int tx = px + 10;
         for (LibraryModel.Sort s : LibraryModel.Sort.values()) {
             if (Ui.inside(mx, my, tx, py + 26, 44, 13)) {
@@ -299,11 +401,6 @@ public final class LibraryScreen extends Screen {
         }
         if (Ui.inside(mx, my, px + 10, fy, 86, 16)) {
             down = "folder";
-            Sfx.play(Sfx.PRESS);
-            return true;
-        }
-        if (Ui.inside(mx, my, px + pw - 10 - 52, fy, 52, 16)) {
-            down = "close";
             Sfx.play(Sfx.PRESS);
             return true;
         }
@@ -325,6 +422,7 @@ public final class LibraryScreen extends Screen {
         LibraryModel.Entry card = downCard;
         down = "";
         downCard = null;
+        if (tab == Tab.COMMUNITY && was.isEmpty()) return community.mouseReleased(mx, my) || super.mouseReleased(event);
         if (was.equals("folder") && Ui.inside(mx, my, px + 10, fy, 86, 16)) {
             Sfx.play(Sfx.RELEASE);
             try {
@@ -379,6 +477,10 @@ public final class LibraryScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {
+        if (tab == Tab.COMMUNITY) {
+            community.mouseScrolled(scrollY);
+            return true;
+        }
         int max = Math.max(0, contentH() - gridH());
         scrollTarget = Math.max(0, Math.min(max, scrollTarget - (float) scrollY * 30));
         return true;
@@ -386,6 +488,13 @@ public final class LibraryScreen extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent event) {
+        if (tab == Tab.COMMUNITY) {
+            if (event.isEscape() && community.backFromDetail()) return true;
+            if (event.isConfirmation() && community.searchable()) {
+                community.submit();
+                return true;
+            }
+        }
         return super.keyPressed(event);
     }
 
@@ -414,6 +523,41 @@ public final class LibraryScreen extends Screen {
         if (added > 0) Sfx.play(Sfx.COMPLETE);
         else Sfx.play(Sfx.ERROR);
         say(added > 0 ? "Added " + added + (added == 1 ? " blueprint" : " blueprints") + (skipped > 0 ? ", skipped " + skipped : "") : "Only .litematic files can be added.");
+    }
+
+    /** Dev demo: the Community tab's pane. */
+    public CommunityPane community() {
+        return community;
+    }
+
+    /** Dev demo: shows a tab by name (MINE, COMMUNITY). */
+    public void showTab(String name) {
+        switchTab(Tab.valueOf(name));
+    }
+
+    /** Dev demo: the tab shown. */
+    public String tabName() {
+        return tab.name();
+    }
+
+    /** Dev demo: where a header tab is on screen. */
+    public int[] tabCenter(String name) {
+        int x = px() + 56;
+        for (Tab tb : Tab.values()) {
+            if (tb.name().equals(name)) return new int[]{x + tabWidth(tb) / 2, py() + 5 + 6};
+            x += tabWidth(tb) + 2;
+        }
+        return null;
+    }
+
+    /** Dev demo: where the Close button is. */
+    public int[] closeCenter() {
+        return new int[]{px() + panelW() - 10 - 26, py() + panelH() - 24 + 8};
+    }
+
+    /** Dev demo: what the search box holds. */
+    public String searchValue() {
+        return search.getValue();
     }
 
     /** Dev demo: types into the search box. */

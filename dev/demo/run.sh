@@ -5,11 +5,11 @@
 #      WIDTH/HEIGHT (1280x720), XMX (3G; big builds need more), MODS (extra jars, colon-separated), FABRIC_API=1,
 #      WORK_TAG (own game dir, for parallel runs), SKIP_BUILD=1, TIMEOUT (s), PROFILE=1 (the user's Fabric 26.3 mods;
 #      EXCLUDE=regex drops some), SHADERS=1 (Complementary Reimagined, with PROFILE=1 for Iris).
-#      Gradle always runs on /usr/lib/jvm/java-25-openjdk.
+#      WS (the workspace folder holding tools/; needed when running from a git worktree under .claude/worktrees). Gradle always runs on /usr/lib/jvm/java-25-openjdk.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
-WS=$(cd "$ROOT/../.." && pwd)
+WS=${WS:-$(cd "$ROOT/../.." && pwd)}
 OUT=$(realpath -m "${1:?usage: run.sh <out> [scenes]}")
 SCENES=${2:-house}
 export JAVA_HOME=/usr/lib/jvm/java-25-openjdk
