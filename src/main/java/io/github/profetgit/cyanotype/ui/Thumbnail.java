@@ -16,11 +16,9 @@ public final class Thumbnail {
     private Thumbnail() {
     }
 
-    /** The colour of a block for the picture: its map colour; glass-like and plant blocks are lightened so they read. */
+    /** The colour of a block for the picture: the average of its real textures (resource pack included), or its map colour when there is no game. */
     static int colorOf(BlockState s) {
-        int c = s.getBlock().defaultMapColor().col;
-        if (c == 0) c = 0x9B9B9B;
-        return c | 0xFF000000;
+        return BlockLook.average(s);
     }
 
     /**

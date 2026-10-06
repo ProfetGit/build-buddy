@@ -109,6 +109,12 @@ final class PickScenes {
         long[] houseA = new long[1];
         act(() -> houseA[0] = SaveScenes.worldBlocks(SelectionBox.of(AX, G + 1, Z0, AX + 6, G + 4, Z1)));
 
+        act(() -> {
+            var grass = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState());
+            var planks = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.OAK_PLANKS.defaultBlockState());
+            check("pick/blocks have their real textures in the preview", grass.face()[2].px() != null && planks.face()[2].px() != null && grass.face()[2].w() >= 16, "grass top " + grass.face()[2].w() + "x" + grass.face()[2].h());
+            check("pick/the grass top is green and its side is not", ((grass.face()[2].avg() >> 8) & 255) > ((grass.face()[2].avg() >> 16) & 255) && grass.face()[2].avg() != grass.face()[4].avg(), Integer.toHexString(grass.face()[2].avg()) + " / " + Integer.toHexString(grass.face()[4].avg()));
+        });
         // ---- the wheel starts it; the crosshair says what a click would do
         SaveScenes.startPickThroughTheWheel();
         act(() -> check("pick/the wheel's Smart pick starts the tool", Placements.mode() == Placements.Mode.PICK && !Picking.working(), "mode " + Placements.mode()));
@@ -175,12 +181,46 @@ final class PickScenes {
         act(() -> {
             SaveScreen sv = (SaveScreen) screen();
             var info = new net.minecraft.client.input.MouseButtonInfo(0, 0);
-            int[] at = sv.anchor("preview");
-            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info), true);
+            int[] at = sv.anchor("reset");
+            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info), false);
             sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info));
-            check("pick/a double click starts the view over", sv.preview().view().equals(io.github.profetgit.cyanotype.ui.PreviewRaster.View.HOME), sv.preview().view().toString());
+            check("pick/the Reset button starts the view over", sv.preview().view().equals(io.github.profetgit.cyanotype.ui.PreviewRaster.View.HOME), sv.preview().view().toString());
+            // remove mode: the button, then pointing at a block of the picture lights it up
+            int[] rm = sv.anchor("remove");
+            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(rm[0], rm[1], info), false);
+            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(rm[0], rm[1], info));
+            check("pick/the Remove blocks button turns remove mode on", sv.removing(), "removing " + sv.removing());
+            io.github.profetgit.cyanotype.ui.Ui.testMouse = sv.anchor("preview");
+        });
+        waitTicks(16);
+        act(() -> check("pick/pointing at the picture finds a block", ((SaveScreen) screen()).preview().hovered() >= 0, "hovered " + ((SaveScreen) screen()).preview().hovered()));
+        shot("pick_5c_remove_hover");
+        act(() -> {
+            SaveScreen sv = (SaveScreen) screen();
+            var info = new net.minecraft.client.input.MouseButtonInfo(0, 0);
+            int[] at = sv.anchor("preview");
+            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info), false);
+            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info));
+            check("pick/a click on a block takes it out of what is saved", sv.removedCount() == 1 && sv.captured().totalBlocks() == houseA[0] - 1, sv.removedCount() + " removed, " + sv.captured().totalBlocks() + " blocks");
         });
         waitTicks(14);
+        shot("pick_5d_block_removed");
+        act(() -> {
+            SaveScreen sv = (SaveScreen) screen();
+            int ctrl = 192;
+            sv.keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_Z, 0, ctrl));
+            check("pick/Ctrl+Z puts the block back", sv.removedCount() == 0 && sv.captured().totalBlocks() == houseA[0], sv.removedCount() + " removed, " + sv.captured().totalBlocks() + " blocks");
+            sv.keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_Y, 0, ctrl));
+            check("pick/Ctrl+Y takes it out again", sv.removedCount() == 1 && sv.captured().totalBlocks() == houseA[0] - 1, sv.removedCount() + " removed");
+            sv.keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_Z, 0, ctrl));
+            io.github.profetgit.cyanotype.ui.Ui.testMouse = null;
+            int[] rm = sv.anchor("remove");
+            var info = new net.minecraft.client.input.MouseButtonInfo(0, 0);
+            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(rm[0], rm[1], info), false);
+            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(rm[0], rm[1], info));
+            check("pick/remove mode is off again", !sv.removing() && sv.captured().totalBlocks() == houseA[0], "removing " + sv.removing());
+        });
+        waitTicks(10);
         waitTicks(6);
         shot("pick_5_save");
         act(() -> screen().keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN, 0, 0)));

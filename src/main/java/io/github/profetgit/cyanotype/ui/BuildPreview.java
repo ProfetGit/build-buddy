@@ -29,8 +29,11 @@ public final class BuildPreview {
     private volatile boolean tooBig, building;
     private PreviewRaster.View view = PreviewRaster.View.HOME;
     private final AtomicBoolean busy = new AtomicBoolean(), dirty = new AtomicBoolean();
-    private volatile int[] frame;
-    private volatile int frameW, frameH, frameSeq;
+    private volatile PreviewRaster.@Nullable Frame frame;
+    private volatile PreviewRaster.@Nullable Scene frameScene;
+    private volatile int frameSeq;
+    private volatile int hoverCell = -1;
+    private volatile boolean removeMode;
     private int shownSeq = -1;
     private volatile int wantW = 1, wantH = 1;
     private volatile long lastMoveNs;
@@ -47,10 +50,16 @@ public final class BuildPreview {
 
     /** Sets what to draw: null while the box is still being read. A new blueprint keeps the view the player has chosen. */
     public void setBlueprint(@Nullable Blueprint bp) {
-        scene = null;
-        tooBig = false;
-        frame = null;
-        if (bp == null) return;
+        if (bp == null) {
+            // nothing to show yet: the old picture goes
+            scene = null;
+            frame = null;
+            frameScene = null;
+            tooBig = false;
+            hoverCell = -1;
+            return;
+        }
+        // a new blueprint (an edit, say) replaces the picture when it is ready; until then the old one stays
         building = true;
         Util.backgroundExecutor().execute(() -> {
             PreviewRaster.Scene s = PreviewRaster.scene(bp);
@@ -69,6 +78,46 @@ public final class BuildPreview {
 
     public PreviewRaster.View view() {
         return view;
+    }
+
+    /** Whether pointing at a block lights it up (the Save screen's remove mode). */
+    public void setRemoveMode(boolean on) {
+        removeMode = on;
+        if (!on && hoverCell >= 0) {
+            hoverCell = -1;
+            request();
+        }
+    }
+
+    /** The cell under a point of the picture ({@code gx, gy} in GUI units from its top left), as an index into the box, or -1. */
+    public int cellAt(double gx, double gy) {
+        PreviewRaster.Frame f = frame;
+        PreviewRaster.Scene s = frameScene;
+        if (f == null || s == null) return -1;
+        int x = (int) (gx * RES), y = (int) (gy * RES);
+        if (x < 0 || y < 0 || x >= f.w() || y >= f.h()) return -1;
+        int id = f.ids()[y * f.w() + x];
+        return id <= 0 || id - 1 >= s.count ? -1 : s.cellOfFace(id - 1);
+    }
+
+    /** The box's size in cells of the scene the picture shows: {x, y, z}, or null. */
+    public int @Nullable [] boxSize() {
+        PreviewRaster.Scene s = frameScene;
+        return s == null ? null : new int[]{s.ex, s.ey, s.ez};
+    }
+
+    /** Points at a place of the picture (or null when the pointer is elsewhere): in remove mode the block there lights up. */
+    private void point(double gx, double gy, boolean inside) {
+        int cell = removeMode && inside ? cellAt(gx, gy) : -1;
+        if (cell != hoverCell) {
+            hoverCell = cell;
+            request();
+        }
+    }
+
+    /** The cell the pointer is on now (-1 when not in remove mode or not over a block). */
+    public int hovered() {
+        return hoverCell;
     }
 
     // ---- the player's hands
@@ -113,7 +162,7 @@ public final class BuildPreview {
      *
      * @param progress 0..1 while the box is still being read, else negative
      */
-    public void draw(GuiGraphicsExtractor g, int x, int y, int w, int h, double progress) {
+    public void draw(GuiGraphicsExtractor g, int x, int y, int w, int h, double progress, int mouseX, int mouseY) {
         int tw = Math.max(8, w * RES), th = Math.max(8, h * RES);
         if (tw != wantW || th != wantH) {
             wantW = tw;
@@ -123,7 +172,9 @@ public final class BuildPreview {
         Ui.inset(g, x, y, w, h);
         g.fillGradient(x + 1, y + 1, x + w - 1, y + h - 1, 0x40163B63, 0x400A1B30);
         PreviewRaster.Scene s = scene;
-        if (s != null && frame != null && frameW == tw && frameH == th) {
+        PreviewRaster.Frame fr = frame;
+        point(mouseX - x, mouseY - y, mouseX >= x && mouseY >= y && mouseX < x + w && mouseY < y + h);
+        if (s != null && fr != null && fr.w() == tw && fr.h() == th) {
             if (frameSeq != shownSeq) upload(tw, th);
             if (textureId != null) g.blit(RenderPipelines.GUI_TEXTURED, textureId, x, y, 0f, 0f, w, h, tw, th, tw, th);
             if (System.nanoTime() - lastMoveNs > SETTLE_NS && lastWasFast) request();
@@ -140,8 +191,9 @@ public final class BuildPreview {
     }
 
     private void upload(int tw, int th) {
-        int[] px = frame;
-        if (px == null || px.length != tw * th) return;
+        PreviewRaster.Frame fr = frame;
+        if (fr == null || fr.px().length != tw * th) return;
+        int[] px = fr.px();
         if (texture == null || texW != tw || texH != th) {
             close();
             NativeImage img = new NativeImage(tw, th, true);
@@ -180,12 +232,12 @@ public final class BuildPreview {
         int w = wantW, h = wantH;
         boolean moving = System.nanoTime() - lastMoveNs < SETTLE_NS;
         int stride = moving && s.count > FAST_FACES ? (int) Math.ceil(s.count / (double) FAST_FACES) : 1;
+        int hover = hoverCell;
         Util.backgroundExecutor().execute(() -> {
             try {
-                int[] px = PreviewRaster.render(s, v, w, h, stride);
-                frameW = w;
-                frameH = h;
-                frame = px;
+                PreviewRaster.Frame made = PreviewRaster.render(s, v, w, h, stride, hover);
+                frameScene = s;
+                frame = made;
                 lastWasFast = stride > 1;
                 frameSeq++;
             } catch (RuntimeException e) {

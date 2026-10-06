@@ -4,38 +4,46 @@ import io.github.profetgit.cyanotype.blueprint.Blueprint;
 import io.github.profetgit.cyanotype.blueprint.PaletteEntry;
 import io.github.profetgit.cyanotype.blueprint.Region;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import net.minecraft.world.level.block.state.BlockState;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Draws a blueprint from any side, in software, from the blocks' map colours: the picture in the Save screen that can be turned,
- * zoomed and dragged. No game rendering is needed, so it runs on a worker thread. Only the faces that have air in front of
- * them are kept (a {@link Scene}), each face is drawn as two flat triangles with a depth buffer, shaded by the way it faces and
- * by a light that stays where it is as the build turns, with a few per cent of variation from block to block so a wall
- * reads as blocks and not as one slab. The camera looks straight on (no perspective), so sizes stay true when zooming.
+ * Draws a blueprint from any side, in software: the picture in the Save screen that can be turned, zoomed and dragged, and where
+ * a block can be pointed at. No game rendering is needed, so it runs on a worker thread. Only the faces that have air in front of
+ * them are kept (a {@link Scene}); each is drawn as two triangles with a depth buffer, textured with the block's real face texture
+ * ({@link BlockLook}, resource packs included) once a block is big enough on screen to show it and flat in its average colour
+ * below that, shaded by the way it faces under a light that stays where it is as the build turns. The camera looks straight on (no
+ * perspective), so sizes stay true when zooming. Besides the picture it fills an id buffer, so the block under a pixel is known.
  */
 public final class PreviewRaster {
     private PreviewRaster() {
     }
 
-    /** Boxes with more cells than this are not previewed (the grid of colours would not fit in memory sensibly). */
+    /** Boxes with more cells than this are not previewed (the grid of cells would not fit in memory sensibly). */
     public static final int MAX_CELLS = 16_000_000;
     /** More faces than this are thinned out (every n-th is kept) and the preview says so. */
     public static final int MAX_FACES = 6_000_000;
+    /** Blocks drawn smaller than this many pixels across are flat colour: the texture would only shimmer. */
+    static final double TEXTURE_FROM = 5.0;
 
-    /** The faces to draw: {@code faces[i] = cell << 3 | direction} (+x, -x, +y, -y, +z, -z), and the colour of every cell (0 = air). */
+    /** The faces to draw: {@code faces[i] = cell << 3 | direction} (+x, -x, +y, -y, +z, -z); {@code cells[c]} is the look's number plus one (0 = air). */
     public static final class Scene {
         public final int ex, ey, ez;
-        final int[] grid;
+        final int[] cells;
+        final BlockLook.Look[] looks;
         final int[] faces;
         public final int count;
         /** True when there were too many faces and only some are kept. */
         public final boolean thinned;
 
-        Scene(int ex, int ey, int ez, int[] grid, int[] faces, int count, boolean thinned) {
+        Scene(int ex, int ey, int ez, int[] cells, BlockLook.Look[] looks, int[] faces, int count, boolean thinned) {
             this.ex = ex;
             this.ey = ey;
             this.ez = ez;
-            this.grid = grid;
+            this.cells = cells;
+            this.looks = looks;
             this.faces = faces;
             this.count = count;
             this.thinned = thinned;
@@ -45,6 +53,15 @@ public final class PreviewRaster {
         public double radius() {
             return 0.5 * Math.sqrt((double) ex * ex + (double) ey * ey + (double) ez * ez);
         }
+
+        /** The cell a face belongs to, as an index into the box (x fastest, then z, then y). */
+        public int cellOfFace(int face) {
+            return faces[face] >>> 3;
+        }
+    }
+
+    /** What one render makes: the picture, and for every pixel the number of the face drawn there plus one (0 = nothing). */
+    public record Frame(int w, int h, int[] px, int[] ids) {
     }
 
     /** The camera: turn about the vertical axis, tilt, zoom (1 = the whole build fits), and where the middle is on the picture, in pixels from its centre. */
@@ -75,37 +92,78 @@ public final class PreviewRaster {
         return out;
     }
 
-    /** The colour of a block in the picture. */
-    static int colorOf(net.minecraft.world.level.block.state.BlockState s) {
-        return Thumbnail.colorOf(s);
+    /** Texture coordinates of a point of a face (u to the right and v down as seen from outside; on a top, up the picture is north). */
+    private static double u(int d, double x, double z) {
+        return switch (d) {
+            case 0 -> 1 - z;
+            case 1 -> z;
+            case 2, 3 -> x;
+            case 4 -> x;
+            default -> 1 - x;
+        };
     }
 
-    /** Collects what can be seen of a blueprint, or null when the box is empty or too large to preview. */
+    private static double v(int d, double y, double z) {
+        return switch (d) {
+            case 2 -> z;
+            case 3 -> 1 - z;
+            default -> 1 - y;
+        };
+    }
+
+    /** Collects what can be seen of a blueprint, or null when the box is too large to preview. */
     public static @Nullable Scene scene(Blueprint bp) {
         int ex = bp.sizeX, ey = bp.sizeY, ez = bp.sizeZ;
         if (ex <= 0 || ey <= 0 || ez <= 0 || (long) ex * ey * ez > MAX_CELLS) return null;
-        int[] grid = new int[ex * ey * ez];
+        int[] cells = new int[ex * ey * ez];
+        Map<BlockState, Integer> ids = new HashMap<>();
+        java.util.List<BlockLook.Look> looks = new java.util.ArrayList<>();
         for (Region r : bp.regions) {
             int[] pal = new int[r.palette.length];
             for (int i = 0; i < pal.length; i++) {
                 PaletteEntry e = r.palette[i];
-                pal[i] = e.isAir() ? 0 : colorOf(e.state());
+                if (e.isAir()) continue;
+                BlockState st = e.state();
+                Integer id = ids.get(st);
+                if (id == null) {
+                    looks.add(BlockLook.of(st));
+                    id = looks.size();
+                    ids.put(st, id);
+                }
+                pal[i] = id;
             }
             for (int y = 0; y < r.sy; y++) {
                 for (int z = 0; z < r.sz; z++) {
                     for (int x = 0; x < r.sx; x++) {
                         int c = pal[r.blocks[(y * r.sz + z) * r.sx + x] & 0xFFFF];
                         if (c == 0) continue;
-                        grid[((r.y - bp.minY + y) * ez + (r.z - bp.minZ + z)) * ex + (r.x - bp.minX + x)] = c;
+                        cells[((r.y - bp.minY + y) * ez + (r.z - bp.minZ + z)) * ex + (r.x - bp.minX + x)] = c;
                     }
                 }
             }
         }
-        return scene(grid, ex, ey, ez);
+        return scene(cells, looks.toArray(new BlockLook.Look[0]), ex, ey, ez);
     }
 
-    /** From a grid of colours (0 = air), x fastest, then z, then y. */
-    static @Nullable Scene scene(int[] grid, int ex, int ey, int ez) {
+    /** From a grid of colours (0 = air), for tests: every distinct colour is a flat look. */
+    static @Nullable Scene sceneOfColors(int[] colors, int ex, int ey, int ez) {
+        Map<Integer, Integer> ids = new HashMap<>();
+        java.util.List<BlockLook.Look> looks = new java.util.ArrayList<>();
+        int[] cells = new int[colors.length];
+        for (int i = 0; i < colors.length; i++) {
+            if (colors[i] == 0) continue;
+            Integer id = ids.get(colors[i]);
+            if (id == null) {
+                looks.add(BlockLook.Look.solid(colors[i]));
+                id = looks.size();
+                ids.put(colors[i], id);
+            }
+            cells[i] = id;
+        }
+        return scene(cells, looks.toArray(new BlockLook.Look[0]), ex, ey, ez);
+    }
+
+    static @Nullable Scene scene(int[] cells, BlockLook.Look[] looks, int ex, int ey, int ez) {
         long total = 0;
         for (int pass = 0; pass < 2; pass++) {
             // the first pass counts the faces, the second keeps them (every n-th when there are too many)
@@ -119,10 +177,10 @@ public final class PreviewRaster {
                     int row = (y * ez + z) * ex;
                     for (int x = 0; x < ex; x++) {
                         int i = row + x;
-                        if (grid[i] == 0) continue;
+                        if (cells[i] == 0) continue;
                         for (int d = 0; d < 6; d++) {
                             int nx = x + N[d][0], ny = y + N[d][1], nz = z + N[d][2];
-                            boolean open = nx < 0 || ny < 0 || nz < 0 || nx >= ex || ny >= ey || nz >= ez || grid[(ny * ez + nz) * ex + nx] == 0;
+                            boolean open = nx < 0 || ny < 0 || nz < 0 || nx >= ex || ny >= ey || nz >= ez || cells[(ny * ez + nz) * ex + nx] == 0;
                             if (!open) continue;
                             if (pass == 0) {
                                 total++;
@@ -133,8 +191,8 @@ public final class PreviewRaster {
                     }
                 }
             }
-            if (pass == 1) return new Scene(ex, ey, ez, grid, faces, n, total > MAX_FACES);
-            if (total == 0) return new Scene(ex, ey, ez, grid, new int[0], 0, false);
+            if (pass == 1) return new Scene(ex, ey, ez, cells, looks, faces, n, total > MAX_FACES);
+            if (total == 0) return new Scene(ex, ey, ez, cells, looks, new int[0], 0, false);
         }
         return null;
     }
@@ -148,41 +206,48 @@ public final class PreviewRaster {
      * Draws the scene.
      *
      * @param stride draw every n-th face only (1 = all of them): used while the picture is being dragged, to stay fast on big builds
-     * @return {@code w * h} ARGB pixels, 0 where nothing is
+     * @param hover  the cell to light up (an index into the box), or -1
      */
-    public static int[] render(Scene s, View v, int w, int h, int stride) {
-        int[] px = new int[w * h];
-        if (s.count == 0) return px;
+    public static Frame render(Scene s, View v, int w, int h, int stride, int hover) {
+        int[] px = new int[w * h], ids = new int[w * h];
+        if (s.count == 0) return new Frame(w, h, px, ids);
         double[] depth = new double[w * h];
         Arrays.fill(depth, -Double.MAX_VALUE);
         double cy = Math.cos(v.yaw), sy = Math.sin(v.yaw), cp = Math.cos(v.pitch), sp = Math.sin(v.pitch);
         double scale = fit(s, w, h) * v.zoom;
+        boolean textured = scale >= TEXTURE_FROM;
         double ox = w / 2.0 + v.panX, oy = h / 2.0 + v.panY;
         double mx = s.ex / 2.0, my = s.ey / 2.0, mz = s.ez / 2.0;
         // which way each face turns in the camera's space; a face looking away is skipped
         boolean[] front = new boolean[6];
         for (int d = 0; d < 6; d++) {
-            double nx = N[d][0] * cy - N[d][2] * sy, nz = N[d][0] * sy + N[d][2] * cy;
+            double nz = N[d][0] * sy + N[d][2] * cy;
             front[d] = N[d][1] * sp + nz * cp > 1e-9;
         }
-        double[] fx = new double[4], fy = new double[4], fz = new double[4];
+        double[] fx = new double[4], fy = new double[4], fz = new double[4], fu = new double[4], fv = new double[4];
         for (int k = 0; k < s.count; k += stride) {
             int code = s.faces[k];
             int d = code & 7, i = code >>> 3;
             if (!front[d]) continue;
             int x = i % s.ex, z = (i / s.ex) % s.ez, y = i / (s.ex * s.ez);
             for (int c = 0; c < 4; c++) {
-                double qx = x + CORNERS[d][c][0] - mx, qy = y + CORNERS[d][c][1] - my, qz = z + CORNERS[d][c][2] - mz;
+                int[] cc = CORNERS[d][c];
+                double qx = x + cc[0] - mx, qy = y + cc[1] - my, qz = z + cc[2] - mz;
                 double rx = qx * cy - qz * sy, rz = qx * sy + qz * cy;
                 fx[c] = ox + rx * scale;
                 fy[c] = oy - (qy * cp - rz * sp) * scale;
                 fz[c] = qy * sp + rz * cp;
+                fu[c] = u(d, cc[0], cc[2]);
+                fv[c] = v(d, cc[1], cc[2]);
             }
-            int color = shade(s.grid[i], LIGHT[d] * (0.94 + 0.12 * jitter(i)));
-            tri(px, depth, w, h, fx[0], fy[0], fz[0], fx[1], fy[1], fz[1], fx[2], fy[2], fz[2], color);
-            tri(px, depth, w, h, fx[0], fy[0], fz[0], fx[2], fy[2], fz[2], fx[3], fy[3], fz[3], color);
+            BlockLook.Tex tex = s.looks[s.cells[i] - 1].face()[d];
+            boolean useTexture = textured && tex.px() != null;
+            double light = LIGHT[d] * (useTexture ? 1.0 : 0.94 + 0.12 * jitter(i));
+            boolean hot = i == hover;
+            tri(px, ids, depth, w, h, fx[0], fy[0], fz[0], fu[0], fv[0], fx[1], fy[1], fz[1], fu[1], fv[1], fx[2], fy[2], fz[2], fu[2], fv[2], tex, useTexture, light, hot, k + 1);
+            tri(px, ids, depth, w, h, fx[0], fy[0], fz[0], fu[0], fv[0], fx[2], fy[2], fz[2], fu[2], fv[2], fx[3], fy[3], fz[3], fu[3], fv[3], tex, useTexture, light, hot, k + 1);
         }
-        return px;
+        return new Frame(w, h, px, ids);
     }
 
     /** A steady number in 0..1 for a cell, so the variation between blocks does not flicker as the view moves. */
@@ -194,12 +259,21 @@ public final class PreviewRaster {
         return (h & 0xFFFF) / 65535.0;
     }
 
-    private static int shade(int argb, double k) {
+    private static int shade(int argb, double k, boolean hot) {
         int r = (int) Math.min(255, ((argb >> 16) & 255) * k), g = (int) Math.min(255, ((argb >> 8) & 255) * k), b = (int) Math.min(255, (argb & 255) * k);
+        if (hot) {
+            r = (r * 45 + 255 * 55) / 100;
+            g = (g * 45 + 90 * 55) / 100;
+            b = (b * 45 + 90 * 55) / 100;
+        }
         return 0xFF000000 | r << 16 | g << 8 | b;
     }
 
-    private static void tri(int[] px, double[] depth, int w, int h, double x0, double y0, double z0, double x1, double y1, double z1, double x2, double y2, double z2, int color) {
+    private static void tri(int[] px, int[] ids, double[] depth, int w, int h,
+                            double x0, double y0, double z0, double u0, double v0,
+                            double x1, double y1, double z1, double u1, double v1,
+                            double x2, double y2, double z2, double u2, double v2,
+                            BlockLook.Tex tex, boolean useTexture, double light, boolean hot, int id) {
         double minX = Math.min(x0, Math.min(x1, x2)), maxX = Math.max(x0, Math.max(x1, x2));
         double minY = Math.min(y0, Math.min(y1, y2)), maxY = Math.max(y0, Math.max(y1, y2));
         int ix0 = Math.max(0, (int) Math.floor(minX)), ix1 = Math.min(w - 1, (int) Math.ceil(maxX));
@@ -208,6 +282,9 @@ public final class PreviewRaster {
         double area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
         if (Math.abs(area) < 1e-9) return;
         double inv = 1.0 / area;
+        int flat = shade(tex.avg(), light, hot);
+        int[] texels = tex.px();
+        int tw = tex.w(), th = tex.h();
         for (int y = iy0; y <= iy1; y++) {
             double py = y + 0.5;
             for (int x = ix0; x <= ix1; x++) {
@@ -219,10 +296,17 @@ public final class PreviewRaster {
                 if (w0 < -0.02 || w1 < -0.02 || w2 < -0.02) continue;
                 double z = w0 * z0 + w1 * z1 + w2 * z2;
                 int at = y * w + x;
-                if (z > depth[at]) {
-                    depth[at] = z;
-                    px[at] = color;
+                if (z <= depth[at]) continue;
+                int color = flat;
+                if (useTexture) {
+                    double uu = Math.max(0, Math.min(0.9999, w0 * u0 + w1 * u1 + w2 * u2)), vv = Math.max(0, Math.min(0.9999, w0 * v0 + w1 * v1 + w2 * v2));
+                    int t = texels[(int) (vv * th) * tw + (int) (uu * tw)];
+                    if ((t >>> 24) < 128) continue;
+                    color = shade(t, light, hot);
                 }
+                depth[at] = z;
+                px[at] = color;
+                ids[at] = id;
             }
         }
     }

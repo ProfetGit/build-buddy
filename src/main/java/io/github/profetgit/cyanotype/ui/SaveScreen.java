@@ -62,6 +62,14 @@ public final class SaveScreen extends Screen {
     /** On a screen too narrow for the preview beside the form, the preview takes the form's place when this is on. */
     private boolean previewOnly;
     private boolean draggingPreview, panningPreview;
+    private double dragDistance;
+    /** Remove mode: pointing at a block of the preview lights it up and a click takes it out of the save. Ctrl+Z brings it back. */
+    private boolean removeMode;
+    /** What was read from the world (before any block was taken out), where its min corner is, and the blocks taken out as world positions, with the ones undone for redo. */
+    private Blueprint base;
+    private int[] origin = {0, 0, 0};
+    private final it.unimi.dsi.fastutil.longs.LongArrayList removedStack = new it.unimi.dsi.fastutil.longs.LongArrayList(), redoStack = new it.unimi.dsi.fastutil.longs.LongArrayList();
+    private final it.unimi.dsi.fastutil.longs.LongOpenHashSet removedSet = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
     private String error = "";
     private String down = "";
     private int loadedColumns, totalColumns, sinceCount;
@@ -264,6 +272,7 @@ public final class SaveScreen extends Screen {
      */
     private void restartCapture() {
         captured = null;
+        base = null;
         error = "";
         job = null;
         preview.setBlueprint(null);
@@ -285,12 +294,60 @@ public final class SaveScreen extends Screen {
             job = null;
             return;
         }
-        captured = job.result();
-        preview.setBlueprint(captured);
+        base = job.result();
+        origin = job.origin();
+        applyEdits();
         if (wantSave) {
             wantSave = false;
             write();
         }
+    }
+
+    /** Makes what is saved: what was read, minus the blocks taken out. */
+    private void applyEdits() {
+        if (base == null) return;
+        captured = io.github.profetgit.cyanotype.blueprint.CellEdits.without(base, origin[0], origin[1], origin[2], removedSet);
+        preview.setBlueprint(captured);
+    }
+
+    /** Takes the block of the preview under the pointer out of the save (remove mode). */
+    private void removeHovered() {
+        int cell = preview.hovered();
+        int[] size = preview.boxSize();
+        if (cell < 0 || size == null || base == null) return;
+        int x = cell % size[0], z = (cell / size[0]) % size[2], y = cell / (size[0] * size[2]);
+        long pos = net.minecraft.core.BlockPos.asLong(origin[0] + x, origin[1] + y, origin[2] + z);
+        if (!removedSet.add(pos)) return;
+        removedStack.add(pos);
+        redoStack.clear();
+        Sfx.play(Sfx.RELEASE, 1.1f);
+        applyEdits();
+    }
+
+    /** Ctrl+Z: puts the last block taken out back. */
+    private void undoRemoval() {
+        if (removedStack.isEmpty()) {
+            Sfx.play(Sfx.ERROR, 0.8f);
+            return;
+        }
+        long pos = removedStack.removeLong(removedStack.size() - 1);
+        removedSet.remove(pos);
+        redoStack.add(pos);
+        Sfx.play(Sfx.PRESS, 0.9f);
+        applyEdits();
+    }
+
+    /** Ctrl+Y or Ctrl+Shift+Z: takes the block put back out again. */
+    private void redoRemoval() {
+        if (redoStack.isEmpty()) {
+            Sfx.play(Sfx.ERROR, 0.8f);
+            return;
+        }
+        long pos = redoStack.removeLong(redoStack.size() - 1);
+        removedSet.add(pos);
+        removedStack.add(pos);
+        Sfx.play(Sfx.RELEASE, 1.1f);
+        applyEdits();
     }
 
     /** Saves: writes what was read (waiting for the reading to end first when it is still running). Does nothing without a name or while a save is running. */
@@ -429,15 +486,26 @@ public final class SaveScreen extends Screen {
     /** The preview's panel: a title, the picture, a line of hints under it, and what is being read while it is. */
     private void drawPreviewPanel(GuiGraphicsExtractor g, int[] pp, float inner, int mx, int my) {
         Ui.text(g, "Preview", pp[0] + 10, pp[1] + 8, Ui.withAlpha(Ui.LINE, inner));
-        if (captured != null) Ui.right(g, captured.sizeX + " x " + captured.sizeY + " x " + captured.sizeZ, pp[0] + pp[2] - 10, pp[1] + 8, Ui.withAlpha(Ui.DIM, inner));
-        int[] r = previewRect();
-        if (!wide()) {
-            r = new int[]{pp[0] + 8, pp[1] + 22, pp[2] - 16, pp[3] - 22 - 24};
-        }
+        boolean idle = state == State.EDITING;
+        Ui.button(g, "sv#reset", resetX(pp), pp[1] + 5, RESET_W, 14, "Reset", null, mx, my, false, idle);
+        Ui.button(g, "sv#remove", removeX(pp), pp[1] + 5, REMOVE_W, 14, "Remove blocks", null, mx, my, removeMode, idle && captured != null);
+        int[] r = wide() ? previewRect() : new int[]{pp[0] + 8, pp[1] + 22, pp[2] - 16, pp[3] - 22 - 24};
         double progress = job != null && !job.done() ? job.progress() : -1;
-        preview.draw(g, r[0], r[1], r[2], r[3], progress);
-        String hint = "Drag to turn, right-drag to move, scroll to zoom";
-        Ui.text(g, Ui.fit(hint, pp[2] - 16), pp[0] + 8, pp[1] + pp[3] - 17, Ui.withAlpha(Ui.DIM, inner * 0.8f));
+        preview.draw(g, r[0], r[1], r[2], r[3], progress, mx, my);
+        String hint = removedStack.isEmpty()
+            ? (removeMode ? "Click a block to take it out" : "Drag to turn, right-drag to move, scroll to zoom")
+            : "Took out " + removedStack.size() + (removedStack.size() == 1 ? " block" : " blocks") + ". Ctrl+Z puts it back";
+        Ui.text(g, Ui.fit(hint, pp[2] - 16), pp[0] + 8, pp[1] + pp[3] - 17, Ui.withAlpha(removeMode ? Ui.CYAN : Ui.DIM, inner * 0.9f));
+    }
+
+    private static final int RESET_W = 44, REMOVE_W = 90;
+
+    private int resetX(int[] pp) {
+        return pp[0] + pp[2] - 10 - RESET_W;
+    }
+
+    private int removeX(int[] pp) {
+        return resetX(pp) - 4 - REMOVE_W;
     }
 
     private void fieldRow(GuiGraphicsExtractor g, String label, EditBox f, int x, int y, float inner, float partial, int mx, int my, String hint) {
@@ -469,15 +537,24 @@ public final class SaveScreen extends Screen {
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         int mx = (int) event.x(), my = (int) event.y();
-        if (previewShown() && state != State.WRITING) {
+        if (previewShown() && state == State.EDITING) {
+            int[] pp = previewPanel();
+            if (Ui.inside(mx, my, resetX(pp), pp[1] + 5, RESET_W, 14)) {
+                preview.reset();
+                Sfx.play(Sfx.PRESS, 1.1f);
+                return true;
+            }
+            if (captured != null && Ui.inside(mx, my, removeX(pp), pp[1] + 5, REMOVE_W, 14)) {
+                removeMode = !removeMode;
+                preview.setRemoveMode(removeMode);
+                Sfx.play(Sfx.PRESS, removeMode ? 1.2f : 0.9f);
+                return true;
+            }
             int[] r = wide() ? previewRect() : new int[]{px() + 8, py() + 22, pw() - 16, ph() - 22 - 24};
             if (Ui.inside(mx, my, r[0], r[1], r[2], r[3])) {
-                if (doubleClick) {
-                    preview.reset();
-                } else {
-                    draggingPreview = true;
-                    panningPreview = event.button() == 1 || event.button() == 2 || (event.modifiers() & 1) != 0;
-                }
+                draggingPreview = true;
+                dragDistance = 0;
+                panningPreview = event.button() == 1 || event.button() == 2 || (event.modifiers() & 1) != 0;
                 return true;
             }
         }
@@ -514,6 +591,8 @@ public final class SaveScreen extends Screen {
         int mx = (int) event.x(), my = (int) event.y();
         if (draggingPreview) {
             draggingPreview = false;
+            // a click that did not move is a removal, in remove mode; a drag is only the view turning
+            if (removeMode && event.button() == 0 && dragDistance < 4) removeHovered();
             return true;
         }
         String was = down;
@@ -537,6 +616,7 @@ public final class SaveScreen extends Screen {
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
         if (draggingPreview) {
+            dragDistance += Math.abs(dx) + Math.abs(dy);
             preview.drag(dx, dy, panningPreview);
             return true;
         }
@@ -558,6 +638,15 @@ public final class SaveScreen extends Screen {
     @Override
     public boolean keyPressed(KeyEvent event) {
         if (state != State.EDITING) return true;
+        if (event.hasControlDown() && event.input() == com.mojang.blaze3d.platform.InputConstants.KEY_Z) {
+            if (event.hasShiftDown()) redoRemoval();
+            else undoRemoval();
+            return true;
+        }
+        if (event.hasControlDown() && event.input() == com.mojang.blaze3d.platform.InputConstants.KEY_Y) {
+            redoRemoval();
+            return true;
+        }
         if (super.keyPressed(event)) return true;
         if (event.isConfirmation()) {
             save();
@@ -647,11 +736,30 @@ public final class SaveScreen extends Screen {
         return captured;
     }
 
+    public int removedCount() {
+        return removedStack.size();
+    }
+
+    public boolean removing() {
+        return removeMode;
+    }
+
+    /** Dev demo: undo and redo of the removals, as the keys do them. */
+    public void undoRemovalForDemo() {
+        undoRemoval();
+    }
+
+    public void redoRemovalForDemo() {
+        redoRemoval();
+    }
+
     public int[] anchor(String which) {
         return switch (which) {
             case "save" -> new int[]{saveX() + 45, buttonY() + 8};
             case "back" -> new int[]{backX() + 35, buttonY() + 8};
             case "trim", "ground" -> new int[]{px() + 20, py() + 44 + 86 + 5};
+            case "reset" -> new int[]{resetX(previewPanel()) + RESET_W / 2, previewPanel()[1] + 12};
+            case "remove" -> new int[]{removeX(previewPanel()) + REMOVE_W / 2, previewPanel()[1] + 12};
             case "preview" -> {
                 int[] r = wide() ? previewRect() : new int[]{px() + 8, py() + 22, pw() - 16, ph() - 22 - 24};
                 yield new int[]{r[0] + r[2] / 2, r[1] + r[3] / 2};
