@@ -55,6 +55,13 @@ public final class SaveScreen extends Screen {
     private boolean trim = true, blockData = true;
     private State state = State.EDITING;
     private Capture.Job job;
+    /** What the box holds with the current switches, read as soon as the screen opens and again whenever a switch changes: this is what is saved and what the preview shows. */
+    private Blueprint captured;
+    private boolean wantSave;
+    private BuildPreview preview;
+    /** On a screen too narrow for the preview beside the form, the preview takes the form's place when this is on. */
+    private boolean previewOnly;
+    private boolean draggingPreview, panningPreview;
     private String error = "";
     private String down = "";
     private int loadedColumns, totalColumns, sinceCount;
@@ -87,7 +94,18 @@ public final class SaveScreen extends Screen {
         name.setFocused(true);
         setFocused(name);
         countChunks();
-        Sfx.play(Sfx.OPEN);
+        for (EditBox f : List.of(name, author, tags)) f.setVisible(!previewOnly || wide());
+        if (preview == null) {
+            preview = new BuildPreview(minecraft);
+            restartCapture();
+            Sfx.play(Sfx.OPEN);
+        }
+    }
+
+    @Override
+    public void removed() {
+        if (preview != null) preview.close();
+        super.removed();
     }
 
     private EditBox field(String label, int max, String value) {
@@ -152,10 +170,41 @@ public final class SaveScreen extends Screen {
             default -> blockData = !blockData;
         }
         Sfx.play(Sfx.PRESS, 1.1f);
+        restartCapture();
+    }
+
+    private static final int GAP = 8, PREVIEW_MIN = 200;
+
+    /** Whether there is room for the preview beside the form. */
+    private boolean wide() {
+        return width >= 292 + GAP + PREVIEW_MIN + 24;
+    }
+
+    private int pvW() {
+        return Math.min(300, width - 24 - pw() - GAP);
     }
 
     private int px() {
-        return (width - pw()) / 2;
+        return (width - (wide() ? pw() + GAP + pvW() : pw())) / 2;
+    }
+
+    /** The preview's panel: beside the form, or on top of it when the screen is narrow and the preview is asked for. */
+    private int[] previewPanel() {
+        return wide() ? new int[]{px() + pw() + GAP, py(), pvW(), ph()} : new int[]{px(), py(), pw(), ph()};
+    }
+
+    /** Where the picture itself is, inside its panel. */
+    private int[] previewRect() {
+        int[] p = previewPanel();
+        return new int[]{p[0] + 8, p[1] + 22, p[2] - 16, p[3] - 22 - 24};
+    }
+
+    private boolean previewShown() {
+        return wide() || previewOnly;
+    }
+
+    private boolean formShown() {
+        return wide() || !previewOnly;
     }
 
     private int py() {
@@ -202,42 +251,76 @@ public final class SaveScreen extends Screen {
             sinceCount = 0;
             countChunks();
         }
-        if (state == State.READING && job != null) {
-            if (job.step(READ_BUDGET_NS)) finishReading();
+        if (job != null && !job.done() && state != State.WRITING) {
+            if (job.step(READ_BUDGET_NS)) finishCapture();
         }
     }
 
-    // ---- saving
+    // ---- reading the box, then saving
 
-    /** Starts reading the box. Does nothing without a name or while a save is running. */
-    public void save() {
-        if (state != State.EDITING || !nameOk() || minecraft.level == null) return;
+    /**
+     * Reads the box with the current switches, a few milliseconds a tick, from the moment the screen opens and again whenever a
+     * switch changes: the result is both what the preview shows and what Save writes, so the picture cannot differ from the file.
+     */
+    private void restartCapture() {
+        captured = null;
         error = "";
-        String title = name.getValue().trim();
-        long now = System.currentTimeMillis();
-        Blueprint.Metadata meta = new Blueprint.Metadata(title, author.getValue().trim(), "", now, now, 0);
+        job = null;
+        preview.setBlueprint(null);
+        if (minecraft.level == null) return;
         try {
             var level = new LevelSource(minecraft.level);
             BoxFilter filter = new BoxFilter(level, withGround, withNature, pick != null && onlyBuild ? pick.others() : null);
-            job = new Capture.Job(level, box.x0(), box.y0(), box.z0(), box.x1(), box.y1(), box.z1(), new Capture.Options(trim, blockData), meta, filter.filters() ? filter : null);
+            job = new Capture.Job(level, box.x0(), box.y0(), box.z0(), box.x1(), box.y1(), box.z1(), new Capture.Options(trim, blockData), Blueprint.Metadata.of("main"), filter.filters() ? filter : null);
         } catch (IllegalArgumentException e) {
             error = "This box is too big to save in one piece.";
             Sfx.play(Sfx.ERROR);
-            return;
         }
-        state = State.READING;
-        for (EditBox f : List.of(name, author, tags)) f.setEditable(false);
-        Sfx.play(Sfx.PRESS, 1.2f);
     }
 
-    private void finishReading() {
+    private void finishCapture() {
         if (job.failure() != null) {
-            fail(job.failure());
+            if (state == State.READING) fail(job.failure());
+            else error = job.failure();
+            job = null;
             return;
         }
-        Blueprint bp = job.result();
+        captured = job.result();
+        preview.setBlueprint(captured);
+        if (wantSave) {
+            wantSave = false;
+            write();
+        }
+    }
+
+    /** Saves: writes what was read (waiting for the reading to end first when it is still running). Does nothing without a name or while a save is running. */
+    public void save() {
+        if (state == State.WRITING || !nameOk() || minecraft.level == null) return;
+        if (state == State.EDITING) {
+            error = "";
+            for (EditBox f : List.of(name, author, tags)) f.setEditable(false);
+            Sfx.play(Sfx.PRESS, 1.2f);
+        }
+        if (captured == null) {
+            if (job == null) {
+                for (EditBox f : List.of(name, author, tags)) f.setEditable(true);
+                return;
+            }
+            state = State.READING;
+            wantSave = true;
+            return;
+        }
+        write();
+    }
+
+    private void write() {
+        String title = name.getValue().trim();
+        long now = System.currentTimeMillis();
+        Blueprint.Metadata meta = new Blueprint.Metadata(title, author.getValue().trim(), "", now, now, captured.meta.dataVersion());
+        var r = captured.regions.get(0);
+        Blueprint bp = new Blueprint(meta, List.of(new io.github.profetgit.cyanotype.blueprint.Region(title.isBlank() ? "main" : title, r.x, r.y, r.z, r.sx, r.sy, r.sz, r.palette, r.blocks, r.blockEntities)));
         List<String> tagList = BlueprintSaver.parseTags(tags.getValue());
-        String stem = BlueprintSaver.stem(name.getValue());
+        String stem = BlueprintSaver.stem(title);
         state = State.WRITING;
         Settings.get().author = author.getValue().trim();
         Settings.changed();
@@ -267,7 +350,7 @@ public final class SaveScreen extends Screen {
     private void fail(String why) {
         error = why;
         state = State.EDITING;
-        job = null;
+        wantSave = false;
         for (EditBox f : List.of(name, author, tags)) f.setEditable(true);
         Sfx.play(Sfx.ERROR);
     }
@@ -285,6 +368,7 @@ public final class SaveScreen extends Screen {
         double t = System.nanoTime() / 1e9;
         boolean busy = state != State.EDITING;
 
+        if (formShown()) {
         Ui.text(g, getTitle().getString(), px + 10, py + 8, Ui.withAlpha(Ui.LINE, inner));
         Ui.right(g, box.sizeText(), px + pw - 10, py + 8, Ui.withAlpha(Ui.CYAN, inner));
         String info = pick != null ? "Fitted round a build of " + String.format(Locale.ROOT, "%,d", pick.blocks()) + " blocks." : String.format(Locale.ROOT, "%,d", box.volume()) + " cells in the box.";
@@ -323,10 +407,37 @@ public final class SaveScreen extends Screen {
             Ui.text(g, "Give it a name first.", px + 10, ly + 6, Ui.withAlpha(Ui.WARN, inner));
         }
 
+        } else {
+            drawPreviewPanel(g, previewPanel(), inner, mx, my);
+        }
+        if (wide()) {
+            int[] pp = previewPanel();
+            float inner2 = Ui.panelOpening(g, pp[0], pp[1], pp[2], pp[3], open);
+            if (inner2 >= 0.05f) drawPreviewPanel(g, pp, inner2, mx, my);
+        }
         Ui.button(g, "sv#back", backX(), buttonY(), 70, 16, "Back", null, mx, my, down.equals("back"), !busy);
-        boolean saveOn = !busy && nameOk();
+        if (!wide()) Ui.button(g, "sv#view", viewX(), buttonY(), 80, 16, previewOnly ? "Details" : "Preview", null, mx, my, down.equals("view"), !busy);
+        boolean saveOn = !busy && nameOk() && (captured != null || job != null);
         Ui.button(g, "sv#save", saveX(), buttonY(), 90, 16, "Save", "save", mx, my, down.equals("save"), saveOn);
         if (saveOn) Ui.marching(g, saveX() - 2, buttonY() - 2, 94, 20, Ui.withAlpha(Ui.CYAN, inner * 0.8f), t);
+    }
+
+    private int viewX() {
+        return px() + pw() / 2 - 40;
+    }
+
+    /** The preview's panel: a title, the picture, a line of hints under it, and what is being read while it is. */
+    private void drawPreviewPanel(GuiGraphicsExtractor g, int[] pp, float inner, int mx, int my) {
+        Ui.text(g, "Preview", pp[0] + 10, pp[1] + 8, Ui.withAlpha(Ui.LINE, inner));
+        if (captured != null) Ui.right(g, captured.sizeX + " x " + captured.sizeY + " x " + captured.sizeZ, pp[0] + pp[2] - 10, pp[1] + 8, Ui.withAlpha(Ui.DIM, inner));
+        int[] r = previewRect();
+        if (!wide()) {
+            r = new int[]{pp[0] + 8, pp[1] + 22, pp[2] - 16, pp[3] - 22 - 24};
+        }
+        double progress = job != null && !job.done() ? job.progress() : -1;
+        preview.draw(g, r[0], r[1], r[2], r[3], progress);
+        String hint = "Drag to turn, right-drag to move, scroll to zoom";
+        Ui.text(g, Ui.fit(hint, pp[2] - 16), pp[0] + 8, pp[1] + pp[3] - 17, Ui.withAlpha(Ui.DIM, inner * 0.8f));
     }
 
     private void fieldRow(GuiGraphicsExtractor g, String label, EditBox f, int x, int y, float inner, float partial, int mx, int my, String hint) {
@@ -358,14 +469,31 @@ public final class SaveScreen extends Screen {
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         int mx = (int) event.x(), my = (int) event.y();
+        if (previewShown() && state != State.WRITING) {
+            int[] r = wide() ? previewRect() : new int[]{px() + 8, py() + 22, pw() - 16, ph() - 22 - 24};
+            if (Ui.inside(mx, my, r[0], r[1], r[2], r[3])) {
+                if (doubleClick) {
+                    preview.reset();
+                } else {
+                    draggingPreview = true;
+                    panningPreview = event.button() == 1 || event.button() == 2 || (event.modifiers() & 1) != 0;
+                }
+                return true;
+            }
+        }
         if (state == State.EDITING) {
             int cy = py() + 44 + 86, fx = px() + 10;
             List<String> rows = rows();
-            for (int i = 0; i < rows.size(); i++) {
+            for (int i = 0; formShown() && i < rows.size(); i++) {
                 if (onCheck(mx, my, fx, cy + i * 13, labelOf(rows.get(i)))) {
                     flip(rows.get(i));
                     return true;
                 }
+            }
+            if (!wide() && Ui.inside(mx, my, viewX(), buttonY(), 80, 16)) {
+                down = "view";
+                Sfx.play(Sfx.PRESS);
+                return true;
             }
             if (Ui.inside(mx, my, backX(), buttonY(), 70, 16)) {
                 down = "back";
@@ -384,10 +512,19 @@ public final class SaveScreen extends Screen {
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
         int mx = (int) event.x(), my = (int) event.y();
+        if (draggingPreview) {
+            draggingPreview = false;
+            return true;
+        }
         String was = down;
         down = "";
         if (was.equals("back") && Ui.inside(mx, my, backX(), buttonY(), 70, 16)) {
             back();
+            return true;
+        }
+        if (was.equals("view") && Ui.inside(mx, my, viewX(), buttonY(), 80, 16)) {
+            previewOnly = !previewOnly;
+            for (EditBox f : List.of(name, author, tags)) f.setVisible(!previewOnly);
             return true;
         }
         if (was.equals("save") && Ui.inside(mx, my, saveX(), buttonY(), 90, 16)) {
@@ -395,6 +532,27 @@ public final class SaveScreen extends Screen {
             return true;
         }
         return super.mouseReleased(event);
+    }
+
+    @Override
+    public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+        if (draggingPreview) {
+            preview.drag(dx, dy, panningPreview);
+            return true;
+        }
+        return super.mouseDragged(event, dx, dy);
+    }
+
+    @Override
+    public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {
+        if (previewShown()) {
+            int[] r = wide() ? previewRect() : new int[]{px() + 8, py() + 22, pw() - 16, ph() - 22 - 24};
+            if (Ui.inside((int) x, (int) y, r[0], r[1], r[2], r[3])) {
+                preview.zoom(scrollY, x - (r[0] + r[2] / 2.0), y - (r[1] + r[3] / 2.0));
+                return true;
+            }
+        }
+        return super.mouseScrolled(x, y, scrollX, scrollY);
     }
 
     @Override
@@ -463,6 +621,7 @@ public final class SaveScreen extends Screen {
         this.withGround = ground;
         this.withNature = nature;
         this.onlyBuild = onlyBuild;
+        restartCapture();
     }
 
     public boolean trimming() {
@@ -472,6 +631,20 @@ public final class SaveScreen extends Screen {
     public void setOptions(boolean trim, boolean blockData) {
         this.trim = trim;
         this.blockData = blockData;
+        restartCapture();
+    }
+
+    /** Dev demo: the preview, and whether the box has been read. */
+    public BuildPreview preview() {
+        return preview;
+    }
+
+    public boolean readyToSave() {
+        return captured != null;
+    }
+
+    public Blueprint captured() {
+        return captured;
     }
 
     public int[] anchor(String which) {
@@ -479,6 +652,10 @@ public final class SaveScreen extends Screen {
             case "save" -> new int[]{saveX() + 45, buttonY() + 8};
             case "back" -> new int[]{backX() + 35, buttonY() + 8};
             case "trim", "ground" -> new int[]{px() + 20, py() + 44 + 86 + 5};
+            case "preview" -> {
+                int[] r = wide() ? previewRect() : new int[]{px() + 8, py() + 22, pw() - 16, ph() - 22 - 24};
+                yield new int[]{r[0] + r[2] / 2, r[1] + r[3] / 2};
+            }
             default -> new int[]{0, 0};
         };
     }

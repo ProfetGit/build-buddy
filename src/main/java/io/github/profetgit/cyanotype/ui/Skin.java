@@ -20,7 +20,7 @@ import net.minecraft.resources.Identifier;
 
 /**
  * The interface art: one atlas drawn at 4 texels per GUI unit (dev/ui/hires.py), sampled linearly so lines stay fine and
- * smooth at any GUI scale, plus two small tiles that repeat (the paper grid and the progress hatch). Sprites are drawn by
+ * smooth at any GUI scale, plus one small tile that repeats (the progress hatch). Sprites are drawn by
  * name at any size; the ones with a slice are cut into nine pieces and the edges and middle are stretched.
  */
 public final class Skin {
@@ -49,10 +49,10 @@ public final class Skin {
     private static int pixelW, pixelH;
     private static boolean pixelLoaded, pixelFailed;
 
-    private static final Identifier ATLAS = Identifier.fromNamespaceAndPath(Cyanotype.MOD_ID, "skin/atlas"), GRID = Identifier.fromNamespaceAndPath(Cyanotype.MOD_ID, "skin/grid"),
+    private static final Identifier ATLAS = Identifier.fromNamespaceAndPath(Cyanotype.MOD_ID, "skin/atlas"),
         HATCH = Identifier.fromNamespaceAndPath(Cyanotype.MOD_ID, "skin/hatch");
     private static final Map<String, Sprite> SPRITES = new HashMap<>();
-    private static int texW, texH, density = 4, gridPx, hatchPx;
+    private static int texW, texH, density = 4, hatchPx;
     private static boolean loaded, failed;
 
     private Skin() {
@@ -77,9 +77,6 @@ public final class Skin {
             texW = atlas.getWidth();
             texH = atlas.getHeight();
             mc.getTextureManager().register(ATLAS, new Smooth("Cyanotype atlas", atlas, false));
-            NativeImage grid = image("ui/grid.png");
-            gridPx = grid.getWidth();
-            mc.getTextureManager().register(GRID, new Smooth("Cyanotype grid", grid, true));
             NativeImage hatch = image("ui/hatch.png");
             hatchPx = hatch.getWidth();
             mc.getTextureManager().register(HATCH, new Smooth("Cyanotype hatch", hatch, true));
@@ -207,11 +204,6 @@ public final class Skin {
                 g.blit(RenderPipelines.GUI_TEXTURED, ATLAS, dx[i], dy[j], sx[i], sy[j], dw[i], dh[j], sw[i], sh[j], texW, texH, color);
             }
         }
-    }
-
-    /** The paper grid over a rectangle: lines every 4 units, fixed to the rectangle's corner. */
-    public static void grid(GuiGraphicsExtractor g, int x, int y, int w, int h, float alpha) {
-        tile(g, GRID, gridPx, x, y, w, h, 0, 0, alpha);
     }
 
     /** The progress hatch over a rectangle, drifting by {@code shiftUnits} GUI units along it. */

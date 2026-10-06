@@ -38,7 +38,6 @@ public final class Ui {
 
     public static void panel(GuiGraphicsExtractor g, int x, int y, int w, int h) {
         blit(g, "panel", x, y, w, h);
-        Skin.grid(g, x + 1, y + 1, w - 2, h - 2, 1f);
     }
 
     public static void inset(GuiGraphicsExtractor g, int x, int y, int w, int h) {

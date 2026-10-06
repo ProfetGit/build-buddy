@@ -5,7 +5,7 @@ Everything is drawn as vector shapes at 16 px per unit and reduced 4:1, so lines
 are smooth. The game draws the atlas with a linear sampler (ui/Skin.java), so it stays crisp at any GUI scale. Sizes in
 atlas.json are in GUI units (what the layouts use); x, y, w, h are texels of atlas.png.
 
-Run: python3 dev/ui/hires.py   (writes src/main/resources/assets/cyanotype/ui/{atlas.png,atlas.json,grid.png,hatch.png}
+Run: python3 dev/ui/hires.py   (writes src/main/resources/assets/cyanotype/ui/{atlas.png,atlas.json,hatch.png}
 and a preview sheet in dev/ui/out/hires_preview.png).  The wheel is not drawn here: it is made at run time for however many
 tools there are (ui/WheelArt.java), from the same colours.
 """
@@ -28,7 +28,6 @@ LINE = (232, 246, 255)
 CYAN = (127, 227, 255)
 DIM = (139, 182, 216)
 BLUE = (44, 102, 201)
-GRID = (30, 78, 126)
 
 
 class Canvas:
@@ -236,14 +235,6 @@ def knob():
 
 # ---- tiles (repeat in the game) --------------------------------------------------------------------------------------
 
-def grid_tile():
-    """4 x 4 units: a fine line on the left and top; tiled over a panel it makes the blueprint paper."""
-    c = Canvas(4, 4)
-    c.rect(0, 0, 4, 0.3, GRID, 0.85)
-    c.rect(0, 0, 0.3, 4, GRID, 0.85)
-    return c.done()
-
-
 def hatch_tile():
     """4 x 4 units of diagonal stripes for the progress fill."""
     c = Canvas(4, 4)
@@ -283,7 +274,6 @@ def main():
         meta[n] = {"x": place[n][0], "y": place[n][1], "w": im.width, "h": im.height, "lw": lw, "lh": lh, "slice": sl}
     atlas.save(OUT / "atlas.png")
     (OUT / "atlas.json").write_text(json.dumps({"r": R, "size": [W, H], "sprites": meta}, indent=1) + "\n")
-    grid_tile().save(OUT / "grid.png")
     hatch_tile().save(OUT / "hatch.png")
 
     # a preview on the panel colour, enlarged, to look at

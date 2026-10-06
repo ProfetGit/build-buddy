@@ -153,6 +153,38 @@ final class PickScenes {
                 s.setTags("house, oak");
             }
         });
+        until("pick/the box is read and drawn for the preview", 400, () -> screen() instanceof SaveScreen sv && sv.readyToSave() && sv.preview().faces() > 0);
+        waitTicks(12);
+        act(() -> {
+            SaveScreen sv = (SaveScreen) screen();
+            check("pick/the preview is what will be saved", sv.captured() != null && sv.captured().totalBlocks() == houseA[0], sv.captured() == null ? "nothing" : sv.captured().totalBlocks() + " blocks, wanted " + houseA[0]);
+            var info = new net.minecraft.client.input.MouseButtonInfo(0, 0);
+            int[] at = sv.anchor("preview");
+            var home = sv.preview().view();
+            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info), false);
+            sv.mouseDragged(new net.minecraft.client.input.MouseButtonEvent(at[0] + 30, at[1] + 6, info), 30, 6);
+            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0] + 30, at[1] + 6, info));
+            check("pick/dragging the preview turns it", sv.preview().view().yaw() != home.yaw() && sv.preview().view().pitch() != home.pitch(), sv.preview().view().toString());
+            sv.mouseScrolled(at[0], at[1], 0, 3);
+            check("pick/scrolling over the preview zooms it", sv.preview().view().zoom() > 1.5, sv.preview().view().toString());
+            var right = new net.minecraft.client.input.MouseButtonInfo(1, 0);
+            double panBefore = sv.preview().view().panX();
+            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], right), false);
+            sv.mouseDragged(new net.minecraft.client.input.MouseButtonEvent(at[0] + 20, at[1], right), 20, 0);
+            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0] + 20, at[1], right));
+            check("pick/a right drag moves it", sv.preview().view().panX() > panBefore + 10, sv.preview().view().toString());
+        });
+        waitTicks(14);
+        shot("pick_5b_preview_turned");
+        act(() -> {
+            SaveScreen sv = (SaveScreen) screen();
+            var info = new net.minecraft.client.input.MouseButtonInfo(0, 0);
+            int[] at = sv.anchor("preview");
+            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info), true);
+            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info));
+            check("pick/a double click starts the view over", sv.preview().view().equals(io.github.profetgit.cyanotype.ui.PreviewRaster.View.HOME), sv.preview().view().toString());
+        });
+        waitTicks(14);
         waitTicks(6);
         shot("pick_5_save");
         act(() -> screen().keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN, 0, 0)));
