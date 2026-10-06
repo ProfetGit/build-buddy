@@ -138,6 +138,11 @@ final class Grab {
         return new double[]{eye.x + look.x * t, eye.z + look.z * t};
     }
 
+    /** The scroll wheel while carrying: one block up (positive) or down per notch, on top of whatever the carry has done; never more than the reach. */
+    void lift(int steps) {
+        dy = (int) Math.max(-reachMax, Math.min(reachMax, dy + steps));
+    }
+
     boolean moved() {
         return dx != 0 || dy != 0 || dz != 0;
     }

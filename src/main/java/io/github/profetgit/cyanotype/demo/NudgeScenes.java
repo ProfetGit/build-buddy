@@ -74,6 +74,27 @@ final class NudgeScenes {
             BlockPos d = house.origin.subtract(o[0]);
             check("carry/six blocks of ground are six blocks of build", Math.abs(d.getX() - 6) <= 1 && Math.abs(d.getZ()) <= 1 && d.getY() == 0, "moved " + d);
         });
+        // Shift (sneak, fly down) does nothing to the height; the wheel lifts a block a notch
+        act(() -> Interaction.testModifiers = 1);
+        waitTicks(3);
+        act(() -> PlaceScenes.aim(mc(), 18, G + 6, 4));
+        waitTicks(6);
+        act(() -> check("carry/Shift held while carrying does not lift the build", house.origin.getY() == o[0].getY(), "origin " + house.origin + " from " + o[0]));
+        act(() -> Interaction.testModifiers = -1);
+        act(() -> {
+            scroll(mc(), 1);
+            scroll(mc(), 1);
+            scroll(mc(), 1);
+        });
+        waitTicks(4);
+        act(() -> check("carry/three notches up lift it three blocks", house.origin.getY() == o[0].getY() + 3, "origin " + house.origin + " from " + o[0]));
+        act(() -> {
+            scroll(mc(), -1);
+            scroll(mc(), -1);
+            scroll(mc(), -1);
+        });
+        waitTicks(4);
+        act(() -> check("carry/and three down put it back at the height it had", house.origin.getY() == o[0].getY(), "origin " + house.origin + " from " + o[0]));
         // a right click puts it back where it was picked up
         act(() -> PlaceScenes.tap(mc().options.keyUse));
         waitTicks(6);
@@ -83,6 +104,41 @@ final class NudgeScenes {
         });
         waitTicks(4);
         act(() -> check("carry/and nothing is left to undo from the cancelled carry", house.origin.equals(o[0]), "origin " + house.origin));
+        // from above (flying over it) and while the player moves: the height set stays the height set
+        act(() -> PlaceScenes.release(mc().options.keyAttack));
+        waitTicks(3);
+        look(5.5, G + 30, -20, 0, 35);
+        act(() -> {
+            o[0] = house.origin;
+            PlaceScenes.aim(mc(), 0.7, G + 6, 9);
+        });
+        waitTicks(6);
+        act(() -> PlaceScenes.hold(mc().options.keyAttack));
+        waitTicks(3);
+        act(() -> check("carry/from above: picked up", Interaction.grabbing(), "grabbing " + Interaction.grabbing()));
+        int[] ys = new int[1];
+        for (int i = 0; i < 12; i++) {
+            final int k = i;
+            act(() -> {
+                // the player flies up and sideways a little each step while the view sweeps across the ground
+                var m = mc().player;
+                Director.run(mc(), String.format(java.util.Locale.ROOT, "tp %s %.2f %.2f %.2f", m.getGameProfile().name(), 5.5 + k * 0.7, G + 30 + k * 0.9, -20 + k * 0.3));
+                PlaceScenes.aim(mc(), 14 + k, G + 1, 3 + k % 4);
+                if (house.origin.getY() != o[0].getY()) ys[0]++;
+            });
+            waitTicks(3);
+        }
+        act(() -> check("carry/flying up and sweeping the view over the ground never changes the height", ys[0] == 0 && house.origin.getY() == o[0].getY(), ys[0] + " frames off the height, origin " + house.origin + " from " + o[0]));
+        act(() -> PlaceScenes.release(mc().options.keyAttack));
+        waitTicks(4);
+        act(() -> check("carry/and it is put down at the same height", house.origin.getY() == o[0].getY(), "origin " + house.origin + " from " + o[0]));
+        act(() -> Placements.undo());
+        waitTicks(4);
+        look(5.5, G + 1, -6, 0, -10);
+        act(() -> PlaceScenes.aim(mc(), 1.5, G + 10, 9));
+        waitTicks(5);
+        act(() -> PlaceScenes.hold(mc().options.keyAttack));
+        waitTicks(3);
         // taking it away while it is held (the Delete key) leaves nothing to carry and does not fail
         act(() -> PlaceScenes.aim(mc(), 1.5, G + 10, 9));
         waitTicks(5);
@@ -285,20 +341,25 @@ final class NudgeScenes {
         });
         waitTicks(6);
         shot("mega_2_carry");
+        // Shift is sneak and fly-down in the game: it does not lift the build, the wheel does
         act(() -> Interaction.testModifiers = 1);
         waitTicks(3);
         act(() -> {
             Vec3 e = mc().player.getEyePosition();
-            PlaceScenes.aim(mc(), 0.0, e.y + 50, 90.0);
+            PlaceScenes.aim(mc(), 0.0, e.y + 40, 90.0);
         });
         waitTicks(6);
-        act(() -> Interaction.testModifiers = -1);
-        waitTicks(3);
+        act(() -> {
+            check("mega/Shift held while carrying does not change the height", house.origin.getY() == o[0].getY(), "origin " + house.origin + " from " + o[0]);
+            Interaction.testModifiers = -1;
+            for (int i = 0; i < 10; i++) scroll(mc(), 1);
+        });
+        waitTicks(4);
         act(() -> PlaceScenes.release(mc().options.keyAttack));
         waitTicks(4);
         act(() -> {
             BlockPos d = house.origin.subtract(o[0]);
-            check("mega/carried 20 blocks north and lifted 10 by looking (within a block)", Math.abs(d.getX()) <= 1 && Math.abs(d.getZ() + 20) <= 1 && Math.abs(d.getY() - 10) <= 1, "moved " + d);
+            check("mega/carried 20 blocks north and lifted 10 with the wheel (within a block)", Math.abs(d.getX()) <= 1 && Math.abs(d.getZ() + 20) <= 1 && Math.abs(d.getY() - 10) <= 1, "moved " + d);
             check("mega/it is put down on release", !Interaction.grabbing(), "grabbing");
         });
         act(() -> {

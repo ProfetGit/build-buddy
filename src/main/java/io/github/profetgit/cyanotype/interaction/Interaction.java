@@ -162,7 +162,18 @@ public final class Interaction {
         }
         if (Placements.mode() == Mode.EDIT && p != null && p.locked) {
             // the wheel moves the build along the axis the player looks along; mid-drag it is not wanted, but must not change the hotbar either
-            if (drag == null && grab == null) editScroll(mc, p, amount);
+            if (grab != null) {
+                // while carrying the wheel lifts or lowers the build, a block a notch
+                scrollAcc += amount;
+                int n = (int) scrollAcc;
+                scrollAcc -= n;
+                if (n != 0) {
+                    grab.lift(n);
+                    Sfx.play(Sfx.SNAP, 1.0f + 0.04f * Math.min(12, Math.abs(grab.dy)));
+                }
+            } else if (drag == null) {
+                editScroll(mc, p, amount);
+            }
             return true;
         }
         if (Placements.mode() != Mode.PLACING || p == null || p.locked) return false;
@@ -290,7 +301,8 @@ public final class Interaction {
             grabbed = null;
             return;
         }
-        g.update(camera, look, shift(mc));
+        // the height changes only when the player says so (the scroll wheel): Shift is sneak and fly-down in the game, and must not lift the build
+        g.update(camera, look, false);
         BlockPos target = grabOrigin.offset(g.dx, g.dy, g.dz);
         // never out of the world: the build keeps its whole height between the bottom and the top of it
         int lowest = mc.level.getMinY(), highest = mc.level.getMaxY() - p.sizeY();
@@ -685,7 +697,7 @@ public final class Interaction {
             // carrying it: the mouse is busy, so no arrows and no ring; only where it came from and how far it has come
             handles = null;
             updateGrab(mc, camera, look);
-            chips(mc, new Chips.Chip("Release", "Drop it here"), new Chips.Chip("Shift", "Lift it up / down"), new Chips.Chip("Right click", "Put it back"));
+            chips(mc, new Chips.Chip("Release", "Drop it here"), new Chips.Chip("Scroll", "Lift it up / down"), new Chips.Chip("Right click", "Put it back"));
             return;
         }
         if (drag != null) {
