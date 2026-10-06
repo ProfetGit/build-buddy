@@ -6,6 +6,5 @@
   "key.cyanotype.redo": "Redo (hold Ctrl)",
   "key.cyanotype.mirror": "Mirror the build (left and right as you see it)",
   "key.cyanotype.paste": "Paste the build into the world (creative, your own world)",
-  "key.cyanotype.fit": "Grow the Save area box until it holds the whole build",
   "key.cyanotype.remove": "Remove the selected placement"
 }

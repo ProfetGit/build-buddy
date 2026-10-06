@@ -106,39 +106,11 @@ class BoxCheckTest {
     }
 
     @Test
-    void fitGrowsTheBoxUntilTheBuildIsInsideAndNeverShrinksIt() {
-        W w = tower();
-        BoxCheck.Fit f = BoxCheck.fit(w, SelectionBox.of(9, 1, 9, 13, 10, 13), null, 96, 8_000_000L);
-        assertEquals(20, f.box().y1());
-        assertEquals(9, f.box().x0());
-        assertEquals(13, f.box().x1());
-        assertEquals(10, f.layers());
-        assertFalse(f.stopped());
-        assertFalse(BoxCheck.check(w, f.box(), null).any());
-        // a box that is not cut stays as it is, margins and all
-        BoxCheck.Fit again = BoxCheck.fit(w, SelectionBox.of(5, 0, 5, 20, 30, 20), null, 96, 8_000_000L);
-        assertEquals(SelectionBox.of(5, 0, 5, 20, 30, 20), again.box());
-        assertEquals(0, again.layers());
-    }
-
-    @Test
-    void fitStopsAtTheLimitAndSaysSo() {
-        W w = new W();
-        w.fill(10, 1, 10, 12, 400, 12, Blocks.OAK_PLANKS);
-        BoxCheck.Fit f = BoxCheck.fit(w, SelectionBox.of(9, 1, 9, 13, 10, 13), null, 50, 8_000_000L);
-        assertEquals(50, f.layers());
-        assertTrue(f.stopped());
-        assertEquals(60, f.box().y1());
-    }
-
-    @Test
     void aFencePostOrTwoTouchingTheBoxIsNotABuildGoingOn() {
         W w = new W();
         w.fill(10, 1, 10, 10, 1, 10, Blocks.OAK_FENCE);
         w.fill(11, 1, 10, 11, 1, 10, Blocks.OAK_FENCE);
         assertFalse(BoxCheck.check(w, SelectionBox.of(9, 1, 9, 10, 3, 11), null).any(), "two cells are under the minimum");
-        // fit leaves such a box alone
-        assertEquals(0, BoxCheck.fit(w, SelectionBox.of(9, 1, 9, 10, 3, 11), null, 96, 8_000_000L).layers());
     }
 
     /** A world that only knows the chunks it holds, and is asked in block coordinates like the game's: loaded(x, z) is "is the chunk of block x, z there". */
@@ -163,7 +135,6 @@ class BoxCheckTest {
         BoxCheck.Result r = BoxCheck.check(w, SelectionBox.of(4999, 1, -7001, 5003, 10, -6997), null);
         assertTrue(r.cut(Direction.UP), "cut on top, far from the origin");
         assertEquals(9, r.count[Direction.UP.ordinal()]);
-        assertEquals(10, BoxCheck.fit(w, SelectionBox.of(4999, 1, -7001, 5003, 10, -6997), null, 96, 8_000_000L).layers());
         // chunks that are not loaded count as nothing, never as a build
         Chunked empty = new Chunked();
         empty.fill(5000, 1, -7000, 5002, 20, -6998, Blocks.OAK_PLANKS);
@@ -177,7 +148,6 @@ class BoxCheckTest {
         w.fill(11, 1, 12, 11, 1, 12, Blocks.OAK_FENCE);
         // the post touches several wall blocks (straight and slanting), but it is one block
         assertFalse(BoxCheck.check(w, SelectionBox.of(8, 1, 9, 10, 4, 15), null).any());
-        assertEquals(0, BoxCheck.fit(w, SelectionBox.of(8, 1, 9, 10, 4, 15), null, 96, 8_000_000L).layers());
     }
 
     /** A roof of {@code block} climbing one block up for every block east, 5 wide (z 10..14), from x 10 to x 25. */
@@ -193,9 +163,6 @@ class BoxCheckTest {
         BoxCheck.Result r = BoxCheck.check(w, SelectionBox.of(9, 1, 9, 13, 20, 15), null);
         assertTrue(r.cut(Direction.EAST), "the stairs go on to the east");
         assertEquals(5, r.count[Direction.EAST.ordinal()]);
-        BoxCheck.Fit f = BoxCheck.fit(w, SelectionBox.of(9, 1, 9, 13, 20, 15), null, 96, 8_000_000L);
-        assertEquals(25, f.box().x1());
-        assertFalse(BoxCheck.check(w, f.box(), null).any());
     }
 
     @Test

@@ -9,6 +9,8 @@ import static io.github.profetgit.cyanotype.demo.Director.shot;
 import static io.github.profetgit.cyanotype.demo.Director.until;
 import static io.github.profetgit.cyanotype.demo.Director.waitTicks;
 import static io.github.profetgit.cyanotype.demo.PlaceScenes.aim;
+import static io.github.profetgit.cyanotype.demo.PlaceScenes.hold;
+import static io.github.profetgit.cyanotype.demo.PlaceScenes.release;
 import static io.github.profetgit.cyanotype.demo.PlaceScenes.scroll;
 import static io.github.profetgit.cyanotype.demo.PlaceScenes.tap;
 import static io.github.profetgit.cyanotype.demo.SaveScenes.aimCell;
@@ -440,7 +442,7 @@ final class PickScenes {
         });
         waitTicks(4);
 
-        // ---- the Save area box says when it cuts a build in two, and the fit key grows it
+        // ---- the Save area box says where it cuts a build in two, but only while a side is being dragged
         camera(27, G + 8, 35, 180, 25);
         waitTicks(10);
         act(() -> {
@@ -449,26 +451,19 @@ final class PickScenes {
             io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(AX, G + 1, Z0, AX + 6, G + 3, Z1));
         });
         waitTicks(16);
+        act(() -> check("pick/with no side being dragged nothing is checked or shown", io.github.profetgit.cyanotype.interaction.Selecting.cuts() == null, String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.cuts())));
+        shot("pick_9_idle_box");
+        grabSide("top");
         act(() -> {
             var c = io.github.profetgit.cyanotype.interaction.Selecting.cuts();
             int up = net.minecraft.core.Direction.UP.ordinal();
-            check("pick/a box that stops under the roof is cut on top", c != null && c.cut(net.minecraft.core.Direction.UP) && c.count[up] == 34, c == null ? "no result" : "top " + c.count[up]);
+            check("pick/dragging a side of a box that stops under the roof shows it is cut on top", c != null && c.cut(net.minecraft.core.Direction.UP) && c.count[up] == 34, c == null ? "no result" : "top " + c.count[up]);
             check("pick/and on no other side (a lone fence post is not a building)", c != null && c.total() == c.count[up], c == null ? "no result" : "total " + c.total());
         });
         shot("pick_9_cut_top");
-        act(() -> io.github.profetgit.cyanotype.interaction.Selecting.fit(mc()));
-        waitTicks(14);
-        act(() -> {
-            var b = io.github.profetgit.cyanotype.interaction.Selecting.box();
-            var c = io.github.profetgit.cyanotype.interaction.Selecting.cuts();
-            check("pick/the fit key grows the box up over the roof and no further", b != null && b.y1() == G + 4 && b.y0() == G + 1 && b.x0() == AX && b.x1() == AX + 6, String.valueOf(b));
-            check("pick/after fitting nothing is cut off", c != null && !c.any(), c == null ? "no result" : "total " + c.total());
-        });
-        shot("pick_9_fitted");
-        // a tall box: the ruler on the nearest vertical edge, far edges dashed
-        act(() -> io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(AX + 5, G, 18, AX + 12, G + 9, 26)));
-        waitTicks(16);
-        shot("pick_9_tall");
+        letGo();
+        act(() -> check("pick/letting go clears it again", io.github.profetgit.cyanotype.interaction.Selecting.cuts() == null, String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.cuts())));
+
         // a roof of stairs and slabs climbs a step sideways at a time: the box through it is cut too
         act(() -> {
             java.util.List<String> roof = new java.util.ArrayList<>();
@@ -481,16 +476,17 @@ final class PickScenes {
         waitTicks(20);
         act(() -> io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(42, G + 1, 26, 45, G + 8, 28)));
         waitTicks(16);
+        grabSide("east");
         act(() -> {
             var c = io.github.profetgit.cyanotype.interaction.Selecting.cuts();
             int east = net.minecraft.core.Direction.EAST.ordinal();
             check("pick/a box through a roof of stairs and slabs is cut where the roof climbs out", c != null && c.count[east] >= 3, c == null ? "no result" : "east " + c.count[east] + ", total " + c.total());
         });
         shot("pick_9_stairs");
+        letGo();
         act(() -> io.github.profetgit.cyanotype.interaction.Selecting.cancel(mc()));
 
         // far from the world's origin, where only some chunks are loaded: the check must still see the build
-        act(() -> io.github.profetgit.cyanotype.interaction.Selecting.cancel(mc()));
         camera(3003, G + 10, 3014, 180, 20);
         until("pick/the far chunks are loaded", 600, () -> mc().level != null && mc().level.getChunkSource().hasChunk(3000 >> 4, 3000 >> 4) && mc().level.getChunkSource().hasChunk(3005 >> 4, 3005 >> 4));
         waitTicks(10);
@@ -498,12 +494,14 @@ final class PickScenes {
         waitTicks(20);
         act(() -> io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(3000, G + 1, 3000, 3005, G + 3, 3005)));
         waitTicks(16);
+        grabSide("top");
         act(() -> {
             var c = io.github.profetgit.cyanotype.interaction.Selecting.cuts();
             int up = net.minecraft.core.Direction.UP.ordinal();
             check("pick/a box through a build far from the origin is cut on top too", c != null && c.count[up] == 36, c == null ? "no result" : "top " + c.count[up] + ", total " + c.total());
         });
         shot("pick_9_far");
+        letGo();
         act(() -> {
             io.github.profetgit.cyanotype.interaction.Selecting.cancel(mc());
             Director.hideHud(mc(), true);
@@ -513,8 +511,25 @@ final class PickScenes {
         camera(23.5, G + 7, 32, 180, 28);
         until("pick/the spawn chunks are loaded again", 600, () -> mc().level != null && mc().level.getChunkSource().hasChunk(1, 1));
         waitTicks(20);
-        waitTicks(4);
         act(() -> Director.hideHud(mc(), true));
+    }
+
+    /** Takes hold of a side of the Save area box by its arrow, the way a player does, and keeps hold. */
+    private static void grabSide(String face) {
+        act(() -> {
+            var a = io.github.profetgit.cyanotype.interaction.Selecting.faceAnchor(face);
+            check("pick/the " + face + " arrow is there", a != null, String.valueOf(a));
+            if (a != null) aim(mc(), a.x, a.y, a.z);
+        });
+        waitTicks(5);
+        act(() -> hold(mc().options.keyAttack));
+        waitTicks(5);
+        act(() -> check("pick/the " + face + " side is being dragged", io.github.profetgit.cyanotype.interaction.Selecting.dragging(), "dragging " + io.github.profetgit.cyanotype.interaction.Selecting.dragging()));
+    }
+
+    private static void letGo() {
+        act(() -> release(mc().options.keyAttack));
+        waitTicks(6);
     }
 
     private static void aimAt(int x, int y, int z) {

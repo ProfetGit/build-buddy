@@ -346,9 +346,6 @@ public final class Interaction {
         while (Keys.MIRROR.consumeClick()) {
             if (!screen && !GhostRenderer.hidden) mirror(mc);
         }
-        while (Keys.FIT.consumeClick()) {
-            if (!screen && Selecting.active()) Selecting.fit(mc);
-        }
         while (Keys.REMOVE.consumeClick()) {
             if (!screen && !GhostRenderer.hidden) askRemove(mc);
         }

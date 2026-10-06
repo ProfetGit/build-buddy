@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * How the Save area box is drawn so that it can be read at a glance, on a tall build too: edges on the near side solid and the
  * far ones thin and dashed (so the box has depth), the top edges brighter than the bottom ones, the floor lightly filled, the
- * side being pointed at or dragged filled, a ruler of heights on the edge nearest to you, and amber squares on the box's faces
+ * side being pointed at or dragged filled and amber squares on the box's faces
  * where it cuts a build in two ({@link BoxCheck}).
  */
 final class BoxFrame {
@@ -88,39 +88,6 @@ final class BoxFrame {
         fill(face(a, Direction.DOWN, 0), CYAN, 0.10);
         if (pointed != null) fill(face(a, pointed, 0.01), CYAN, dragging ? 0.30 : 0.20);
         Handles.brackets(a, CYAN, true);
-    }
-
-    /** Heights along the vertical edge nearest to the camera: a tick every few blocks, numbered from the bottom, and the total at the top. */
-    static void ruler(AABB a, int height, Vec3 camera) {
-        if (height < 6) return;
-        double[] xs = {a.minX, a.maxX}, zs = {a.minZ, a.maxZ};
-        double bx = 0, bz = 0, best = Double.MAX_VALUE;
-        for (double x : xs) {
-            for (double z : zs) {
-                double d = (x - camera.x) * (x - camera.x) + (z - camera.z) * (z - camera.z);
-                if (d < best) {
-                    best = d;
-                    bx = x;
-                    bz = z;
-                }
-            }
-        }
-        double dist = Math.sqrt(best + Math.pow(camera.y - (a.minY + a.maxY) / 2, 2));
-        if (dist > 140) return;
-        double ox = bx == a.minX ? -1 : 1, oz = bz == a.minZ ? -1 : 1;
-        int step = 5;
-        for (int s : new int[]{5, 10, 20, 50, 100, 200, 500}) {
-            step = s;
-            if (height / s <= 8) break;
-        }
-        float scale = Handles.labelScale(dist, 0.7, 0.04);
-        for (int k = step; k < height; k += step) {
-            double y = a.minY + k;
-            Gizmos.line(new Vec3(bx, y, bz), new Vec3(bx + ox * 0.7, y, bz), alpha(WHITE, 0.9), 2.4f).setAlwaysOnTop();
-            Gizmos.line(new Vec3(bx, y, bz), new Vec3(bx, y, bz + oz * 0.7), alpha(WHITE, 0.9), 2.4f).setAlwaysOnTop();
-            Handles.label(new Vec3(bx + ox * (0.9 + 0.6 * scale), y + 0.35 * scale, bz + oz * (0.9 + 0.6 * scale)), String.valueOf(k), scale, WHITE, CYAN);
-        }
-        Handles.label(new Vec3(bx + ox * (1.0 + 1.3 * scale), a.maxY + 0.35 * scale, bz + oz * (1.0 + 1.3 * scale)), height + " tall", scale, WHITE, CYAN);
     }
 
     /** Amber squares on the faces where the build goes on past the box, and a word beside each side that does. */

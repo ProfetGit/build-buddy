@@ -14,8 +14,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Tells whether a Save area box cuts a build in two: on each of the box's six faces, the cells of the outermost layer where a
  * built block inside has a built block touching it on the other side of the face (straight on, or slanting by one: a stair or slab roof climbs a step sideways at a time). Those are the places where the build goes on past the box. Pure
- * apart from the block classification ({@link BlockKinds}), so it is tested on made-up worlds. {@link #fit} grows the box
- * where it cuts until it no longer does.
+ * apart from the block classification ({@link BlockKinds}), so it is tested on made-up worlds.
  */
 public final class BoxCheck {
     /** A box with more face cells than this is not checked (the check would take too long to run as the box is dragged). */
@@ -81,7 +80,7 @@ public final class BoxCheck {
     }
 
     /** The cells of one face of the box that are cut, as {@code asLong} of the cell inside the box; {@code ignore} says which outside cells to leave out (other buildings). */
-    private static void scanFace(Picker.Field f, SelectionBox b, Direction face, @Nullable LongPredicate ignore, int stopAt, LongArrayList out, int[] count, LongOpenHashSet outside) {
+    private static void scanFace(Picker.Field f, SelectionBox b, Direction face, @Nullable LongPredicate ignore, LongArrayList out, int[] count, LongOpenHashSet outside) {
         Direction.Axis axis = face.getAxis();
         int sign = face.getStepX() + face.getStepY() + face.getStepZ();
         int inside = switch (axis) {
@@ -122,7 +121,6 @@ public final class BoxCheck {
                 }
                 if (!goesOn) continue;
                 count[0]++;
-                if (outside.size() >= stopAt) return;
                 if (out != null && out.size() < KEEP) out.add(BlockPos.asLong(x, y, z));
             }
         }
@@ -140,7 +138,7 @@ public final class BoxCheck {
             LongArrayList list = new LongArrayList();
             int[] n = {0};
             LongOpenHashSet outside = new LongOpenHashSet();
-            scanFace(f, box, d, ignore, Integer.MAX_VALUE, list, n, outside);
+            scanFace(f, box, d, ignore, list, n, outside);
             // real only when at least MIN_CUT different blocks outside go on from it: one fence post touching three wall blocks is not a building
             boolean real = outside.size() >= MIN_CUT;
             r.cells[d.ordinal()] = real ? thin(list) : new long[0];
@@ -156,52 +154,5 @@ public final class BoxCheck {
         LongArrayList out = new LongArrayList();
         for (int i = 0; i < list.size(); i += step) out.add(list.getLong(i));
         return out.toLongArray();
-    }
-
-    /** Whether one face of the box cuts a build (stops once it is sure). */
-    private static boolean cuts(Picker.Field f, SelectionBox box, Direction d, @Nullable LongPredicate ignore) {
-        int[] n = {0};
-        LongOpenHashSet outside = new LongOpenHashSet();
-        scanFace(f, box, d, ignore, MIN_CUT, null, n, outside);
-        return outside.size() >= MIN_CUT;
-    }
-
-    /** What {@link #fit} made: the new box, how many layers it added, and whether it stopped at the limit with a face still cut. */
-    public record Fit(SelectionBox box, int layers, boolean stopped) {
-    }
-
-    /**
-     * Grows the box one layer at a time on every face that cuts a build, until none does or {@code maxLayers} layers have been
-     * added in all. Never shrinks it, so what the player chose to include (ground, a margin) stays.
-     */
-    public static Fit fit(Picker.Field f, SelectionBox box, @Nullable LongPredicate ignore, int maxLayers, long maxVolume) {
-        SelectionBox b = box;
-        int layers = 0;
-        boolean[] done = new boolean[6];
-        while (layers < maxLayers) {
-            boolean grew = false;
-            for (Direction d : Direction.values()) {
-                if (done[d.ordinal()]) continue;
-                if (faceCells(b) > MAX_FACE_CELLS * 4 || !cuts(f, b, d, ignore)) {
-                    done[d.ordinal()] = true;
-                    continue;
-                }
-                SelectionBox grown = b.moved(d, 1);
-                if (grown.volume() > maxVolume) {
-                    done[d.ordinal()] = true;
-                    continue;
-                }
-                b = grown;
-                layers++;
-                grew = true;
-                if (layers >= maxLayers) break;
-            }
-            if (!grew) break;
-        }
-        boolean stopped = false;
-        if (layers >= maxLayers) {
-            for (Direction d : Direction.values()) if (cuts(f, b, d, ignore)) stopped = true;
-        }
-        return new Fit(b, layers, stopped);
     }
 }
