@@ -77,9 +77,7 @@ public final class Community {
 
     /** A downloaded file must open as a blueprint before it joins the library (shapes are not worked out: only the file is judged). */
     static void validate(java.nio.file.Path file) throws java.io.IOException {
-        try (java.io.InputStream in = java.nio.file.Files.newInputStream(file)) {
-            LitematicReader.read(in, file.getFileName().toString(), false);
-        }
+        io.github.profetgit.cyanotype.blueprint.SchematicReader.read(file, false);
     }
 
     static CommunityModel.Pixels decode(byte[] png) throws java.io.IOException {

@@ -303,7 +303,7 @@ public final class CommunityModel {
 
     /** Whether the Download button can do anything now. */
     public static boolean canDownload(DetailState d) {
-        return d != null && d.data != null && d.summary.isLitematic() && d.download != DownloadPhase.RUNNING;
+        return d != null && d.data != null && d.summary.canOpen() && d.download != DownloadPhase.RUNNING;
     }
 
     public void download() {

@@ -273,16 +273,65 @@ class DownloadsTest {
     }
 
     @Test
-    void onlyLitematicIsDownloadedAndNothingIsAskedForTheRest(@TempDir Path dir) throws Exception {
+    void onlyFormatsTheReaderOpensAreDownloadedAndNothingIsAskedForTheRest(@TempDir Path dir) throws Exception {
         byte[] file = gz("x");
         try (FakeSite site = new FakeSite()) {
             serve(site, file);
-            for (String ext : new String[]{"schem", "nbt", "", "litematic.exe"}) {
+            for (String ext : new String[]{"nbt", "", "litematic.exe", "schem.exe", "zip"}) {
                 ApiException e = assertThrows(ApiException.class, () -> save(site, detailFor("abcd1234", "House", ext, file, sha(file)), dir, ACCEPT), ext);
                 assertEquals(ApiException.Kind.UNREADABLE, e.kind);
             }
             assertEquals(0, site.log.size(), "no request for a file that cannot be opened");
             assertEquals(Set.of(), names(dir));
+        }
+    }
+
+    @Test
+    void aSchemAndASchematicKeepTheirOwnKindAndNumberTheirCopiesSeparately(@TempDir Path dir) throws Exception {
+        byte[] file = gz("a schematic");
+        try (FakeSite site = new FakeSite()) {
+            serve(site, file);
+            Path a = save(site, detailFor("abcd1234", "Cozy Cottage", "schem", file, sha(file)), dir, ACCEPT).file();
+            Path b = save(site, detailFor("abcd1234", "Cozy Cottage", "schem", file, sha(file)), dir, ACCEPT).file();
+            Path c = save(site, detailFor("abcd1234", "Cozy Cottage", "SCHEMATIC", file, sha(file)), dir, ACCEPT).file();
+            Path d = save(site, detailFor("abcd1234", "Cozy Cottage", "litematic", file, sha(file)), dir, ACCEPT).file();
+            assertEquals("Cozy Cottage.schem", a.getFileName().toString());
+            assertEquals("Cozy Cottage 2.schem", b.getFileName().toString());
+            assertEquals("Cozy Cottage.schematic", c.getFileName().toString());
+            assertEquals("Cozy Cottage.litematic", d.getFileName().toString());
+            assertEquals(Set.of("Cozy Cottage.schem", "Cozy Cottage 2.schem", "Cozy Cottage.schematic", "Cozy Cottage.litematic"), names(dir), "no temporary file is left");
+            assertEquals(List.of("community", "houses"), io.github.profetgit.cyanotype.placement.LibraryIndex.tags(a));
+        }
+    }
+
+    @Test
+    void aRealSchemAndAJunkOneThroughTheRealValidator(@TempDir Path dir) throws Exception {
+        net.minecraft.nbt.CompoundTag sp = new net.minecraft.nbt.CompoundTag(), pal = new net.minecraft.nbt.CompoundTag(), root = new net.minecraft.nbt.CompoundTag();
+        pal.putInt("minecraft:air", 0);
+        pal.putInt("minecraft:stone", 1);
+        sp.putInt("Version", 2);
+        sp.putInt("DataVersion", net.minecraft.SharedConstants.getCurrentVersion().dataVersion().version());
+        sp.putShort("Width", (short) 2);
+        sp.putShort("Height", (short) 1);
+        sp.putShort("Length", (short) 1);
+        sp.put("Palette", pal);
+        sp.putByteArray("BlockData", new byte[]{1, 0});
+        root.put("Schematic", sp);
+        net.minecraft.nbt.NbtIo.writeCompressed(root, dir.resolve("download-1.schem"));
+        Community.validate(dir.resolve("download-1.schem"));
+        Files.write(dir.resolve("download-2.schem"), gz("not a schematic"));
+        assertThrows(Exception.class, () -> Community.validate(dir.resolve("download-2.schem")));
+    }
+
+    @Test
+    void theValidatorSeesTheRightExtensionSoTheReaderCanChoose(@TempDir Path dir) throws Exception {
+        byte[] file = gz("x");
+        java.util.List<String> seen = new java.util.ArrayList<>();
+        try (FakeSite site = new FakeSite()) {
+            serve(site, file);
+            save(site, detailFor("abcd1234", "House", "schem", file, sha(file)), dir, f -> seen.add(f.getFileName().toString()));
+            assertEquals(1, seen.size());
+            assertTrue(seen.get(0).endsWith(".schem"), seen.get(0));
         }
     }
 

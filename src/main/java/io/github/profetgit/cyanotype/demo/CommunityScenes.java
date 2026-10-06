@@ -443,7 +443,7 @@ final class CommunityScenes {
         waitTicks(10);
         act(() -> {
             CommunityModel.DetailState d = model().detail();
-            check("community/an .nbt build cannot be downloaded here, and it says why", !CommunityModel.canDownload(d) && !d.summary.isLitematic(), "canDownload " + CommunityModel.canDownload(d));
+            check("community/an .nbt build cannot be downloaded here, and it says why", !CommunityModel.canDownload(d) && !d.summary.canOpen(), "canDownload " + CommunityModel.canDownload(d));
             check("community/it can still be opened on its page", pane().controls().contains("website"), String.valueOf(pane().controls()));
             long files = countFiles();
             model().download();

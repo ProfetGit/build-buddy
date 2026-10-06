@@ -80,9 +80,9 @@ public final class Api {
     public record Build(String id, String title, String author, String category, String categoryLabel, String summary, int sx, int sy, int sz, long blockCount,
                         String sizeClass, String sizeLabel, String minecraftVersion, int dataVersion, long downloads, long favorites, String remixOf,
                         String createdAt, String fileName, String fileExtension, long fileBytes, String thumbnailUrl, String pageUrl, String downloadUrl) {
-        /** Only .litematic can be opened by this version of the mod. */
-        public boolean isLitematic() {
-            return "litematic".equalsIgnoreCase(fileExtension);
+        /** Whether this version of the mod opens the file: .litematic, .schem (Sponge) and .schematic (old MCEdit). */
+        public boolean canOpen() {
+            return "litematic".equalsIgnoreCase(fileExtension) || "schem".equalsIgnoreCase(fileExtension) || "schematic".equalsIgnoreCase(fileExtension);
         }
 
         public String sizeText() {

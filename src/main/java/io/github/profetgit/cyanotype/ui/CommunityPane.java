@@ -361,7 +361,7 @@ public final class CommunityPane {
         if (hover != null) {
             StringBuilder tip = new StringBuilder(hover.title()).append("\nby ").append(hover.author().isEmpty() ? "unknown" : hover.author());
             for (String line : Ui.wrap(hover.summary(), 170, 4)) tip.append('\n').append(line);
-            if (!hover.isLitematic()) tip.append("\nA .").append(hover.fileExtension()).append(" file: this version opens .litematic only.");
+            if (!hover.canOpen()) tip.append("\nA .").append(hover.fileExtension()).append(" file: this version opens .litematic, .schem and .schematic only.");
             Ui.tooltip(g, mx, my, tip.toString());
         }
     }
@@ -382,7 +382,7 @@ public final class CommunityPane {
         } else {
             Ui.centered(g, ".".repeat(1 + (int) (t * 3) % 3), tx + THUMB_W / 2, ty + 18, Ui.DIM);
         }
-        if (!b.isLitematic()) {
+        if (!b.canOpen()) {
             String ext = "." + b.fileExtension();
             int w = Ui.font().width(ext) + 4;
             g.fill(tx + THUMB_W - w, ty + THUMB_H - 10, tx + THUMB_W, ty + THUMB_H, Ui.withAlpha(Ui.DEEP, 0.85f));
@@ -476,7 +476,7 @@ public final class CommunityPane {
         facts.add(new String[]{Words.size(b) + "  (" + Words.count(b.blockCount()) + " blocks)", "cyan"});
         if (!b.sizeLabel().isEmpty()) facts.add(new String[]{b.sizeLabel() + " build", "cyan"});
         if (!b.minecraftVersion().isEmpty()) facts.add(new String[]{"Minecraft " + b.minecraftVersion(), "dim"});
-        facts.add(new String[]{"." + (b.fileExtension().isEmpty() ? "?" : b.fileExtension()) + " file, " + Words.bytes(b.fileBytes()), b.isLitematic() ? "dim" : "warn"});
+        facts.add(new String[]{"." + (b.fileExtension().isEmpty() ? "?" : b.fileExtension()) + " file, " + Words.bytes(b.fileBytes()), b.canOpen() ? "dim" : "warn"});
         facts.add(new String[]{Words.downloads(b.downloads()) + (b.favorites() > 0 ? ", " + b.favorites() + (b.favorites() == 1 ? " favourite" : " favourites") : ""), "dim"});
         if (b.remixOf() != null) facts.add(new String[]{"A remix of another build", "dim"});
         int fh = 0;
@@ -591,8 +591,8 @@ public final class CommunityPane {
             return new String[]{"Saved as " + d.saved.getFileName() + " in your library. It is in the Mine tab now.", "good"};
         }
         if (d.download == CommunityModel.DownloadPhase.FAILED && d.downloadError != null) return new String[]{d.downloadError.forPlayer(), "bad"};
-        if (!b.isLitematic()) {
-            return new String[]{"This is a ." + (b.fileExtension().isEmpty() ? "?" : b.fileExtension()) + " file. This version of Cyanotype opens .litematic files only, so it cannot be downloaded here. "
+        if (!b.canOpen()) {
+            return new String[]{"This is a ." + (b.fileExtension().isEmpty() ? "?" : b.fileExtension()) + " file. This version of Cyanotype opens .litematic, .schem and .schematic files, so it cannot be downloaded here. "
                 + "You can still get it from its page on the website.", "warn"};
         }
         if (d.existing != null && d.download == CommunityModel.DownloadPhase.IDLE) {

@@ -48,10 +48,15 @@ public final class BlueprintSaver {
 
     /** As {@link #freePath(Path, String)}; with {@code sidecarToo} a name whose tags file is still lying there is not free either. */
     public static Path freePath(Path dir, String stem, boolean sidecarToo) {
-        Path p = dir.resolve(stem + ".litematic");
+        return freePath(dir, stem, "litematic", sidecarToo);
+    }
+
+    /** As above for a file of another extension ("schem", "schematic"): {@code stem.ext}, {@code stem 2.ext}... */
+    public static Path freePath(Path dir, String stem, String ext, boolean sidecarToo) {
+        Path p = dir.resolve(stem + "." + ext);
         int n = 2;
-        while (exists(p) || sidecarToo && exists(dir.resolve(p.getFileName().toString().replaceFirst("(?i)\\.litematic$", "") + ".cyanotype.json"))) {
-            p = dir.resolve(stem + " " + n++ + ".litematic");
+        while (exists(p) || sidecarToo && exists(dir.resolve(p.getFileName().toString().replaceFirst("\\.[^.]+$", "") + ".cyanotype.json"))) {
+            p = dir.resolve(stem + " " + n++ + "." + ext);
         }
         return p;
     }

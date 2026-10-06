@@ -37,13 +37,15 @@ public final class Downloads {
 
     public static Result save(Net net, Api.Detail d, Path dir, Validator validate, Net.ProgressSink progress, BooleanSupplier cancelled) throws ApiException {
         Api.Build b = d.build();
-        if (!b.isLitematic()) {
-            throw new ApiException(ApiException.Kind.UNREADABLE, "it is a ." + (b.fileExtension().isEmpty() ? "?" : b.fileExtension()) + " file and this version opens .litematic");
+        if (!b.canOpen()) {
+            throw new ApiException(ApiException.Kind.UNREADABLE, "it is a ." + (b.fileExtension().isEmpty() ? "?" : b.fileExtension()) + " file and this version opens .litematic, .schem and .schematic");
         }
+        // the file keeps the kind it is: the reader chooses by the name, and the Library lists it as what it is
+        String ext = b.fileExtension().toLowerCase(java.util.Locale.ROOT);
         Path tmp = null;
         try {
             Files.createDirectories(dir);
-            tmp = Files.createTempFile(dir, "download-", ".tmp");
+            tmp = Files.createTempFile(dir, "download-", "." + ext);
             Net.Fetched got = net.downloadTo(downloadPath(b), tmp, Net.DOWNLOAD_MAX, progress, cancelled);
             if (b.fileBytes() >= 0 && got.bytes() != b.fileBytes()) {
                 throw new ApiException(ApiException.Kind.CHECKSUM, "expected " + b.fileBytes() + " bytes, got " + got.bytes());
@@ -57,7 +59,7 @@ public final class Downloads {
             } catch (Exception e) {
                 throw new ApiException(ApiException.Kind.UNREADABLE, 0, 0, e.getMessage() == null ? e.toString() : e.getMessage(), e);
             }
-            Path target = place(tmp, dir, BlueprintSaver.stem(b.title()));
+            Path target = place(tmp, dir, BlueprintSaver.stem(b.title()), ext);
             writeSidecar(dir, target, b, net.base(), got.sha256());
             tmp = null;
             return new Result(target, got.bytes());
@@ -68,7 +70,7 @@ public final class Downloads {
                 try {
                     Files.deleteIfExists(tmp);
                 } catch (IOException ignored) {
-                    // a stray .tmp is harmless: the Library lists .litematic only
+                    // a stray download-*.tmp-like file is harmless; a .schem/.litematic named download-... would only show if the move failed half way
                 }
             }
         }
@@ -79,9 +81,9 @@ public final class Downloads {
      * create-new flag, which only one of two downloads at once can win; the finished file then replaces the empty one in a
      * single rename. A plain move would check and then rename, and two renames can both pass the check.
      */
-    static Path place(Path tmp, Path dir, String stem) throws IOException {
+    static Path place(Path tmp, Path dir, String stem, String ext) throws IOException {
         for (int attempt = 0; attempt < 200; attempt++) {
-            Path target = BlueprintSaver.freePath(dir, stem, true);
+            Path target = BlueprintSaver.freePath(dir, stem, ext, true);
             try {
                 Files.createFile(target);
             } catch (FileAlreadyExistsException raced) {

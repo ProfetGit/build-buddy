@@ -43,8 +43,17 @@ public final class SchematicReader {
     }
 
     public static Blueprint read(Path file) throws IOException {
+        return read(file, true);
+    }
+
+    /** @param fixShapes whether blocks that read their neighbours get the shape they have in place; false is enough to judge a file */
+    public static Blueprint read(Path file, boolean fixShapes) throws IOException {
         String name = file.getFileName().toString();
-        if (name.toLowerCase(Locale.ROOT).endsWith(".litematic")) return LitematicReader.read(file);
+        if (name.toLowerCase(Locale.ROOT).endsWith(".litematic")) {
+            try (InputStream in = new BufferedInputStream(Files.newInputStream(file))) {
+                return LitematicReader.read(in, name.substring(0, name.length() - ".litematic".length()), fixShapes);
+            }
+        }
         String stem = name.replaceFirst("(?i)\\.(schem|schematic)$", "");
         CompoundTag root;
         try (InputStream in = new BufferedInputStream(Files.newInputStream(file))) {
@@ -52,7 +61,7 @@ public final class SchematicReader {
         } catch (IOException e) {
             throw new LitematicException("This is not a schematic file (" + e.getMessage() + ")", e);
         }
-        return fromTag(root, stem, true);
+        return fromTag(root, stem, fixShapes);
     }
 
     /** Reads an already parsed schematic of the Sponge or MCEdit kind (the root may hold everything, or one "Schematic" tag that does). */

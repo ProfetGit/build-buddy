@@ -66,7 +66,12 @@ public final class BlueprintLibrary {
     }
 
     public static Path resolve(String ref) {
-        if (ref.startsWith(OWN)) return ownDir().resolve(ref.substring(OWN.length()));
+        if (ref.startsWith(OWN)) {
+            Path own = ownDir().resolve(ref.substring(OWN.length()));
+            // a build moved from the mod's old folder into schematics/ is still found by the reference a saved placement kept
+            Path moved = litematicaDir().resolve(ref.substring(OWN.length()));
+            return !Files.exists(own) && Files.exists(moved) ? moved : own;
+        }
         if (ref.startsWith(LITEMATICA)) return litematicaDir().resolve(ref.substring(LITEMATICA.length()));
         return Path.of(ref);
     }

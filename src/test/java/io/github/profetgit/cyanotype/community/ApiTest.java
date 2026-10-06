@@ -35,9 +35,9 @@ class ApiTest {
         assertEquals("9x6x7", a.sizeText());
         assertEquals("Tiny", a.sizeLabel());
         assertEquals(155, a.blockCount());
-        assertFalse(a.isLitematic(), "an .nbt build cannot be opened by this version");
+        assertFalse(a.canOpen(), "an .nbt build cannot be opened by this version");
         assertNull(a.remixOf());
-        assertTrue(b.isLitematic());
+        assertTrue(b.canOpen());
         assertEquals("abcd1234", b.remixOf());
         assertEquals(2, b.favorites());
         assertEquals(637, b.fileBytes());
