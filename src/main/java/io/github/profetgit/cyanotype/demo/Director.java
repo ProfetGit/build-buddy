@@ -207,6 +207,7 @@ public final class Director {
         for (String scene : SCENES) {
             switch (scene) {
                 case "house" -> houseScene();
+                case "shaderswap" -> ShaderScenes.swap();
                 case "perf" -> perfScenes();
                 case "commands" -> commandScene();
                 case "place" -> PlaceScenes.place();

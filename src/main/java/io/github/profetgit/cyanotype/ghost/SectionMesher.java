@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.renderpearl.api.vertex.VertexFormat;
 import io.github.profetgit.cyanotype.verify.Verifier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -60,15 +61,16 @@ final class SectionMesher {
      * @param region the placed region; the box {@code x0..x0+w} etc. is in its own turned coordinates
      * @param wx world position of the region's min corner
      * @param mask the verifier's states of the box (y, then z, then x), or null to draw every block
+     * @param format the vertex layout the draw will expect (a shader pack changes it): decided on the render thread when the bake starts
      * @return null when the box has nothing to draw
      */
-    static Baked bake(OrientedRegion region, int wx, int wy, int wz, int x0, int y0, int z0, int w, int h, int d, ClientLevel level, byte[] mask) {
+    static Baked bake(OrientedRegion region, int wx, int wy, int wz, int x0, int y0, int z0, int w, int h, int d, ClientLevel level, byte[] mask, VertexFormat format) {
         Minecraft mc = Minecraft.getInstance();
         PlacementView view = new PlacementView(region, wx, wy, wz, level);
         ModelBlockRenderer renderer = new ModelBlockRenderer(false, true, mc.getBlockColors());
         RenderType type = renderType();
         ByteBufferBuilder bytes = new ByteBufferBuilder(1 << 16);
-        BufferBuilder builder = new BufferBuilder(bytes, type.primitiveTopology(), type.format());
+        BufferBuilder builder = new BufferBuilder(bytes, type.primitiveTopology(), format);
         PoseStack ps = new PoseStack();
         int[] quads = new int[1];
         boolean[] wrong = new boolean[1];
@@ -122,13 +124,13 @@ final class SectionMesher {
      * @param top true for the faces that point up (the layer above is cut away), false for those that point down
      * @return null when the layer has no such faces
      */
-    static BakedCap bakeCap(OrientedRegion region, int wx, int wy, int wz, int x0, int y0, int z0, int w, int h, int d, int ly, boolean top, ClientLevel level, byte[] mask) {
+    static BakedCap bakeCap(OrientedRegion region, int wx, int wy, int wz, int x0, int y0, int z0, int w, int h, int d, int ly, boolean top, ClientLevel level, byte[] mask, VertexFormat format) {
         Minecraft mc = Minecraft.getInstance();
         PlacementView view = new PlacementView(region, wx, wy, wz, level);
         ModelBlockRenderer renderer = new ModelBlockRenderer(false, true, mc.getBlockColors());
         RenderType type = renderType();
         ByteBufferBuilder bytes = new ByteBufferBuilder(1 << 12);
-        BufferBuilder builder = new BufferBuilder(bytes, type.primitiveTopology(), type.format());
+        BufferBuilder builder = new BufferBuilder(bytes, type.primitiveTopology(), format);
         PoseStack ps = new PoseStack();
         int[] quads = new int[1];
         boolean[] wrong = new boolean[1];

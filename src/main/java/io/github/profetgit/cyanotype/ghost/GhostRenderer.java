@@ -5,6 +5,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.vertex.VertexFormat;
 import io.github.profetgit.cyanotype.Cyanotype;
 import io.github.profetgit.cyanotype.blueprint.Blueprint;
 import io.github.profetgit.cyanotype.placement.Placement;
@@ -65,6 +66,11 @@ public final class GhostRenderer {
     public static volatile boolean fadeEnabled = true;
     private static Object lastModels;
     private static long lastFrameNs;
+    /** The vertex layout the ghost's pipeline expects now: a shader pack on or off changes it, and meshes made for another layout must not be drawn. */
+    private static VertexFormat liveFormat;
+    /** Render failures in a row, and when drawing may start again after too many. */
+    private static int failStreak;
+    private static long pausedUntilNs, lastFailLogNs;
 
     /** The quick toggle: ghosts keep baking but are not drawn (nor are their handles). */
     public static volatile boolean hidden;
@@ -82,6 +88,24 @@ public final class GhostRenderer {
     }
 
     private GhostRenderer() {
+    }
+
+    /** Whether two vertex layouts are the same (the same elements in the same order): a shader pack can make a new object for the same layout. */
+    static boolean sameFormat(VertexFormat a, VertexFormat b) {
+        return a == b || a != null && b != null && a.toString().equals(b.toString());
+    }
+
+    /** Uploaded meshes written for a layout other than the one drawn now (dev checks; 0 once they have been made again). */
+    public static int staleSections() {
+        int n = 0;
+        if (liveFormat == null) return 0;
+        for (Slot s : SLOTS.values()) {
+            for (Ghost g : new Ghost[]{s.current, s.pending}) {
+                if (g == null || g.sections == null) continue;
+                for (Ghost.Section sec : g.sections) if (sec.buffer != null && sec.meshFormat != null && !sameFormat(sec.meshFormat, liveFormat)) n++;
+            }
+        }
+        return n;
     }
 
     /** Frees every ghost; the next frame rebuilds those that should be drawn. */
@@ -176,8 +200,26 @@ public final class GhostRenderer {
     /** Called once per frame from the level renderer, after the main pass has composed the scene. */
     public static void render(Minecraft mc, CameraRenderState cam, RenderTarget target) {
         long t0 = System.nanoTime();
+        if (t0 < pausedUntilNs) return;
         try {
             renderTimed(mc, cam, target);
+            failStreak = 0;
+        } catch (Throwable t) {
+            // the ghost is a guest in the frame: whatever goes wrong with it must not take the game down
+            if (t0 - lastFailLogNs > 10_000_000_000L) {
+                lastFailLogNs = t0;
+                Cyanotype.LOG.error("The ghost could not be drawn this frame", t);
+            }
+            if (++failStreak >= 3) {
+                // something is broken for now (a pipeline being rebuilt, say): rest, throw the meshes away, start again clean
+                pausedUntilNs = t0 + 2_000_000_000L;
+                failStreak = 0;
+                try {
+                    clear();
+                } catch (Throwable ignored) {
+                    SLOTS.clear();
+                }
+            }
         } finally {
             if (!SLOTS.isEmpty()) {
                 Stats.cpuNanos += System.nanoTime() - t0;
@@ -196,6 +238,9 @@ public final class GhostRenderer {
         boolean reloaded = lastModels != null && models != lastModels;
         lastModels = models;
         if (reloaded) clear();
+        VertexFormat live = SectionMesher.renderType().format();
+        if (liveFormat != null && !sameFormat(liveFormat, live)) Cyanotype.LOG.info("The vertex layout changed (a shader pack was switched): ghost meshes are made again");
+        liveFormat = live;
         // placements that are gone, or whose ghost belongs to another level
         SLOTS.entrySet().removeIf(e -> {
             Placement p = e.getKey();
@@ -231,6 +276,10 @@ public final class GhostRenderer {
                 Verifier v = g.verifier;
                 for (Ghost.Section sec : g.sections) {
                     if (distSq(sec.bounds, mine, cx, cy, cz) > rangeSq) continue;
+                    // a mesh written for another vertex layout cannot be drawn: it is made again (and not shown until it is)
+                    if (sec.state == Ghost.Section.UPLOADED && sec.meshFormat != null && !sameFormat(sec.meshFormat, live)) sec.state = Ghost.Section.IDLE;
+                    // a failed bake or upload is tried again after a while, a few times
+                    if (sec.state == Ghost.Section.FAILED && sec.failures < 3 && now - sec.failedNs > 8_000_000_000L) sec.state = Ghost.Section.IDLE;
                     // the world changed under a section that is up to date: bake it again, drawing the old mesh meanwhile
                     if (v != null && sec.state == Ghost.Section.UPLOADED && v.version(sec.part, sec.vsec) != sec.bakedVersion) sec.state = Ghost.Section.IDLE;
                     if (sec.state == Ghost.Section.IDLE || sec.state == Ghost.Section.BAKING || sec.state == Ghost.Section.BAKED) pending++;
@@ -307,7 +356,8 @@ public final class GhostRenderer {
             double dist = Math.sqrt(distSq(sec.bounds, m, cx, cy, cz));
             double fade = !fadeEnabled || dist <= fadeStart ? 1.0 : Math.max(0.0, 1.0 - (dist - fadeStart) / (range - fadeStart));
             if (fade < 0.03) continue;
-            if (sec.buffer != null && sec.layerQuads != null) {
+            boolean fits = sec.meshFormat == null || sameFormat(sec.meshFormat, live);
+            if (fits && sec.buffer != null && sec.layerQuads != null) {
                 int q0 = sec.layerQuads[a], q1 = sec.layerQuads[b + 1];
                 if (q1 > q0) {
                     draw.add(new DrawItem(sec, sec.buffer, sec.indexCount, m, q0, q1, fade));
@@ -316,7 +366,7 @@ public final class GhostRenderer {
             }
             // the faces the cut layers would have covered
             for (Ghost.Cap c : sec.caps.values()) {
-                if (c.exact && c.buffer != null && c.quads > 0) draw.add(new DrawItem(sec, c.buffer, c.indexCount, m, 0, c.quads, fade));
+                if (c.exact && c.buffer != null && c.quads > 0 && (c.meshFormat == null || sameFormat(c.meshFormat, live))) draw.add(new DrawItem(sec, c.buffer, c.indexCount, m, 0, c.quads, fade));
             }
         }
         Stats.drawn = sectionsDrawn;
@@ -357,6 +407,9 @@ public final class GhostRenderer {
             int version = v.version(sec.part, sec.vsec);
             for (Ghost.Cap c : sec.caps.values()) if (c.state == Ghost.Section.UPLOADED && c.bakedVersion != version) c.state = Ghost.Section.IDLE;
         }
+        if (liveFormat != null) {
+            for (Ghost.Cap c : sec.caps.values()) if (c.state == Ghost.Section.UPLOADED && c.meshFormat != null && !sameFormat(c.meshFormat, liveFormat)) c.state = Ghost.Section.IDLE;
+        }
     }
 
     /** The cap at the window's edge layer (drawn) and the layers next to it (ready for when the window moves). */
@@ -384,6 +437,7 @@ public final class GhostRenderer {
 
     private static void startCapBake(Ghost.Section s, Ghost.Cap c) {
         c.state = Ghost.Section.BAKING;
+        VertexFormat format = SectionMesher.renderType().format();
         Verifier v = s.ghost.verifier;
         byte[] mask = v == null ? null : v.snapshot(s.part, s.x, s.y, s.z, s.w, s.h, s.d);
         c.bakingVersion = v == null ? 0 : v.version(s.part, s.vsec);
@@ -394,7 +448,7 @@ public final class GhostRenderer {
                     c.state = Ghost.Section.IDLE;
                     return;
                 }
-                SectionMesher.BakedCap b = SectionMesher.bakeCap(s.region, s.wx, s.wy, s.wz, s.x, s.y, s.z, s.w, s.h, s.d, c.layer, c.top, s.ghost.level, mask);
+                SectionMesher.BakedCap b = SectionMesher.bakeCap(s.region, s.wx, s.wy, s.wz, s.x, s.y, s.z, s.w, s.h, s.d, c.layer, c.top, s.ghost.level, mask, format);
                 c.baked = b;
                 c.state = Ghost.Section.BAKED;
                 if (c.dead || s.ghost.disposed) c.release();
@@ -411,9 +465,15 @@ public final class GhostRenderer {
         SectionMesher.BakedCap b = c.baked;
         c.baked = null;
         c.bakedVersion = c.bakingVersion;
+        if (b != null && liveFormat != null && !sameFormat(b.mesh().drawState().format(), liveFormat)) {
+            b.close();
+            c.state = Ghost.Section.IDLE;
+            return;
+        }
         if (b == null) {
             if (c.buffer != null) c.buffer.close();
             c.buffer = null;
+            c.meshFormat = null;
             c.indexCount = 0;
             c.quads = 0;
             c.state = Ghost.Section.UPLOADED;
@@ -424,9 +484,13 @@ public final class GhostRenderer {
             if (c.buffer != null) c.buffer.close();
             c.buffer = fresh;
             c.indexCount = b.mesh().drawState().indexCount();
+            c.meshFormat = b.mesh().drawState().format();
             c.quads = b.quads();
             RenderSystem.getSequentialBuffer(SectionMesher.renderType().primitiveTopology()).requestIndexCount(c.indexCount);
             c.state = Ghost.Section.UPLOADED;
+        } catch (RuntimeException e) {
+            Cyanotype.LOG.error("Ghost cap upload failed", e);
+            c.state = Ghost.Section.FAILED;
         } finally {
             b.close();
         }
@@ -526,6 +590,7 @@ public final class GhostRenderer {
 
     private static void startBake(Ghost.Section s) {
         s.state = Ghost.Section.BAKING;
+        VertexFormat format = SectionMesher.renderType().format();
         // what the world looked like when this bake started; a later change bumps the version and bakes the section again
         Verifier v = s.ghost.verifier;
         byte[] mask = v == null ? null : v.snapshot(s.part, s.x, s.y, s.z, s.w, s.h, s.d);
@@ -539,12 +604,14 @@ public final class GhostRenderer {
                     return;
                 }
                 // null: nothing to draw in this box (all of it built, or empty); the section still counts as baked
-                SectionMesher.Baked b = SectionMesher.bake(s.region, s.wx, s.wy, s.wz, s.x, s.y, s.z, s.w, s.h, s.d, s.ghost.level, mask);
+                SectionMesher.Baked b = SectionMesher.bake(s.region, s.wx, s.wy, s.wz, s.x, s.y, s.z, s.w, s.h, s.d, s.ghost.level, mask, format);
                 s.baked = b;
                 s.state = Ghost.Section.BAKED;
                 if (s.ghost.disposed && b != null) s.release();
             } catch (Throwable t) {
                 Cyanotype.LOG.error("Ghost section bake failed", t);
+                s.failures++;
+                s.failedNs = System.nanoTime();
                 s.state = Ghost.Section.FAILED;
             } finally {
                 Stats.bakeNanos.add(System.nanoTime() - t0);
@@ -563,10 +630,17 @@ public final class GhostRenderer {
             // nothing to show: drop any old buffer
             if (s.buffer != null) s.buffer.close();
             s.buffer = null;
+            s.meshFormat = null;
             s.indexCount = 0;
             s.quads = 0;
             s.layerQuads = null;
             s.state = Ghost.Section.UPLOADED;
+            return 0;
+        }
+        // made for a layout that is no longer the one drawn (a shader pack was switched while it baked): throw it away and bake again
+        if (liveFormat != null && !sameFormat(b.mesh().drawState().format(), liveFormat)) {
+            b.close();
+            s.state = Ghost.Section.IDLE;
             return 0;
         }
         int bytes = b.mesh().vertexBuffer().remaining();
@@ -575,12 +649,19 @@ public final class GhostRenderer {
             if (s.buffer != null) s.buffer.close();
             s.buffer = fresh;
             s.indexCount = b.mesh().drawState().indexCount();
+            s.meshFormat = b.mesh().drawState().format();
             s.quads = b.quads();
             s.layerQuads = b.layerQuads();
             RenderSystem.getSequentialBuffer(SectionMesher.renderType().primitiveTopology()).requestIndexCount(s.indexCount);
             s.state = Ghost.Section.UPLOADED;
             Stats.uploaded++;
             Stats.bytesUploaded.add(bytes);
+        } catch (RuntimeException e) {
+            Cyanotype.LOG.error("Ghost section upload failed", e);
+            s.failures++;
+            s.failedNs = System.nanoTime();
+            s.state = Ghost.Section.FAILED;
+            return 0;
         } finally {
             b.close();
         }
@@ -590,6 +671,12 @@ public final class GhostRenderer {
     private static void draw(CameraRenderState cam, RenderTarget target, List<DrawItem> items) {
         PreparedRenderType prepared = SectionMesher.renderType().prepare();
         RenderPipeline pipeline = prepared.pipeline();
+        // the pipeline must expect the layout the meshes were written in; if it moved on this very frame, wait for the next
+        VertexFormat expected = pipeline.getVertexFormatBinding(0);
+        if (expected != null && liveFormat != null && !sameFormat(expected, liveFormat)) {
+            Stats.quadsDrawn = 0;
+            return;
+        }
         Matrix4f modelView = RenderSystem.getModelViewMatrixCopy();
         Matrix4f texture = new Matrix4f();
         var index = RenderSystem.getSequentialBuffer(SectionMesher.renderType().primitiveTopology());

@@ -108,6 +108,11 @@ public final class Ghost {
         /** The verifier version the mesh in the buffer was made from, and the one being made. */
         int bakedVersion = -1, bakingVersion;
         GpuBuffer buffer;
+        /** The vertex format the mesh in the buffer was written in (null when there is no mesh). */
+        com.mojang.renderpearl.api.vertex.VertexFormat meshFormat;
+        /** Failed bakes or uploads so far, and when the last one was: a failed section is tried again after a while, a few times. */
+        int failures;
+        long failedNs;
         int indexCount;
         int quads;
         /** Quads emitted up to the end of each layer of the section (length h + 1): a range of layers is a range of quads. */
@@ -162,6 +167,7 @@ public final class Ghost {
         boolean exact;
         int bakedVersion = -1, bakingVersion;
         GpuBuffer buffer;
+        com.mojang.renderpearl.api.vertex.VertexFormat meshFormat;
         int indexCount, quads;
 
         Cap(boolean top, int layer) {
