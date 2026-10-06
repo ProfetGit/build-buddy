@@ -172,6 +172,69 @@ class PickSetTest {
     }
 
     @Test
+    void growTakesTheNearestPartAndShrinkGivesItUpAgain() {
+        TestWorld w = new TestWorld();
+        house(w, 10, 10);
+        house(w, 24, 10);
+        house(w, 40, 10);
+        for (int x = 17; x <= 23; x++) w.set(x, 1, 12, Blocks.OAK_FENCE);
+        for (int x = 31; x <= 39; x++) w.set(x, 1, 12, Blocks.OAK_FENCE);
+        PickSet s = new PickSet(w, Picker.DEFAULT_LIMIT);
+        s.start(key(12, 3, 10), null);
+        run(s);
+        int one = s.picked().size();
+        assertEquals(0, s.shrink(), "only the clicked part: nothing to give up");
+        // nearest first: the fence that joins them may come before the second house, but the second before the third
+        int steps = 0;
+        PickSet.Grown last = null;
+        while (!s.picked().contains(key(26, 3, 10)) && steps < 6) {
+            last = s.grow();
+            assertNotNull(last, "something nearby at step " + steps);
+            assertFalse(s.picked().contains(key(42, 3, 10)), "the far house is not before the near one");
+            steps++;
+        }
+        assertTrue(s.picked().contains(key(26, 3, 10)), "the second house comes in");
+        assertEquals("to the east", last.direction());
+        while (!s.picked().contains(key(42, 3, 10)) && steps < 12) {
+            assertNotNull(s.grow());
+            steps++;
+        }
+        assertTrue(s.picked().contains(key(42, 3, 10)), "then the third");
+        while (s.grow() != null) steps++;
+        assertEquals(null, s.grow(), "nothing left nearby");
+        int taken = 0;
+        while (s.shrink() > 0) taken++;
+        assertTrue(taken >= 2 && taken <= steps + 1, "given up again: " + taken + " of " + steps);
+        assertEquals(one, s.picked().size(), "back to the clicked house");
+        assertEquals(0, s.shrink());
+    }
+
+    @Test
+    void aPartTakenOutByHandIsOfferedAgainByGrow() {
+        TestWorld w = new TestWorld();
+        house(w, 10, 10);
+        house(w, 24, 10);
+        for (int x = 17; x <= 23; x++) w.set(x, 1, 12, Blocks.OAK_FENCE);
+        PickSet s = new PickSet(w, Picker.DEFAULT_LIMIT);
+        s.start(key(12, 3, 10), null);
+        run(s);
+        int one = s.picked().size();
+        s.addPart(key(26, 3, 10), null);
+        s.removePart(key(26, 3, 10));
+        assertEquals(one, s.picked().size());
+        int steps = 0;
+        while (!s.picked().contains(key(26, 3, 10)) && steps++ < 4) {
+            PickSet.Grown gg = s.grow();
+            assertNotNull(gg);
+        }
+        assertTrue(s.picked().contains(key(26, 3, 10)), "it comes back");
+        int sizeBefore = s.picked().size();
+        int gone = s.shrink();
+        assertTrue(gone > 100, "gone " + gone + " of " + sizeBefore + " (one house " + one + ")");
+        assertFalse(s.picked().contains(key(26, 3, 10)), "and goes first when scrolling down");
+    }
+
+    @Test
     void aFailedPickKeepsTheOldOneAndSaysWhy() {
         TestWorld w = new TestWorld();
         house(w, 10, 10);

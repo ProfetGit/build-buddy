@@ -158,7 +158,13 @@ public final class PickSet {
             if (r.cells.contains(cell)) {
                 // taken out before? then it comes back
                 removed.removeAll(r.members(r.partOf(cell)));
-                if (!chosen.contains(cell)) chosen.add(cell);
+                // the newest addition goes last, so scrolling down gives up what was added most recently (the clicked part stays
+                // first); older entries of the same part (another cell of it) are dropped so one scroll gives the whole part up
+                int part = r.partOf(cell);
+                if (r.partOf(chosen.get(0)) != part) {
+                    for (int i = chosen.size() - 1; i >= 1; i--) if (r.partOf(chosen.get(i)) == part) chosen.remove(i);
+                    chosen.add(cell);
+                }
                 derive();
                 return;
             }
@@ -230,6 +236,86 @@ public final class PickSet {
         extra.addAll(add);
         derive();
         return add.size();
+    }
+
+    /** What {@link #grow} took in: the words for the player and how many blocks. */
+    public record Grown(long cell, int blocks, String direction) {
+    }
+
+    /**
+     * Takes in the nearest part the picker has seen but not picked (nearest to the middle of what is picked): the plain way
+     * to add what belongs to the build but was cut from it (the porch, the fence round it) without aiming at it. Parts
+     * already picked or never seen are not offered; one taken out by hand is.
+     * @return what came in, or null when there is nothing nearby left
+     */
+    public @Nullable Grown grow() {
+        if (job != null || picked.isEmpty()) return null;
+        double px = 0, py = 0, pz = 0;
+        for (long c : picked) {
+            px += BlockPos.getX(c);
+            py += BlockPos.getY(c);
+            pz += BlockPos.getZ(c);
+        }
+        px /= picked.size();
+        py /= picked.size();
+        pz /= picked.size();
+        long bestCell = 0;
+        double best = Double.POSITIVE_INFINITY, bx = 0, by = 0, bz = 0;
+        int bestSize = 0;
+        for (Picker.Result r : floods) {
+            for (int p = 0; p < r.partCount(); p++) {
+                var members = r.members(p);
+                if (members.isEmpty() || anyPicked(members)) continue;
+                double cx = 0, cy = 0, cz = 0;
+                for (int i = 0; i < members.size(); i++) {
+                    long c = members.getLong(i);
+                    cx += BlockPos.getX(c);
+                    cy += BlockPos.getY(c);
+                    cz += BlockPos.getZ(c);
+                }
+                cx /= members.size();
+                cy /= members.size();
+                cz /= members.size();
+                double d = (cx - px) * (cx - px) + (cy - py) * (cy - py) + (cz - pz) * (cz - pz);
+                if (d < best) {
+                    best = d;
+                    bestCell = members.getLong(0);
+                    bestSize = members.size();
+                    bx = cx - px;
+                    by = cy - py;
+                    bz = cz - pz;
+                }
+            }
+        }
+        if (bestSize == 0) return null;
+        addPart(bestCell, null);
+        String dir;
+        if (Math.abs(by) > Math.abs(bx) && Math.abs(by) > Math.abs(bz)) dir = by > 0 ? "above" : "below";
+        else if (Math.abs(bx) >= Math.abs(bz)) dir = bx > 0 ? "to the east" : "to the west";
+        else dir = bz > 0 ? "to the south" : "to the north";
+        return new Grown(bestCell, bestSize, dir);
+    }
+
+    /** Whether any of these cells is picked: a part taken out by hand has none, so it is offered again, like a part never added. */
+    private boolean anyPicked(it.unimi.dsi.fastutil.longs.LongList members) {
+        for (int i = 0; i < members.size(); i++) if (picked.contains(members.getLong(i))) return true;
+        return false;
+    }
+
+    /**
+     * Gives up the part chosen last, the other half of scrolling: what {@link #grow} or a Shift+click added comes off again,
+     * the first part (the one clicked) never does.
+     * @return how many blocks went, or 0 when only the first part is left
+     */
+    public int shrink() {
+        if (job != null || chosen.size() <= 1) return 0;
+        int before = picked.size();
+        while (chosen.size() > 1) {
+            chosen.remove(chosen.size() - 1);
+            derive();
+            if (picked.size() < before) break;
+        }
+        return before - picked.size();
     }
 
     /** Changes how wide a gap the picker jumps; the old pick stays until the new one is ready. */

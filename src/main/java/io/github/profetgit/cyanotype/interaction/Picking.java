@@ -29,7 +29,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The Smart Pick tool (PRD 7.11): click any part of a build and the whole build lights up; click it again to save it.
- * Scroll changes how wide a gap the picker jumps, Shift+click adds another part, Ctrl+click takes a part out (Alt+click
+ * Scroll adds the nearest part nearby (and takes the last one off), Shift+click adds another part, Ctrl+click takes a part out (Alt+click
  * would be taken by the window manager on KDE), right click starts over. The work is {@link PickSet}'s, a few
  * milliseconds a tick; this class is the input, the hints and the drawing. Static state like {@link Selecting}.
  */
@@ -319,7 +319,7 @@ public final class Picking {
         cancel(mc);
     }
 
-    /** Scroll: how wide a gap the picker jumps, or with Ctrl or Shift held how much a click cuts. Always the tool's, so the hotbar does not move. */
+    /** Scroll: add or take off the nearest part, or with Ctrl or Shift held how much a click cuts. Always the tool's, so the hotbar does not move. */
     public static boolean onScroll(double amount) {
         if (set == null || stage != Stage.RESULT) return true;
         scrollAcc += amount;
@@ -337,10 +337,26 @@ public final class Picking {
             }
             return true;
         }
-        int target = Math.max(0, Math.min(Picker.MAX_REACH, set.reachWanted() + n));
-        if (target != set.reachWanted()) {
-            set.setReach(target);
-            Sfx.play(Sfx.SNAP, 0.9f + 0.15f * target);
+        // scroll up takes in the nearest part nearby, scroll down gives the last one up: the pick grows and shrinks one part at a time
+        for (int i = 0; i < Math.abs(n); i++) {
+            if (set.working()) break;
+            if (n > 0) {
+                PickSet.Grown g = set.grow();
+                if (g == null) {
+                    problem(mc, "No more parts nearby.");
+                    break;
+                }
+                Sfx.play(Sfx.PRESS, 1.25f);
+                Interaction.say(mc, "Added the nearest part, " + String.format(Locale.ROOT, "%,d", g.blocks()) + (g.blocks() == 1 ? " block " : " blocks ") + g.direction() + ". Scroll down to take it off.");
+            } else {
+                int gone = set.shrink();
+                if (gone == 0) {
+                    problem(mc, "That is the part you clicked. Scroll up to add more.");
+                    break;
+                }
+                Sfx.play(Sfx.RELEASE, 0.9f);
+                Interaction.say(mc, "Took the last part off: " + String.format(Locale.ROOT, "%,d", gone) + (gone == 1 ? " block." : " blocks."));
+            }
         }
         return true;
     }
@@ -477,7 +493,7 @@ public final class Picking {
         // always the same seven rows: holding Ctrl or Shift must not rebuild the list, the cut size is in the words
         String cut = DETAIL_NAMES[detail];
         Interaction.chips(mc, new Chips.Chip("Click", first), new Chips.Chip("Shift+Click", "Add " + cut), new Chips.Chip("Ctrl+Click", "Take out " + cut),
-            new Chips.Chip("Ctrl+Scroll", "Cut size: " + cut), new Chips.Chip("Scroll", "Reach " + set.reachWanted()), new Chips.Chip("Right click", "Start over"), new Chips.Chip(cancel, "Cancel"));
+            new Chips.Chip("Ctrl+Scroll", "Cut size: " + cut), new Chips.Chip("Scroll", "Add / take off the nearest part"), new Chips.Chip("Right click", "Start over"), new Chips.Chip(cancel, "Cancel"));
     }
 
     // ---- drawing the pick
@@ -501,7 +517,7 @@ public final class Picking {
         double ly = y - 0.9 * scale;
         int others = m.extraParts;
         if (others > 0) {
-            Handles.label(new Vec3(c.x, ly, c.z), others + (others == 1 ? " more part nearby" : " more parts nearby") + ": Shift+click to add", small, 0xFFFFE9A8, 0x99FFC857);
+            Handles.label(new Vec3(c.x, ly, c.z), others + (others == 1 ? " more part nearby" : " more parts nearby") + ": scroll up or Shift+click to add", small, 0xFFFFE9A8, 0x99FFC857);
             ly -= 0.7 * scale;
         }
         if (set.touchedUnloaded()) Handles.label(new Vec3(c.x, ly, c.z), "Part of it is in chunks that are not loaded", small, 0xFFFFE9A8, 0xCCFFC857);

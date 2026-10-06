@@ -194,18 +194,18 @@ final class PickScenes {
             check("pick/ctrl+scroll back down returns to whole parts", Picking.detail() == 0, "detail " + Picking.detail());
         });
 
-        // ---- the reach: scroll up and down, the pick stays the house
-        act(() -> scroll(mc(), 1));
-        waitTicks(4);
-        settled();
-        act(() -> check("pick/scroll widens the reach", Picking.reach() == 2 && has(AX + 2, G + 3, Z1), "reach " + Picking.reach()));
-        act(() -> scroll(mc(), -5));
-        waitTicks(4);
-        settled();
-        act(() -> check("pick/scroll down stops at zero", Picking.reach() == 0 && has(AX + 2, G + 3, Z1), "reach " + Picking.reach()));
-        act(() -> scroll(mc(), 1));
-        waitTicks(4);
-        settled();
+        // ---- scroll grows the pick one nearest part at a time, and gives them up again
+        for (int k = 0; k < 4; k++) {
+            act(() -> scroll(mc(), 1));
+            waitTicks(4);
+        }
+        act(() -> check("pick/scrolling up takes in the nearby parts, the other house among them", has(BX + 2, G + 3, Z1) && has(AX + 2, G + 3, Z1) && Picking.picked().size() > houseA[0], Picking.picked().size() + " picked"));
+        shot("pick_3d_grown");
+        for (int k = 0; k < 6; k++) {
+            act(() -> scroll(mc(), -1));
+            waitTicks(4);
+        }
+        act(() -> check("pick/scrolling down gives them up, the house you clicked stays", !has(BX + 2, G + 3, Z1) && has(AX + 2, G + 3, Z1) && Picking.picked().size() == houseA[0], Picking.picked().size() + " picked"));
 
         // ---- right click starts over; a second click picks a lone block of terrain, if asked twice
         rightClick();
