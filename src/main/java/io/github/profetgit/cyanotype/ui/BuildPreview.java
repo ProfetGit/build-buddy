@@ -5,7 +5,6 @@ import io.github.profetgit.cyanotype.Cyanotype;
 import io.github.profetgit.cyanotype.blueprint.Blueprint;
 import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.IntStream;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -297,29 +296,11 @@ public final class BuildPreview {
      * the texture's order (ABGR), a row at a time on several threads. Done on the worker so the game's frame only has to copy it.
      */
     private static int[] resolve(PreviewRaster.Frame f, int ss, int tw, int th) {
-        int[] src = f.px();
-        int[] out = new int[tw * th];
-        int sw = tw * ss, n = ss * ss;
-        IntStream.range(0, th).parallel().forEach(yy -> {
+        int[] out = PreviewRaster.resolveArgb(f, ss, tw, th);
+        java.util.stream.IntStream.range(0, th).parallel().forEach(yy -> {
             for (int xx = 0; xx < tw; xx++) {
-                int o = yy * tw + xx;
-                if (ss == 1) {
-                    int c = src[yy * sw + xx];
-                    out[o] = c & 0xFF00FF00 | (c & 255) << 16 | (c >> 16) & 255;
-                    continue;
-                }
-                long a = 0, r = 0, g = 0, b = 0;
-                for (int sy = 0; sy < ss; sy++) {
-                    for (int sx = 0; sx < ss; sx++) {
-                        int c = src[(yy * ss + sy) * sw + xx * ss + sx];
-                        int ca = c >>> 24;
-                        a += ca;
-                        r += ((c >> 16) & 255) * ca;
-                        g += ((c >> 8) & 255) * ca;
-                        b += (c & 255) * ca;
-                    }
-                }
-                if (a != 0) out[o] = (int) (a / n) << 24 | (int) (b / a) << 16 | (int) (g / a) << 8 | (int) (r / a);
+                int c = out[yy * tw + xx];
+                out[yy * tw + xx] = c & 0xFF00FF00 | (c & 255) << 16 | (c >> 16) & 255;
             }
         });
         return out;

@@ -1,7 +1,5 @@
 package io.github.profetgit.cyanotype.placement;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 import io.github.profetgit.cyanotype.blueprint.Blueprint;
 import io.github.profetgit.cyanotype.blueprint.LitematicWriter;
 import java.io.IOException;
@@ -16,8 +14,8 @@ import java.util.Set;
 
 /**
  * Putting a captured blueprint on disk: a safe file name from what the player typed (never replacing a file that is
- * already there), the .litematic itself, and the sidecar {@code name.cyanotype.json} that carries the tags (PRD 7.1a: our
- * extras never go inside the schematic).
+ * already there) and the .litematic itself; the tags go in the {@link LibraryIndex} (PRD 7.1a: our extras never go inside the
+ * schematic, and since 0.0.48 not beside it either).
  */
 public final class BlueprintSaver {
     public static final int MAX_TAGS = 12, MAX_TAG_LENGTH = 24, MAX_STEM = 60;
@@ -83,7 +81,7 @@ public final class BlueprintSaver {
     }
 
     /**
-     * Writes the blueprint and its sidecar into a folder. The file is written to a temporary name and moved into place,
+     * Writes the blueprint into a folder and its tags into the index. The file is written to a temporary name and moved into place,
      * so a crash never leaves half a schematic in the library.
      *
      * @return the file written
@@ -98,23 +96,9 @@ public final class BlueprintSaver {
         } finally {
             Files.deleteIfExists(tmp);
         }
-        String base = file.getFileName().toString().replaceFirst("(?i)\\.litematic$", "");
-        Path sidecar = dir.resolve(base + ".cyanotype.json");
-        if (tags.isEmpty()) {
-            Files.deleteIfExists(sidecar);
-        } else {
-            JsonObject side = new JsonObject();
-            JsonArray arr = new JsonArray();
-            for (String t : tags) arr.add(t);
-            side.add("tags", arr);
-            Path sideTmp = dir.resolve(base + ".cyanotype.json.tmp");
-            try {
-                Files.writeString(sideTmp, side.toString());
-                Files.move(sideTmp, sidecar, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } finally {
-                Files.deleteIfExists(sideTmp);
-            }
-        }
+        // tags live in the library index, not in a file beside the schematic; a stale tags file of an older version under this name goes
+        Files.deleteIfExists(dir.resolve(file.getFileName().toString().replaceFirst("(?i)\\.litematic$", "") + ".cyanotype.json"));
+        LibraryIndex.put(file, tags, null);
         return file;
     }
 }

@@ -1,9 +1,6 @@
 package io.github.profetgit.cyanotype.community;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import io.github.profetgit.cyanotype.placement.BlueprintSaver;
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,13 +11,12 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BooleanSupplier;
-import java.util.stream.Stream;
 
 /**
  * Getting a build from the site into the blueprint folder: the file is fetched to a temporary name, checked (size, the
  * checksum the site announced, that it is a gzip file the mod can read), and only then moved to a name nobody has. A file
  * that is already in the folder is never replaced: the new one becomes "name 2". After that it is an ordinary file in the
- * Library, with a tags file that remembers where it came from.
+ * Library, with an entry in the library index that remembers where it came from.
  */
 public final class Downloads {
     /** Opens the file the way the game will; throws if it cannot be read. Tests pass a stub, the game passes the real reader. */
@@ -108,50 +104,22 @@ public final class Downloads {
         }
     }
 
-    private static void writeSidecar(Path dir, Path file, Api.Build b, String base, String sha) throws IOException {
-        String stem = file.getFileName().toString().replaceFirst("(?i)\\.litematic$", "");
-        JsonObject side = new JsonObject();
-        JsonArray tags = new JsonArray();
-        tags.add("community");
-        if (!b.category().isEmpty()) tags.add(b.category());
-        side.add("tags", tags);
+    private static void writeSidecar(Path dir, Path file, Api.Build b, String base, String sha) {
+        List<String> tagList = new ArrayList<>();
+        tagList.add("community");
+        if (!b.category().isEmpty()) tagList.add(b.category());
         JsonObject src = new JsonObject();
         src.addProperty("site", base);
         src.addProperty("id", b.id());
         src.addProperty("title", b.title());
         src.addProperty("author", b.author());
         src.addProperty("sha256", sha);
-        side.add("source", src);
-        Path tmp = dir.resolve(stem + ".cyanotype.json.tmp");
-        try {
-            Files.writeString(tmp, side.toString());
-            Files.move(tmp, dir.resolve(stem + ".cyanotype.json"), StandardCopyOption.ATOMIC_MOVE);
-        } finally {
-            Files.deleteIfExists(tmp);
-        }
+        io.github.profetgit.cyanotype.placement.LibraryIndex.put(file, tagList, src);
     }
 
     /** The file already in the folder that came from this build of this site, if any. */
     public static Path existingCopy(Path dir, String base, String id) {
-        if (!Files.isDirectory(dir)) return null;
-        try (Stream<Path> s = Files.list(dir)) {
-            List<Path> sidecars = new ArrayList<>();
-            s.filter(p -> p.getFileName().toString().endsWith(".cyanotype.json")).sorted().forEach(sidecars::add);
-            for (Path side : sidecars) {
-                try {
-                    JsonElement root = JsonParser.parseString(Files.readString(side));
-                    if (!root.isJsonObject() || !root.getAsJsonObject().has("source")) continue;
-                    JsonObject src = root.getAsJsonObject().getAsJsonObject("source");
-                    if (!id.equals(src.has("id") ? src.get("id").getAsString() : null) || !base.equals(src.has("site") ? src.get("site").getAsString() : null)) continue;
-                    Path file = side.resolveSibling(side.getFileName().toString().replaceFirst("\\.cyanotype\\.json$", ".litematic"));
-                    if (Files.isRegularFile(file)) return file;
-                } catch (IOException | RuntimeException ignored) {
-                    // an unreadable tags file is not a reason to fail
-                }
-            }
-        } catch (IOException ignored) {
-            // no folder, no copy
-        }
-        return null;
+        Path file = io.github.profetgit.cyanotype.placement.LibraryIndex.findBySource(base, id);
+        return file != null && dir.toAbsolutePath().normalize().equals(file.toAbsolutePath().normalize().getParent()) ? file : null;
     }
 }

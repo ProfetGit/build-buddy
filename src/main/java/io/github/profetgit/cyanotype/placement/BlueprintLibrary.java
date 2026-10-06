@@ -58,6 +58,23 @@ public final class BlueprintLibrary {
         return out;
     }
 
+    /** Files in the folders that are schematics of a kind this version cannot open (.schem, .schematic): the Library lists them with the reason. */
+    public static List<Path> foreignFiles() {
+        List<Path> out = new ArrayList<>();
+        for (Path dir : List.of(ownDir(), litematicaDir())) {
+            if (!Files.isDirectory(dir)) continue;
+            try (Stream<Path> s = Files.list(dir)) {
+                s.filter(p -> {
+                    String n = p.getFileName().toString().toLowerCase(Locale.ROOT);
+                    return n.endsWith(".schem") || n.endsWith(".schematic");
+                }).sorted().forEach(out::add);
+            } catch (IOException e) {
+                Cyanotype.LOG.warn("Cannot list {}", dir, e);
+            }
+        }
+        return out;
+    }
+
     public static String refOf(Path file) {
         Path abs = file.toAbsolutePath().normalize();
         String name = abs.getFileName().toString();

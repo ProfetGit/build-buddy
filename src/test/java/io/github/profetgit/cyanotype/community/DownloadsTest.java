@@ -38,6 +38,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class DownloadsTest {
+    @org.junit.jupiter.api.BeforeEach
+    void libraryIndex(@org.junit.jupiter.api.io.TempDir Path indexDir) {
+        io.github.profetgit.cyanotype.placement.LibraryIndex.useFile(indexDir.resolve("library.json"));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void libraryIndexOff() {
+        io.github.profetgit.cyanotype.placement.LibraryIndex.useFile(null);
+    }
+
     private static final Downloads.Validator ACCEPT = f -> {
     };
 
@@ -86,7 +96,7 @@ class DownloadsTest {
             assertEquals(dir, r.file().getParent());
             assertArrayEquals(file, Files.readAllBytes(r.file()));
             assertEquals(file.length, r.bytes());
-            assertEquals(Set.of("Cozy Cottage.litematic", "Cozy Cottage.cyanotype.json"), names(dir), "no temporary file is left");
+            assertEquals(Set.of("Cozy Cottage.litematic"), names(dir), "no temporary file is left, and no tags file: the library index holds that");
             assertEquals("/api/v1/builds/abcd1234/download", site.log.get(0), "the address is built from the id, not taken from the answer");
         }
     }
@@ -97,10 +107,10 @@ class DownloadsTest {
         try (FakeSite site = new FakeSite()) {
             serve(site, file);
             Downloads.Result r = save(site, detailFor("abcd1234", "Cozy Cottage", "litematic", file, sha(file)), dir, ACCEPT);
-            JsonObject side = JsonParser.parseString(Files.readString(dir.resolve("Cozy Cottage.cyanotype.json"))).getAsJsonObject();
-            assertEquals(List.of("community", "houses"), side.getAsJsonArray("tags").asList().stream().map(e -> e.getAsString()).toList());
-            assertEquals("abcd1234", side.getAsJsonObject("source").get("id").getAsString());
-            assertEquals(site.base(), side.getAsJsonObject("source").get("site").getAsString());
+            assertEquals(List.of("community", "houses"), io.github.profetgit.cyanotype.placement.LibraryIndex.tags(r.file()));
+            JsonObject source = io.github.profetgit.cyanotype.placement.LibraryIndex.source(r.file());
+            assertEquals("abcd1234", source.get("id").getAsString());
+            assertEquals(site.base(), source.get("site").getAsString());
             assertEquals(r.file(), Downloads.existingCopy(dir, site.base(), "abcd1234"));
             assertNull(Downloads.existingCopy(dir, site.base(), "other123"));
             assertNull(Downloads.existingCopy(dir, "https://another.example", "abcd1234"), "another site's build with the same id is not this one");
@@ -122,7 +132,7 @@ class DownloadsTest {
             assertEquals("Cozy Cottage 3.litematic", third.getFileName().toString());
             assertArrayEquals(mine, Files.readAllBytes(dir.resolve("Cozy Cottage.litematic")), "the first file is byte for byte what it was");
             assertArrayEquals(file, Files.readAllBytes(second));
-            assertEquals(Set.of("Cozy Cottage.litematic", "Cozy Cottage 2.litematic", "Cozy Cottage 2.cyanotype.json", "Cozy Cottage 3.litematic", "Cozy Cottage 3.cyanotype.json"), names(dir));
+            assertEquals(Set.of("Cozy Cottage.litematic", "Cozy Cottage 2.litematic", "Cozy Cottage 3.litematic"), names(dir));
         }
     }
 

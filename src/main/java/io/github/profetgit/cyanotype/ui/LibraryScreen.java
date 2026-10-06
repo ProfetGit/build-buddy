@@ -108,6 +108,20 @@ public final class LibraryScreen extends Screen {
         super(Component.literal("Library"));
     }
 
+    private int watchTicks;
+
+    /** The Library follows its folders: a file added or removed there (in the file manager, by Litematica, by a download) shows up within half a second. */
+    @Override
+    public void tick() {
+        super.tick();
+        if (++watchTicks < 10) return;
+        watchTicks = 0;
+        if (tab == Tab.MINE && model.changedOnDisk()) {
+            model.rescan();
+            lastQuery = null;
+        }
+    }
+
     @Override
     protected void init() {
         model.rescan();
@@ -198,22 +212,28 @@ public final class LibraryScreen extends Screen {
         if (sort == LibraryModel.Sort.SIZE) for (LibraryModel.Entry e : model.all()) model.request(e);
     }
 
+    /** The pictures each texture was built from: a new set (another GUI scale) replaces the texture. */
+    private final Map<LibraryModel.Entry, int[][]> builtFrom = new HashMap<>();
+
     private Identifier textureOf(LibraryModel.Entry e) {
-        Identifier have = textures.get(e);
-        if (have != null) return have;
         int[][] frames = e.thumbs;
         if (frames == null) return null;
-        NativeImage img = new NativeImage(LibraryModel.THUMB_W * LibraryModel.THUMB_FRAMES, LibraryModel.THUMB_H, true);
+        Identifier have = textures.get(e);
+        if (have != null && builtFrom.get(e) == frames) return have;
+        int w = e.thumbW, h = e.thumbH;
+        NativeImage img = new NativeImage(w * LibraryModel.THUMB_FRAMES, h, true);
         for (int f = 0; f < frames.length; f++) {
-            for (int y = 0; y < LibraryModel.THUMB_H; y++) {
-                for (int x = 0; x < LibraryModel.THUMB_W; x++) img.setPixel(f * LibraryModel.THUMB_W + x, y, frames[f][y * LibraryModel.THUMB_W + x]);
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) img.setPixel(f * w + x, y, frames[f][y * w + x]);
             }
         }
         Skin.Smooth tex = new Skin.Smooth("Cyanotype library preview", img, false);
         Identifier id = Identifier.fromNamespaceAndPath(Cyanotype.MOD_ID, "library/" + Integer.toHexString(System.identityHashCode(e)) + "_" + System.nanoTime());
         minecraft.getTextureManager().register(id, tex);
-        owned.put(e, tex);
+        DynamicTexture old = owned.put(e, tex);
+        if (old != null) old.close();
         textures.put(e, id);
+        builtFrom.put(e, frames);
         return id;
     }
 
@@ -333,8 +353,10 @@ public final class LibraryScreen extends Screen {
         Identifier tex = textureOf(e);
         if (tex != null) {
             int frame = over && !Motion.reduced() ? (int) (t * 4) % LibraryModel.THUMB_FRAMES : 0;
-            g.blit(RenderPipelines.GUI_TEXTURED, tex, tx, ty, (float) (frame * LibraryModel.THUMB_W), 0f, LibraryModel.THUMB_SHOW_W, LibraryModel.THUMB_SHOW_H,
-                LibraryModel.THUMB_W, LibraryModel.THUMB_H, LibraryModel.THUMB_W * LibraryModel.THUMB_FRAMES, LibraryModel.THUMB_H);
+            int tw = e.thumbW, th = e.thumbH;
+            g.blit(RenderPipelines.GUI_TEXTURED, tex, tx, ty, (float) (frame * tw), 0f, LibraryModel.THUMB_SHOW_W, LibraryModel.THUMB_SHOW_H,
+                tw, th, tw * LibraryModel.THUMB_FRAMES, th);
+            model.refreshScale(e);
         } else if (e.error != null) {
             Ui.icon(g, "cross", tx + 25, ty + 17, false);
         } else {

@@ -20,6 +20,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class BlueprintSaverTest {
+    @org.junit.jupiter.api.BeforeEach
+    void libraryIndex(@org.junit.jupiter.api.io.TempDir Path indexDir) {
+        io.github.profetgit.cyanotype.placement.LibraryIndex.useFile(indexDir.resolve("library.json"));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void libraryIndexOff() {
+        io.github.profetgit.cyanotype.placement.LibraryIndex.useFile(null);
+    }
+
     @BeforeAll
     static void boot() {
         TestBootstrap.init();
@@ -82,16 +92,13 @@ class BlueprintSaverTest {
     }
 
     @Test
-    void saveWritesAReadableFileAndTheTagsSidecar(@TempDir Path dir) throws IOException {
+    void saveWritesAReadableFileAndPutsTheTagsInTheIndex(@TempDir Path dir) throws IOException {
         Path file = BlueprintSaver.save(tiny("shed"), dir, "shed", List.of("small", "wood"));
         assertEquals("shed.litematic", file.getFileName().toString());
         Blueprint back = LitematicReader.read(file);
         assertEquals(1, back.totalBlocks());
-        Path side = dir.resolve("shed.cyanotype.json");
-        assertTrue(Files.isRegularFile(side));
-        var tags = JsonParser.parseString(Files.readString(side)).getAsJsonObject().getAsJsonArray("tags");
-        assertEquals("small", tags.get(0).getAsString());
-        assertEquals("wood", tags.get(1).getAsString());
+        assertFalse(Files.exists(dir.resolve("shed.cyanotype.json")), "the tags are not written beside the schematic");
+        assertEquals(List.of("small", "wood"), LibraryIndex.tags(file));
         assertFalse(Files.exists(dir.resolve("shed.litematic.tmp")));
     }
 
@@ -110,7 +117,8 @@ class BlueprintSaverTest {
         Path b = BlueprintSaver.save(tiny("hut"), dir, "hut", List.of("b"));
         assertEquals("hut.litematic", a.getFileName().toString());
         assertEquals("hut 2.litematic", b.getFileName().toString());
-        assertTrue(Files.exists(dir.resolve("hut.cyanotype.json")));
-        assertTrue(Files.exists(dir.resolve("hut 2.cyanotype.json")));
+        assertEquals(List.of("a"), LibraryIndex.tags(a));
+        assertEquals(List.of("b"), LibraryIndex.tags(b));
+        assertFalse(Files.exists(dir.resolve("hut.cyanotype.json")) || Files.exists(dir.resolve("hut 2.cyanotype.json")));
     }
 }

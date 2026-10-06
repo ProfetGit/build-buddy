@@ -13,7 +13,6 @@ import static io.github.profetgit.cyanotype.demo.PlaceScenes.hold;
 import static io.github.profetgit.cyanotype.demo.PlaceScenes.release;
 import static io.github.profetgit.cyanotype.demo.PlaceScenes.tap;
 
-import com.google.gson.JsonParser;
 import io.github.profetgit.cyanotype.blueprint.Blueprint;
 import io.github.profetgit.cyanotype.blueprint.LitematicReader;
 import io.github.profetgit.cyanotype.blueprint.Region;
@@ -289,8 +288,8 @@ final class SaveScenes {
             try {
                 Path file = SaveScreen.lastSaved;
                 check("save/the file is in the library folder", file.getParent().equals(BlueprintLibrary.saveDir()) && file.getFileName().toString().equals(saved("Test Hut")), String.valueOf(file));
-                var tags = JsonParser.parseString(Files.readString(BlueprintLibrary.saveDir().resolve("Test Hut.cyanotype.json"))).getAsJsonObject().getAsJsonArray("tags");
-                check("save/the tags are in the sidecar", tags.size() == 2 && tags.get(0).getAsString().equals("hut") && tags.get(1).getAsString().equals("wood"), tags.toString());
+                var tags = io.github.profetgit.cyanotype.placement.LibraryIndex.tags(file);
+                check("save/the tags are in the library index, not in a file beside the schematic", tags.equals(java.util.List.of("hut", "wood")) && !Files.exists(BlueprintLibrary.saveDir().resolve("Test Hut.cyanotype.json")), tags.toString());
                 Blueprint bp;
                 try (var in = Files.newInputStream(file)) {
                     bp = LitematicReader.read(in, "Test Hut", false);

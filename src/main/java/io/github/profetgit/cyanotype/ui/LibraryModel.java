@@ -1,7 +1,5 @@
 package io.github.profetgit.cyanotype.ui;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
 import io.github.profetgit.cyanotype.blueprint.Blueprint;
 import io.github.profetgit.cyanotype.blueprint.PaletteEntry;
 import io.github.profetgit.cyanotype.blueprint.Region;
@@ -36,12 +34,14 @@ public final class LibraryModel {
         public final Path file;
         public final String fileName;
         public final long modified, bytes;
-        /** Tags from the sidecar file next to it (name.cyanotype.json), if any. */
+        /** Tags from the library index, if any. */
         public final List<String> tags;
         public volatile Info info;
         public volatile String error;
         /** The rotating preview, one picture per turn; null until made. */
         public volatile int[][] thumbs;
+        /** The size of each picture in {@link #thumbs} in pixels, and the GUI scale it was made for (it is made again when that changes). */
+        public volatile int thumbW = THUMB_W, thumbH = THUMB_H, thumbRes;
         volatile boolean requested;
 
         Entry(Path file, long modified, long bytes, List<String> tags) {
@@ -57,7 +57,7 @@ public final class LibraryModel {
         public String title() {
             Info i = info;
             if (i != null && i.name() != null && !i.name().isBlank()) return i.name();
-            return fileName.replaceFirst("(?i)\\.litematic$", "");
+            return fileName.replaceFirst("(?i)\\.(litematic|schematic|schem)$", "");
         }
 
         /** How a saved placement names this file (needs the game folders, so it is worked out when asked). */
@@ -72,6 +72,11 @@ public final class LibraryModel {
 
     /** The preview is made at twice the size it is shown at (GUI units), and sampled smoothly. */
     public static final int THUMB_W = 128, THUMB_H = 96, THUMB_SHOW_W = 64, THUMB_SHOW_H = 48, THUMB_FRAMES = 8;
+
+    /** The GUI scale the pictures are made for: one pixel of the picture for each pixel of the screen. */
+    static int res() {
+        return (int) Math.max(1, Math.round(net.minecraft.client.Minecraft.getInstance().getWindow().getGuiScale()));
+    }
 
     private final List<Entry> entries = new ArrayList<>();
 
@@ -88,9 +93,15 @@ public final class LibraryModel {
 
     /** Looks at the folders again; entries of files that are still there keep what was learned about them. */
     public void rescan() {
+        // tags files left beside schematics by older versions move into the index; entries of files that are gone leave it
+        for (Path dir : List.of(BlueprintLibrary.ownDir(), BlueprintLibrary.litematicaDir())) io.github.profetgit.cyanotype.placement.LibraryIndex.importSidecars(dir);
+        io.github.profetgit.cyanotype.placement.LibraryIndex.prune();
         List<Entry> old = new ArrayList<>(entries);
         entries.clear();
-        for (Path p : BlueprintLibrary.files()) {
+        List<Path> listed = new ArrayList<>(BlueprintLibrary.files());
+        listed.addAll(BlueprintLibrary.foreignFiles());
+        lastSignature = signature(listed);
+        for (Path p : listed) {
             long modified = 0, bytes = 0;
             try {
                 modified = Files.getLastModifiedTime(p).toMillis();
@@ -104,19 +115,30 @@ public final class LibraryModel {
         }
     }
 
-    static List<String> readTags(Path file) {
-        Path side = file.resolveSibling(file.getFileName().toString().replaceFirst("(?i)\\.litematic$", "") + ".cyanotype.json");
-        if (!Files.isRegularFile(side)) return List.of();
-        try {
-            JsonElement root = JsonParser.parseString(Files.readString(side));
-            List<String> out = new ArrayList<>();
-            if (root.isJsonObject() && root.getAsJsonObject().has("tags")) {
-                for (JsonElement t : root.getAsJsonObject().getAsJsonArray("tags")) out.add(t.getAsString());
+    private String lastSignature = "";
+
+    /** What the folders hold, as one string: every file with its size and time, so a change of any kind shows. */
+    private static String signature(List<Path> files) {
+        StringBuilder sb = new StringBuilder();
+        for (Path p : files) {
+            try {
+                sb.append(p).append('|').append(Files.size(p)).append('|').append(Files.getLastModifiedTime(p).toMillis()).append('\n');
+            } catch (IOException e) {
+                sb.append(p).append("|?\n");
             }
-            return out;
-        } catch (IOException | RuntimeException e) {
-            return List.of();
         }
+        return sb.toString();
+    }
+
+    /** Whether a file was added, removed or changed in the folders since the last look. Cheap: a listing and a stat per file. */
+    public boolean changedOnDisk() {
+        List<Path> listed = new ArrayList<>(BlueprintLibrary.files());
+        listed.addAll(BlueprintLibrary.foreignFiles());
+        return !signature(listed).equals(lastSignature);
+    }
+
+    static List<String> readTags(Path file) {
+        return io.github.profetgit.cyanotype.placement.LibraryIndex.tags(file);
     }
 
     /** Whether an entry matches what was typed in the search box: every word must be in its name, file name, author or tags. */
@@ -142,15 +164,34 @@ public final class LibraryModel {
         return out;
     }
 
+    /** Makes the entry's pictures again when the GUI scale is no longer the one they were made for (the old ones show meanwhile). */
+    public void refreshScale(Entry e) {
+        if (e.thumbs != null && e.thumbRes != res() && e.info != null) {
+            e.requested = false;
+            request(e);
+        }
+    }
+
     /** Starts reading an entry (once): its info and its preview, on a worker thread; the results land in the entry. */
     public void request(Entry e) {
         if (e.requested) return;
         e.requested = true;
+        int res = res();
+        String lower = e.fileName.toLowerCase(Locale.ROOT);
+        if (!lower.endsWith(".litematic")) {
+            e.error = "This version opens .litematic files only; " + (lower.endsWith(".schematic") ? ".schematic is the old MCEdit format" : ".schem is the Sponge/WorldEdit format") + ". It is not supported yet";
+            return;
+        }
         net.minecraft.util.Util.backgroundExecutor().execute(() -> {
             try {
                 Blueprint bp = io.github.profetgit.cyanotype.blueprint.LitematicReader.read(e.file);
                 e.info = Info.of(bp);
-                e.thumbs = Thumbnail.frames(bp, THUMB_FRAMES, THUMB_W, THUMB_H);
+                int w = THUMB_SHOW_W * res, h = THUMB_SHOW_H * res;
+                int[][] frames = Thumbnail.texturedFrames(bp, THUMB_FRAMES, w, h, res >= 3 ? 2 : 3);
+                e.thumbW = w;
+                e.thumbH = h;
+                e.thumbRes = res;
+                e.thumbs = frames;
             } catch (IOException | RuntimeException ex) {
                 e.error = ex.getMessage() == null ? ex.toString() : ex.getMessage();
             }

@@ -290,6 +290,11 @@ public final class PreviewRaster {
 
     /** As above; with {@code whole} the hovered cell's whole group (a tree, the ground) lights up, not just the cell. */
     public static Frame render(Scene s, View v, int w, int h, int stride, int hover, boolean whole) {
+        return render(s, v, w, h, stride, hover, whole, TEXTURE_FROM);
+    }
+
+    /** As above; blocks drawn at least {@code textureFrom} pixels across get their real texture, smaller ones their average colour. */
+    public static Frame render(Scene s, View v, int w, int h, int stride, int hover, boolean whole, double textureFrom) {
         int[] px = new int[w * h], ids = new int[w * h];
         if (s.empty()) return new Frame(w, h, px, ids);
         float[] depth = new float[w * h];
@@ -299,10 +304,10 @@ public final class PreviewRaster {
         int[] labels = lit == 0 ? null : all;
         int bands = Math.max(1, Math.min(Math.min(BANDS, h / 40), (int) Math.min(8, ((long) s.count + s.custom.length) / 400 + 1)));
         if (bands == 1) {
-            band(s, v, w, h, stride, hover, labels, lit, px, ids, depth, 0, h);
+            band(s, v, w, h, stride, hover, labels, lit, textureFrom, px, ids, depth, 0, h);
         } else {
             int rows = (h + bands - 1) / bands;
-            java.util.stream.IntStream.range(0, bands).parallel().forEach(b -> band(s, v, w, h, stride, hover, labels, lit, px, ids, depth, b * rows, Math.min(h, (b + 1) * rows)));
+            java.util.stream.IntStream.range(0, bands).parallel().forEach(b -> band(s, v, w, h, stride, hover, labels, lit, textureFrom, px, ids, depth, b * rows, Math.min(h, (b + 1) * rows)));
         }
         return new Frame(w, h, px, ids);
     }
@@ -310,10 +315,10 @@ public final class PreviewRaster {
     private static final int BANDS = Math.max(1, Math.min(8, Runtime.getRuntime().availableProcessors() / 2));
 
     /** Draws the rows {@code y0 <= y < y1} of the picture. */
-    private static void band(Scene s, View v, int w, int h, int stride, int hover, int @Nullable [] labels, int lit, int[] px, int[] ids, float[] depth, int y0, int y1) {
+    private static void band(Scene s, View v, int w, int h, int stride, int hover, int @Nullable [] labels, int lit, double textureFrom, int[] px, int[] ids, float[] depth, int y0, int y1) {
         double cy = Math.cos(v.yaw), sy = Math.sin(v.yaw), cp = Math.cos(v.pitch), sp = Math.sin(v.pitch);
         double scale = fit(s, w, h) * v.zoom;
-        boolean textured = scale >= TEXTURE_FROM;
+        boolean textured = scale >= textureFrom;
         double ox = w / 2.0 + v.panX, oy = h / 2.0 + v.panY;
         double mx = s.ex / 2.0, my = s.ey / 2.0, mz = s.ez / 2.0;
         // the screen position is linear in the build's coordinates: one step along each axis moves it by a fixed amount
@@ -391,6 +396,38 @@ public final class PreviewRaster {
                 tri(px, ids, depth, w, y0, y1, qx[0], qy[0], qz[0], uv[0], uv[1], qx[2], qy[2], qz[2], uv[4], uv[5], qx[3], qy[3], qz[3], uv[6], uv[7], q.tex(), useTexture, light, hot, -(i + 1), false);
             }
         }
+    }
+
+    /**
+     * Averages the {@code ss x ss} samples of every pixel of a frame drawn at {@code ss} times the size (weighted by coverage, so
+     * edges do not go dark) into {@code tw x th} ARGB pixels, a row at a time on several threads.
+     */
+    public static int[] resolveArgb(Frame f, int ss, int tw, int th) {
+        int[] src = f.px();
+        int[] out = new int[tw * th];
+        int sw = tw * ss, n = ss * ss;
+        java.util.stream.IntStream.range(0, th).parallel().forEach(yy -> {
+            for (int xx = 0; xx < tw; xx++) {
+                int o = yy * tw + xx;
+                if (ss == 1) {
+                    out[o] = src[yy * sw + xx];
+                    continue;
+                }
+                long a = 0, r = 0, g = 0, b = 0;
+                for (int sy = 0; sy < ss; sy++) {
+                    for (int sx = 0; sx < ss; sx++) {
+                        int c = src[(yy * ss + sy) * sw + xx * ss + sx];
+                        int ca = c >>> 24;
+                        a += ca;
+                        r += ((c >> 16) & 255) * ca;
+                        g += ((c >> 8) & 255) * ca;
+                        b += (c & 255) * ca;
+                    }
+                }
+                if (a != 0) out[o] = (int) (a / n) << 24 | (int) (r / a) << 16 | (int) (g / a) << 8 | (int) (b / a);
+            }
+        });
+        return out;
     }
 
     /** A steady number in 0..1 for a cell, so the variation between blocks does not flicker as the view moves. */

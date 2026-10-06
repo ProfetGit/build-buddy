@@ -88,7 +88,7 @@ final class UiScenes {
                 write(dir, "arch-bridge", Samples.bridge());
                 write(dir, "big-noise", Samples.noise(40, 0.45));
                 java.nio.file.Files.write(dir.resolve("watch-tower.litematic"), java.nio.file.Files.readAllBytes(dir.resolve("watch-tower.litematic")));
-                java.nio.file.Files.writeString(dir.resolve("watch-tower.cyanotype.json"), "{\"tags\":[\"castle\",\"medieval\"]}");
+                io.github.profetgit.cyanotype.placement.LibraryIndex.put(dir.resolve("watch-tower.litematic"), java.util.List.of("castle", "medieval"), null);
                 java.nio.file.Files.writeString(dir.resolve("broken.litematic"), "this is not a litematic file");
             } catch (java.io.IOException e) {
                 check("library/files written", false, e.toString());
@@ -162,6 +162,38 @@ final class UiScenes {
         waitTicks(10);
         act(() -> check("library/a dropped file is added", ((io.github.profetgit.cyanotype.ui.LibraryScreen) screen()).entries().size() == 7, ((io.github.profetgit.cyanotype.ui.LibraryScreen) screen()).entries().size() + " entries"));
         shot("library_6_dropped");
+        // the library follows its folder: a file added or removed shows up (or goes) by itself, an older tags file moves into the index, a .schematic says why it cannot open
+        act(() -> {
+            try {
+                java.nio.file.Path dir = io.github.profetgit.cyanotype.placement.BlueprintLibrary.saveDir();
+                write(dir, "late-arrival", Samples.uniform(3, 3, 3));
+                java.nio.file.Files.writeString(dir.resolve("late-arrival.cyanotype.json"), "{\"tags\":[\"fresh\"]}");
+                java.nio.file.Files.write(dir.resolve("old-house.schematic"), new byte[]{1, 2, 3});
+            } catch (java.io.IOException e) {
+                check("library/live files written", false, e.toString());
+            }
+        });
+        waitTicks(30);
+        act(() -> {
+            var list = ((io.github.profetgit.cyanotype.ui.LibraryScreen) screen()).entries();
+            var late = list.stream().filter(e -> e.fileName.equals("late-arrival.litematic")).findFirst().orElse(null);
+            var old = list.stream().filter(e -> e.fileName.equals("old-house.schematic")).findFirst().orElse(null);
+            check("library/a file added to the folder appears by itself", late != null && list.size() == 9, list.size() + " entries");
+            check("library/its older tags file moved into the index and is gone", late != null && late.tags.contains("fresh") && !java.nio.file.Files.exists(io.github.profetgit.cyanotype.placement.BlueprintLibrary.saveDir().resolve("late-arrival.cyanotype.json")), late == null ? "none" : String.valueOf(late.tags));
+            check("library/a .schematic is listed and says it cannot be opened yet", old != null && old.error != null && old.error.contains("not supported"), old == null ? "none" : String.valueOf(old.error));
+        });
+        shot("library_6b_live");
+        act(() -> {
+            try {
+                java.nio.file.Path dir = io.github.profetgit.cyanotype.placement.BlueprintLibrary.saveDir();
+                java.nio.file.Files.deleteIfExists(dir.resolve("late-arrival.litematic"));
+                java.nio.file.Files.deleteIfExists(dir.resolve("old-house.schematic"));
+            } catch (java.io.IOException e) {
+                check("library/live files removed", false, e.toString());
+            }
+        });
+        waitTicks(30);
+        act(() -> check("library/files removed from the folder go by themselves", ((io.github.profetgit.cyanotype.ui.LibraryScreen) screen()).entries().size() == 7, ((io.github.profetgit.cyanotype.ui.LibraryScreen) screen()).entries().size() + " entries"));
         // pick the pyramid: the library closes and placing starts
         act(() -> {
             io.github.profetgit.cyanotype.ui.LibraryScreen ls = (io.github.profetgit.cyanotype.ui.LibraryScreen) screen();

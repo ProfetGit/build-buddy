@@ -22,6 +22,28 @@ public final class Thumbnail {
     }
 
     /**
+     * The same turning pictures, drawn like the Save preview: every block with its real texture or model (resource packs apply),
+     * lit by facing, at the pixel size they are shown at and smoothed from {@code ss x ss} samples a pixel. Falls back to the map
+     * colour picture when the box is too big for the preview or anything fails.
+     *
+     * @return {@code frames} pictures of {@code w * h} ARGB pixels each (0 = transparent)
+     */
+    public static int[][] texturedFrames(Blueprint bp, int frames, int w, int h, int ss) {
+        try {
+            PreviewRaster.Scene scene = PreviewRaster.scene(bp);
+            if (scene == null) return frames(bp, frames, w, h);
+            int[][] out = new int[frames][];
+            for (int i = 0; i < frames; i++) {
+                PreviewRaster.View v = new PreviewRaster.View(PreviewRaster.View.HOME.yaw() + 2 * Math.PI * i / frames, PreviewRaster.View.HOME.pitch(), 1.1, 0, 0);
+                out[i] = PreviewRaster.resolveArgb(PreviewRaster.render(scene, v, w * ss, h * ss, 1, -1, false, 1.2), ss, w, h);
+            }
+            return out;
+        } catch (RuntimeException e) {
+            return frames(bp, frames, w, h);
+        }
+    }
+
+    /**
      * @param frames how many turns around the build (evenly spaced over a full revolution)
      * @return {@code frames} pictures of {@code w * h} ARGB pixels each (0 = transparent)
      */

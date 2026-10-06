@@ -18,6 +18,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class CommunityModelTest {
+    @org.junit.jupiter.api.BeforeEach
+    void libraryIndex(@org.junit.jupiter.api.io.TempDir Path indexDir) {
+        io.github.profetgit.cyanotype.placement.LibraryIndex.useFile(indexDir.resolve("library.json"));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void libraryIndexOff() {
+        io.github.profetgit.cyanotype.placement.LibraryIndex.useFile(null);
+    }
+
     private static final String CATEGORIES = "{\"apiVersion\":1,\"categories\":[{\"id\":\"houses\",\"label\":\"Houses & buildings\",\"blurb\":\"\",\"builds\":2},"
         + "{\"id\":\"castles\",\"label\":\"Castles & landmarks\",\"blurb\":\"\",\"builds\":1}],\"sorts\":[{\"id\":\"new\",\"label\":\"Newest\"},{\"id\":\"popular\",\"label\":\"Most downloaded\"}]}";
 
