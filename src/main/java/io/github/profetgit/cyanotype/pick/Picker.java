@@ -310,16 +310,7 @@ public final class Picker {
 
         /** Whether a tree's leaves are around this log: then it is a trunk, not a beam. */
         private boolean grewHere(int x, int y, int z) {
-            for (int dy = -3; dy <= 4; dy++) {
-                for (int dz = -3; dz <= 3; dz++) {
-                    for (int dx = -3; dx <= 3; dx++) {
-                        int nx = x + dx, nz = z + dz;
-                        if (!field.loaded(nx, nz)) continue;
-                        if (BlockKinds.isNaturalLeaf(field.state(nx, y + dy, nz))) return true;
-                    }
-                }
-            }
-            return false;
+            return BoxFilter.grewHere(field, x, y, z);
         }
 
         /** Whether a terrain cell belongs to a small lump (fewer than {@link #TERRAIN_MASS} cells, nothing unloaded) rather than to the ground. */

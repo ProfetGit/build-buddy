@@ -100,8 +100,8 @@ public enum Tool {
     static ChoiceScreen saveScreen() {
         Minecraft mc = Minecraft.getInstance();
         java.util.List<ChoiceScreen.Choice> choices = java.util.List.of(
-            new ChoiceScreen.Choice("wand", "Pick a build", "Click any part of a build and the whole of it is picked.", true, false, () -> Picking.start(mc)),
-            new ChoiceScreen.Choice("select", "Select a box", "Click two corners, then drag the sides to fit.", true, false, () -> Selecting.start(mc)));
+            new ChoiceScreen.Choice("wand", "Pick a build", "Click a build and a box fits itself round it. Drag the sides to change it.", true, false, () -> Picking.start(mc)),
+            new ChoiceScreen.Choice("select", "Select a box", "Click two corners, then drag the sides until it holds your build.", true, false, () -> Selecting.start(mc)));
         return new ChoiceScreen("Save a build", "Either way you name it next and it goes into your Library.", choices, null);
     }
 }

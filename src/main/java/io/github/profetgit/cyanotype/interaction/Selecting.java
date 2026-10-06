@@ -44,6 +44,8 @@ public final class Selecting {
     private static int lift;
     private static double scrollAcc;
     private static SelectionBox box;
+    /** Set when the box came from Smart Pick: what the Save screen needs to leave the neighbouring buildings out. */
+    private static SaveScreen.@Nullable Pick fromPick;
     private static Handles handles;
     private static Handles.Handle hover;
     /** Where the last frame was seen from: a click picks what the frame showed. */
@@ -85,6 +87,19 @@ public final class Selecting {
         Sfx.play(Sfx.OPEN);
     }
 
+    /** Smart Pick found a build: a box fitted round it, already in the stage where its sides can be dragged. */
+    public static void startFromPick(Minecraft mc, SelectionBox fitted, SaveScreen.Pick pick) {
+        Interaction.reveal();
+        Picking.reset();
+        reset();
+        box = fitted;
+        fromPick = pick;
+        stage = Stage.ADJUST;
+        Placements.setMode(Mode.SELECT);
+        Sfx.play(Sfx.LOCK);
+        Interaction.say(mc, "Picked " + String.format(Locale.ROOT, "%,d", pick.blocks()) + " blocks (" + fitted.sizeText() + "). Drag a side to change the box, right click to save.");
+    }
+
     /** Leaves the tool and forgets the box. */
     public static void cancel(Minecraft mc) {
         reset();
@@ -103,6 +118,7 @@ public final class Selecting {
         stage = Stage.FIRST;
         first = null;
         box = null;
+        fromPick = null;
         lift = 0;
         scrollAcc = 0;
         handles = null;
@@ -171,7 +187,7 @@ public final class Selecting {
             }
             case ADJUST -> {
                 endDrag();
-                mc.gui.setScreen(new SaveScreen(box));
+                mc.gui.setScreen(new SaveScreen(box, Selecting::finish, fromPick));
             }
         }
     }

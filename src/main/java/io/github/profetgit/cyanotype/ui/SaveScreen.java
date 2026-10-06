@@ -7,6 +7,7 @@ import io.github.profetgit.cyanotype.interaction.Interaction;
 import io.github.profetgit.cyanotype.interaction.LevelSource;
 import io.github.profetgit.cyanotype.interaction.Selecting;
 import io.github.profetgit.cyanotype.interaction.SelectionBox;
+import io.github.profetgit.cyanotype.pick.BoxFilter;
 import io.github.profetgit.cyanotype.placement.BlueprintLibrary;
 import io.github.profetgit.cyanotype.placement.BlueprintSaver;
 import java.io.IOException;
@@ -37,15 +38,18 @@ public final class SaveScreen extends Screen {
     public static volatile Path lastSaved;
     public static volatile Blueprint lastBlueprint;
 
-    /** What a Smart Pick hands over: the picked cells, the ground under them, and how many parts they are. */
-    public record Pick(it.unimi.dsi.fastutil.longs.LongOpenHashSet cells, it.unimi.dsi.fastutil.longs.LongOpenHashSet ground, int parts, boolean unloaded) {
-        // parts: how many other parts of the structure were reached and are not in the pick
+    /**
+     * What a Smart Pick hands over with its box: the cells of the parts it reached and did not pick (to leave out when asked),
+     * how many blocks the build has, how many other parts there are, and whether part of it is in chunks that are not loaded.
+     */
+    public record Pick(it.unimi.dsi.fastutil.longs.LongOpenHashSet others, int blocks, int parts, boolean unloaded) {
     }
 
     private final SelectionBox box;
     private final Runnable onSaved;
     private final Pick pick;
-    private boolean withGround;
+    /** The three switches of what the box leaves out (see {@link BoxFilter}); a box from Smart Pick starts without the ground. */
+    private boolean withGround, withNature = true, onlyBuild = true;
     private final long openedNs = System.nanoTime();
     private EditBox name, author, tags;
     private boolean trim = true, blockData = true;
@@ -63,13 +67,14 @@ public final class SaveScreen extends Screen {
 
     /**
      * @param onSaved what ends the tool that opened this once the file is written
-     * @param pick    set by Smart Pick: only these cells are saved, everything else in their box is left out
+     * @param pick    set when the box came from Smart Pick: it can leave the neighbouring buildings out
      */
     public SaveScreen(SelectionBox box, Runnable onSaved, Pick pick) {
         super(Component.literal(pick != null ? "Save this build" : "Save area"));
         this.box = box;
         this.onSaved = onSaved;
         this.pick = pick;
+        this.withGround = pick == null;
     }
 
     @Override
@@ -110,7 +115,43 @@ public final class SaveScreen extends Screen {
     }
 
     private int ph() {
-        return 204;
+        return 204 + (rows().size() - 2) * 13;
+    }
+
+    /** The switches shown, top to bottom: what the box keeps, then the file's own two. */
+    private List<String> rows() {
+        return pick != null ? List.of("ground", "nature", "only", "trim", "data") : List.of("ground", "nature", "trim", "data");
+    }
+
+    private static String labelOf(String row) {
+        return switch (row) {
+            case "ground" -> GROUND;
+            case "nature" -> NATURE;
+            case "only" -> ONLY;
+            case "trim" -> TRIM;
+            default -> DATA;
+        };
+    }
+
+    private boolean isOn(String row) {
+        return switch (row) {
+            case "ground" -> withGround;
+            case "nature" -> withNature;
+            case "only" -> onlyBuild;
+            case "trim" -> trim;
+            default -> blockData;
+        };
+    }
+
+    private void flip(String row) {
+        switch (row) {
+            case "ground" -> withGround = !withGround;
+            case "nature" -> withNature = !withNature;
+            case "only" -> onlyBuild = !onlyBuild;
+            case "trim" -> trim = !trim;
+            default -> blockData = !blockData;
+        }
+        Sfx.play(Sfx.PRESS, 1.1f);
     }
 
     private int px() {
@@ -135,22 +176,6 @@ public final class SaveScreen extends Screen {
 
     private int saveX() {
         return px() + pw() - 10 - 90;
-    }
-
-    /** The box round the pick, and the ground if it is asked for. */
-    private SelectionBox pickBox() {
-        int x0 = box.x0(), y0 = box.y0(), z0 = box.z0(), x1 = box.x1(), y1 = box.y1(), z1 = box.z1();
-        if (withGround) {
-            for (long c : pick.ground()) {
-                x0 = Math.min(x0, net.minecraft.core.BlockPos.getX(c));
-                y0 = Math.min(y0, net.minecraft.core.BlockPos.getY(c));
-                z0 = Math.min(z0, net.minecraft.core.BlockPos.getZ(c));
-                x1 = Math.max(x1, net.minecraft.core.BlockPos.getX(c));
-                y1 = Math.max(y1, net.minecraft.core.BlockPos.getY(c));
-                z1 = Math.max(z1, net.minecraft.core.BlockPos.getZ(c));
-            }
-        }
-        return new SelectionBox(x0, y0, z0, x1, y1, z1);
     }
 
     private void countChunks() {
@@ -192,18 +217,9 @@ public final class SaveScreen extends Screen {
         long now = System.currentTimeMillis();
         Blueprint.Metadata meta = new Blueprint.Metadata(title, author.getValue().trim(), "", now, now, 0);
         try {
-            if (pick != null) {
-                var cells = pick.cells();
-                var ground = withGround ? pick.ground() : null;
-                SelectionBox b = pickBox();
-                Capture.Mask mask = (x, y, z) -> {
-                    long c = net.minecraft.core.BlockPos.asLong(x, y, z);
-                    return cells.contains(c) || ground != null && ground.contains(c);
-                };
-                job = new Capture.Job(new LevelSource(minecraft.level), b.x0(), b.y0(), b.z0(), b.x1(), b.y1(), b.z1(), new Capture.Options(true, blockData), meta, mask);
-            } else {
-                job = new Capture.Job(new LevelSource(minecraft.level), box.x0(), box.y0(), box.z0(), box.x1(), box.y1(), box.z1(), new Capture.Options(trim, blockData), meta);
-            }
+            var level = new LevelSource(minecraft.level);
+            BoxFilter filter = new BoxFilter(level, withGround, withNature, pick != null && onlyBuild ? pick.others() : null);
+            job = new Capture.Job(level, box.x0(), box.y0(), box.z0(), box.x1(), box.y1(), box.z1(), new Capture.Options(trim, blockData), meta, filter.filters() ? filter : null);
         } catch (IllegalArgumentException e) {
             error = "This box is too big to save in one piece.";
             Sfx.play(Sfx.ERROR);
@@ -270,10 +286,8 @@ public final class SaveScreen extends Screen {
         boolean busy = state != State.EDITING;
 
         Ui.text(g, getTitle().getString(), px + 10, py + 8, Ui.withAlpha(Ui.LINE, inner));
-        Ui.right(g, (pick != null ? pickBox() : box).sizeText(), px + pw - 10, py + 8, Ui.withAlpha(Ui.CYAN, inner));
-        String info = pick != null
-            ? String.format(Locale.ROOT, "%,d", pick.cells().size()) + " blocks picked" + (pick.parts() > 0 ? ", " + pick.parts() + (pick.parts() == 1 ? " other part nearby" : " other parts nearby") : "") + "."
-            : String.format(Locale.ROOT, "%,d", box.volume()) + " cells in the box.";
+        Ui.right(g, box.sizeText(), px + pw - 10, py + 8, Ui.withAlpha(Ui.CYAN, inner));
+        String info = pick != null ? "Fitted round a build of " + String.format(Locale.ROOT, "%,d", pick.blocks()) + " blocks." : String.format(Locale.ROOT, "%,d", box.volume()) + " cells in the box.";
         int y = py + 21;
         Ui.text(g, info, px + 10, y, Ui.withAlpha(Ui.DIM, inner));
         if (pick != null ? pick.unloaded() : loadedColumns < totalColumns) {
@@ -292,9 +306,8 @@ public final class SaveScreen extends Screen {
         fieldRow(g, "Tags, separated by commas", tags, fx, fy + 56, inner, partial, mx, my, "house, medieval");
 
         int cy = fy + 86;
-        if (pick != null) check(g, "sv#ground", fx, cy, GROUND, withGround, mx, my, inner, busy);
-        else check(g, "sv#trim", fx, cy, TRIM, trim, mx, my, inner, busy);
-        check(g, "sv#data", fx, cy + 13, DATA, blockData, mx, my, inner, busy);
+        List<String> rows = rows();
+        for (int i = 0; i < rows.size(); i++) check(g, "sv#" + rows.get(i), fx, cy + i * 13, labelOf(rows.get(i)), isOn(rows.get(i)), mx, my, inner, busy);
 
         int ly = py + ph - 44;
         if (busy) {
@@ -339,23 +352,20 @@ public final class SaveScreen extends Screen {
         return Ui.inside(mx, my, x, y, 12 + 6 + font.width(label), 11);
     }
 
-    private static final String TRIM = "Trim the empty space around the build", DATA = "Keep sign text, banners and heads", GROUND = "Include the ground under it";
+    private static final String TRIM = "Trim the empty space around the build", DATA = "Keep sign text, banners and heads", GROUND = "Include the ground (dirt, stone, sand)",
+        NATURE = "Include trees and plants", ONLY = "Leave out the other buildings in the box";
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         int mx = (int) event.x(), my = (int) event.y();
         if (state == State.EDITING) {
             int cy = py() + 44 + 86, fx = px() + 10;
-            if (onCheck(mx, my, fx, cy, pick != null ? GROUND : TRIM)) {
-                if (pick != null) withGround = !withGround;
-                else trim = !trim;
-                Sfx.play(Sfx.PRESS, 1.1f);
-                return true;
-            }
-            if (onCheck(mx, my, fx, cy + 13, DATA)) {
-                blockData = !blockData;
-                Sfx.play(Sfx.PRESS, 1.1f);
-                return true;
+            List<String> rows = rows();
+            for (int i = 0; i < rows.size(); i++) {
+                if (onCheck(mx, my, fx, cy + i * 13, labelOf(rows.get(i)))) {
+                    flip(rows.get(i));
+                    return true;
+                }
             }
             if (Ui.inside(mx, my, backX(), buttonY(), 70, 16)) {
                 down = "back";
@@ -438,6 +448,21 @@ public final class SaveScreen extends Screen {
 
     public boolean groundOn() {
         return withGround;
+    }
+
+    public boolean natureOn() {
+        return withNature;
+    }
+
+    public boolean onlyBuildOn() {
+        return onlyBuild;
+    }
+
+    /** Dev demo: sets the three switches of what the box keeps. */
+    public void setKeeps(boolean ground, boolean nature, boolean onlyBuild) {
+        this.withGround = ground;
+        this.withNature = nature;
+        this.onlyBuild = onlyBuild;
     }
 
     public boolean trimming() {

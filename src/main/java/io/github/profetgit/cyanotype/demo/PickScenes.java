@@ -40,9 +40,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Smart Pick in the real client: two houses tied by a fence on a lawn, a tree growing against one of them. Click a wall and
- * the house is picked, not the tree, the lawn or the other house; add the other house, take it out, change the reach,
- * start over; save the pick (with and without the ground) and lay the file back over the house.
+ * Smart Pick in the real client: two houses tied by a fence on a lawn, a tree growing against one of them, a sapling and
+ * grass inside one. Click a wall and a box fits itself round that house (not the tree, the lawn or the other house), the sides
+ * of the box can be dragged like the Save area's, the Save screen has the switches (ground, trees and plants, other
+ * buildings); save with and without the plants and lay the file back over the house.
  */
 final class PickScenes {
     /** What the mouse handler does when a button goes down with Shift (3) or Ctrl (192) held. */
@@ -75,6 +76,9 @@ final class PickScenes {
         hut(BX, cmds);
         cmds.add("setblock " + (AX + 1) + " " + (G + 2) + " 21 minecraft:oak_wall_sign[facing=south]");
         cmds.add("setblock " + (AX + 5) + " " + (G + 2) + " 23 minecraft:chest");
+        // a sapling and a tuft of grass growing inside the house: in the box, so they are saved (trees and plants switch)
+        cmds.add("setblock " + (AX + 2) + " " + (G + 2) + " 22 minecraft:oak_sapling");
+        cmds.add("setblock " + (AX + 4) + " " + (G + 2) + " 22 minecraft:short_grass");
         // a fence along the lawn from one house to the other
         cmds.add("fill " + (AX + 7) + " " + (G + 1) + " 21 " + (BX - 1) + " " + (G + 1) + " 21 minecraft:oak_fence");
         // a tree growing against the first house
@@ -85,12 +89,9 @@ final class PickScenes {
         waitTicks(30);
     }
 
-    static boolean has(int x, int y, int z) {
-        return Picking.picked().contains(BlockPos.asLong(x, y, z));
-    }
-
-    static void settled() {
-        until("pick/finished", 400, () -> !Picking.working() && Picking.meshCurrent());
+    private static boolean boxIs(int x0, int y0, int z0, int x1, int y1, int z1) {
+        var b = io.github.profetgit.cyanotype.interaction.Selecting.box();
+        return b != null && b.x0() == x0 && b.y0() == y0 && b.z0() == z0 && b.x1() == x1 && b.y1() == y1 && b.z1() == z1;
     }
 
     static void pick() {
@@ -114,7 +115,7 @@ final class PickScenes {
 
         // ---- the wheel starts it; the crosshair says what a click would do
         SaveScenes.startPickThroughTheWheel();
-        act(() -> check("pick/the wheel's Smart pick starts the tool", Placements.mode() == Placements.Mode.PICK && Picking.stage() == Picking.Stage.AIM, "mode " + Placements.mode()));
+        act(() -> check("pick/the wheel's Smart pick starts the tool", Placements.mode() == Placements.Mode.PICK && !Picking.working(), "mode " + Placements.mode()));
         aimCell(AX + 2, G + 3, Z1);
         shot("pick_0_aim_wall");
         // right click with nothing picked leaves the tool
@@ -126,138 +127,52 @@ final class PickScenes {
         aimCell(AX + 2, G, 28);
         shot("pick_1_aim_grass");
         click();
-        act(() -> check("pick/a click on the lawn does not pick it", Picking.stage() == Picking.Stage.AIM && !Picking.working() && Picking.picked().isEmpty(), "stage " + Picking.stage()));
+        act(() -> check("pick/a click on the lawn does not pick it", Placements.mode() == Placements.Mode.PICK && !Picking.working(), "mode " + Placements.mode()));
 
-        // ---- a click on the wall picks the house
+        // ---- a click on the wall fits a box round the house
         aimCell(AX + 2, G + 3, Z1);
         click();
-        settled();
+        until("pick/the box is fitted", 400, () -> Placements.mode() == Placements.Mode.SELECT && io.github.profetgit.cyanotype.interaction.Selecting.stage() == io.github.profetgit.cyanotype.interaction.Selecting.Stage.ADJUST);
         act(() -> {
-            check("pick/a click on a wall picks a build", Picking.stage() == Picking.Stage.RESULT, "stage " + Picking.stage());
-            for (long c : Picking.picked()) if (BlockPos.getX(c) > AX + 6) System.out.println("[cydemo] EXTRA " + BlockPos.of(c) + " " + mc().level.getBlockState(BlockPos.of(c)));
-            check("pick/it is the house, block for block", Picking.picked().size() == houseA[0], Picking.picked().size() + " picked, " + houseA[0] + " in the house");
-            check("pick/the tree against the wall is not in it", !has(AX + 7, G + 2, 22) && !has(AX + 8, G + 5, 22), "trunk " + has(AX + 7, G + 2, 22));
-            check("pick/the lawn is not in it", !has(AX + 2, G, Z1 + 1) && !has(AX + 2, G, Z0 - 1), "lawn");
-            check("pick/the other house and the fence are not in it", !has(BX + 2, G + 3, Z0) && !has(AX + 10, G + 1, 21), "other house " + has(BX + 2, G + 3, Z0));
-            check("pick/it is drawn", Picking.drawnQuads() > 20, Picking.drawnQuads() + " rectangles");
+            check("pick/the box is the house: not the tree, the lawn or the other house", boxIs(AX, G + 1, Z0, AX + 6, G + 4, Z1), String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.box()));
+            check("pick/Smart Pick itself is done", !Picking.active() && !Picking.working(), "mode " + Placements.mode());
         });
         camera(27, G + 8, 35, 180, 25);
         waitTicks(14);
-        shot("pick_2_house");
+        shot("pick_2_box");
 
-        // ---- add the other house with shift, take it out with ctrl
-        act(() -> aimAt(BX + 2, G + 3, Z1));
-        waitTicks(6);
-        shot("pick_3_other_offered");
-        // the modifiers come with the click, as the window system reports them (what a real press carries)
-        act(() -> PickModifiers.press(3));
-        click();
-        waitTicks(6);
-        settled();
-        act(() -> check("pick/shift+click adds the other house", has(BX + 2, G + 3, Z1) && has(AX + 2, G + 3, Z1), "other " + has(BX + 2, G + 3, Z1)));
-        waitTicks(6);
-        shot("pick_4_both");
-        act(() -> PickModifiers.press(192));
-        click();
-        waitTicks(6);
-        settled();
-        act(() -> check("pick/ctrl+click takes it out again", !has(BX + 2, G + 3, Z1) && has(AX + 2, G + 3, Z1) && Picking.picked().size() == houseA[0], Picking.picked().size() + " picked"));
-
-        // ---- precise edits: Ctrl+scroll sets a cube size, Ctrl+click takes the cube out, Shift+click puts it back
-        act(() -> {
-            Interaction.testModifiers = 2;
-            scroll(mc(), 2);
-        });
-        waitTicks(4);
-        act(() -> check("pick/ctrl+scroll picks the 3x3x3 cut", Picking.detail() == 2, "detail " + Picking.detail()));
-        act(() -> aimAt(AX + 2, G + 3, Z1));
-        waitTicks(6);
-        shot("pick_3b_cube_preview");
-        click();
-        waitTicks(6);
-        act(() -> {
-            long n = houseA[0] - Picking.picked().size();
-            check("pick/ctrl+click with a cut size takes only that cube out", n > 0 && n <= 27 && !has(AX + 2, G + 3, Z1) && has(AX + 2, G + 3, Z0), n + " blocks went");
-        });
-        shot("pick_3c_cube_out");
-        act(() -> Interaction.testModifiers = 1);
-        click();
-        waitTicks(6);
-        act(() -> check("pick/shift+click puts the cube back", Picking.picked().size() == houseA[0] && has(AX + 2, G + 3, Z1), Picking.picked().size() + " picked"));
-        act(() -> {
-            Interaction.testModifiers = 2;
-            scroll(mc(), -5);
-        });
-        waitTicks(2);
-        act(() -> {
-            Interaction.testModifiers = -1;
-            check("pick/ctrl+scroll back down returns to whole parts", Picking.detail() == 0, "detail " + Picking.detail());
-        });
-
-        // ---- scroll grows the pick one nearest part at a time, and gives them up again
-        for (int k = 0; k < 4; k++) {
-            act(() -> scroll(mc(), 1));
-            waitTicks(4);
-        }
-        act(() -> check("pick/scrolling up takes in the nearby parts, the other house among them", has(BX + 2, G + 3, Z1) && has(AX + 2, G + 3, Z1) && Picking.picked().size() > houseA[0], Picking.picked().size() + " picked"));
-        shot("pick_3d_grown");
-        for (int k = 0; k < 6; k++) {
-            act(() -> scroll(mc(), -1));
-            waitTicks(4);
-        }
-        act(() -> check("pick/scrolling down gives them up, the house you clicked stays", !has(BX + 2, G + 3, Z1) && has(AX + 2, G + 3, Z1) && Picking.picked().size() == houseA[0], Picking.picked().size() + " picked"));
-
-        // ---- right click starts over; a second click picks a lone block of terrain, if asked twice
+        // ---- a right click opens Save with the house's switches: no ground, trees and plants in, other buildings out
         rightClick();
-        act(() -> check("pick/right click starts over", Picking.stage() == Picking.Stage.AIM && Picking.picked().isEmpty() && Placements.mode() == Placements.Mode.PICK, "stage " + Picking.stage()));
-
-        // ---- pick again and save it, with the ground
-        aimCell(AX + 2, G + 3, Z1);
-        click();
-        settled();
-        act(() -> check("pick/picked again", Picking.picked().size() == houseA[0], Picking.picked().size() + " picked"));
-        aimCell(AX + 2, G + 3, Z1);
-        click();
         waitTicks(8);
-        act(() -> check("pick/a click on the pick opens Save", screen() instanceof SaveScreen, String.valueOf(screen())));
         act(() -> {
-            SaveScreen s = (SaveScreen) screen();
-            s.setName("Test House");
-            s.setAuthor("Tester");
-            s.setTags("house, oak");
+            check("pick/a right click opens Save", screen() instanceof SaveScreen, String.valueOf(screen()));
+            if (screen() instanceof SaveScreen s) {
+                check("pick/the switches start: no ground, plants in, other buildings out", !s.groundOn() && s.natureOn() && s.onlyBuildOn(), "ground " + s.groundOn() + ", plants " + s.natureOn() + ", only " + s.onlyBuildOn());
+                s.setName("Test House");
+                s.setAuthor("Tester");
+                s.setTags("house, oak");
+            }
         });
         waitTicks(6);
         shot("pick_5_save");
-        act(() -> {
-            var s = (SaveScreen) screen();
-            int[] at = s.anchor("ground");
-            var info = new net.minecraft.client.input.MouseButtonInfo(0, 0);
-            s.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info), false);
-            s.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info));
-            check("pick/the ground under it can be included", s.groundOn(), "ground " + s.groundOn());
-        });
-        waitTicks(4);
-        shot("pick_6_save_ground");
         act(() -> screen().keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN, 0, 0)));
         until("pick/saved", 300, () -> SaveScreen.lastSaved != null);
         waitTicks(6);
-        act(() -> check("pick/the tool ends after saving", screen() == null && Placements.mode() == Placements.Mode.IDLE && Picking.picked().isEmpty(), "mode " + Placements.mode()));
+        act(() -> check("pick/the tool ends after saving", screen() == null && Placements.mode() == Placements.Mode.IDLE, "mode " + Placements.mode()));
         act(() -> {
             try {
                 Path file = SaveScreen.lastSaved;
-                Blueprint bp;
-                try (var in = Files.newInputStream(file)) {
-                    bp = LitematicReader.read(in, "t", false);
-                }
-                check("pick/saved with the ground: the house and one layer of grass", bp.totalBlocks() == houseA[0] + 35 && bp.sizeX == 7 && bp.sizeY == 5 && bp.sizeZ == 5, bp.totalBlocks() + " blocks, " + bp.sizeX + "x" + bp.sizeY + "x" + bp.sizeZ);
+                Blueprint bp = LitematicReader.read(file);
+                check("pick/saved: the house and the two plants inside it, nothing else", file.getFileName().toString().equals("Test House.litematic") && bp.totalBlocks() == houseA[0] && bp.sizeX == 7 && bp.sizeY == 4 && bp.sizeZ == 5, file.getFileName() + ", " + bp.totalBlocks() + " blocks, " + bp.sizeX + "x" + bp.sizeY + "x" + bp.sizeZ + ", wanted " + houseA[0]);
                 Region r = bp.regions.get(0);
-                int wrong = 0, trees = 0;
+                int wrong = 0;
                 for (int y = 0; y < r.sy; y++) for (int z = 0; z < r.sz; z++) for (int x = 0; x < r.sx; x++) {
-                    BlockState w = mc().level.getBlockState(new BlockPos(AX + x, G + y, Z0 + z));
+                    BlockState w = mc().level.getBlockState(new BlockPos(AX + x, G + 1 + y, Z0 + z));
                     BlockState f = r.at(x, y, z).state();
                     if (w.isAir() ? !f.isAir() : !w.equals(f)) wrong++;
                 }
                 check("pick/every saved block is the one in the world", wrong == 0, wrong + " differ");
+                check("pick/the sapling and the grass came along", r.at(2, 1, 2).state().getBlock() == net.minecraft.world.level.block.Blocks.OAK_SAPLING && r.at(4, 1, 2).state().getBlock() == net.minecraft.world.level.block.Blocks.SHORT_GRASS, r.at(2, 1, 2).state() + " / " + r.at(4, 1, 2).state());
                 boolean sign = false, chest = false;
                 for (var te : r.blockEntities) {
                     String id = te.getStringOr("id", "");
@@ -274,7 +189,7 @@ final class PickScenes {
         act(() -> {
             try {
                 Blueprint bp = LitematicReader.read(SaveScreen.lastSaved);
-                Placement p = new Placement("picked house", bp, "cyanotype:Test House.litematic", Director.DIM, new BlockPos(AX, G, Z0), Orientation.NONE);
+                Placement p = new Placement("picked house", bp, "cyanotype:Test House.litematic", Director.DIM, new BlockPos(AX, G + 1, Z0), Orientation.NONE);
                 p.locked = true;
                 Placements.add(p);
                 UiScenes.house = p;
@@ -289,46 +204,45 @@ final class PickScenes {
             Placements.remove(UiScenes.house);
         });
 
-        // ---- save again without the ground: the same house, no grass, a numbered name
+        // ---- save again with trees and plants switched off: the same house without them, under a numbered name
         SaveScenes.startPickThroughTheWheel();
         act(() -> SaveScreen.lastSaved = null);
         aimCell(AX + 2, G + 3, Z1);
         click();
-        settled();
-        aimCell(AX + 2, G + 3, Z1);
-        click();
+        until("pick/the box is fitted again", 400, () -> io.github.profetgit.cyanotype.interaction.Selecting.box() != null);
+        rightClick();
         waitTicks(8);
         act(() -> {
             SaveScreen s = (SaveScreen) screen();
             s.setName("Test House");
+            s.setKeeps(false, false, true);
         });
         waitTicks(4);
+        shot("pick_6_save_no_plants");
         act(() -> screen().keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN, 0, 0)));
         until("pick/saved again", 300, () -> SaveScreen.lastSaved != null);
         act(() -> {
             try {
                 Path file = SaveScreen.lastSaved;
                 Blueprint bp = LitematicReader.read(file);
-                check("pick/without the ground just the house, under a new name", file.getFileName().toString().equals("Test House 2.litematic") && bp.totalBlocks() == houseA[0] && bp.sizeY == 4, file.getFileName() + ", " + bp.totalBlocks() + " blocks, height " + bp.sizeY);
+                check("pick/without trees and plants the house alone, under a new name", file.getFileName().toString().equals("Test House 2.litematic") && bp.totalBlocks() == houseA[0] - 2, file.getFileName() + ", " + bp.totalBlocks() + " blocks, wanted " + (houseA[0] - 2));
+                check("pick/and the sapling is not in it", bp.regions.get(0).at(2, 1, 2).state().isAir(), String.valueOf(bp.regions.get(0).at(2, 1, 2).state()));
             } catch (IOException e) {
                 check("pick/second file", false, e.toString());
             }
         });
 
-        // ---- a bare block of the lawn, asked twice, picks the whole lawn as one big flood: finishes, sliced, without a hitch
+        // ---- a bare block of the lawn, asked twice, floods the whole lawn: finishes, sliced, without a hitch
         SaveScenes.startPickThroughTheWheel();
         camera(23.5, G + 7, 32, 180, 28);
         waitTicks(10);
         aimCell(AX + 2, G, 28);
         click();
-        act(() -> check("pick/terrain asks first", Picking.picked().isEmpty() && !Picking.working(), "working " + Picking.working()));
+        act(() -> check("pick/terrain asks first", !Picking.working() && Placements.mode() == Placements.Mode.PICK, "working " + Picking.working()));
         long[] t0 = new long[1];
         act(() -> {
             Director.frameNs.clear();
             Director.measuring = true;
-            Picking.worstSliceNs = 0;
-            Picking.worstStepNs = 0;
-            io.github.profetgit.cyanotype.pick.Picker.resetWorst();
             t0[0] = System.nanoTime();
         });
         click();
@@ -339,17 +253,17 @@ final class PickScenes {
             sorted.sort(null);
             double p99 = sorted.isEmpty() ? 0 : sorted.get((int) (sorted.size() * 0.99)) / 1e6, max = sorted.isEmpty() ? 0 : sorted.get(sorted.size() - 1) / 1e6;
             Director.perf.add(String.format(Locale.ROOT, "{\"measure\":\"pick/lawn flood\",\"frames\":%d,\"p99FrameMs\":%.3f,\"maxFrameMs\":%.3f}", sorted.size(), p99, max));
-            check("pick/no frame hitch while it floods 84 000 blocks", max < 250, String.format(Locale.ROOT, "%d frames, p99 %.1f ms, worst %.1f ms, longest pick tick %.1f ms (the work itself %.1f ms); longest call per phase: %s", sorted.size(), p99, max, Picking.worstSliceNs / 1e6, Picking.worstStepNs / 1e6, io.github.profetgit.cyanotype.pick.Picker.worstPhases()));
+            check("pick/no frame hitch while it floods 84 000 blocks", max < 250, String.format(Locale.ROOT, "%d frames, p99 %.1f ms, worst %.1f ms", sorted.size(), p99, max));
         });
         act(() -> {
             double ms = (System.nanoTime() - t0[0]) / 1e6;
-            check("pick/a flood over the whole lawn ends and says what it found", Picking.stage() == Picking.Stage.RESULT || Picking.picked().isEmpty(), "stage " + Picking.stage() + ", " + Picking.picked().size() + " blocks, " + Math.round(ms) + " ms");
+            check("pick/a flood over the whole lawn ends in a box or a message, not a hang", Placements.mode() == Placements.Mode.SELECT || Placements.mode() == Placements.Mode.PICK, "mode " + Placements.mode() + ", " + Math.round(ms) + " ms");
         });
         waitTicks(20);
         shot("pick_7_lawn");
         act(() -> tap(Keys.MAIN));
         waitTicks(4);
-        act(() -> check("pick/V cancels and forgets", Placements.mode() == Placements.Mode.IDLE && Picking.picked().isEmpty(), "mode " + Placements.mode()));
+        act(() -> check("pick/V cancels and forgets", Placements.mode() == Placements.Mode.IDLE, "mode " + Placements.mode()));
         act(() -> Director.hideHud(mc(), true));
     }
 

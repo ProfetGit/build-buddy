@@ -48,7 +48,7 @@ class PickSetTest {
     }
 
     @Test
-    void anotherPartCanBeAddedAndTakenOutAgain() {
+    void theOtherPartsOfTheStructureAreContextAndNotPicked() {
         TestWorld w = new TestWorld();
         house(w, 10, 10);
         house(w, 24, 10);
@@ -56,219 +56,41 @@ class PickSetTest {
         PickSet s = new PickSet(w, Picker.DEFAULT_LIMIT);
         s.start(key(12, 3, 10), null);
         run(s);
-        assertFalse(s.picked().contains(key(26, 3, 10)));
-        assertTrue(s.isContext(key(26, 3, 10)), "offered");
-        assertFalse(s.isContext(key(12, 3, 10)));
-        int before = s.picked().size();
-        s.addPart(key(26, 3, 10), null);
-        assertFalse(s.working(), "a part already reached needs no new work");
-        assertTrue(s.picked().contains(key(26, 3, 10)));
-        assertTrue(s.picked().size() > before * 2 - 20);
-        assertTrue(s.removePart(key(26, 3, 10)));
-        assertFalse(s.picked().contains(key(26, 3, 10)));
-        assertEquals(before, s.picked().size());
-        assertTrue(s.isContext(key(26, 3, 10)), "still offered after it was taken out");
-        assertFalse(s.removePart(key(26, 3, 10)), "it is not picked any more");
-        s.addPart(key(26, 3, 10), null);
-        assertTrue(s.picked().contains(key(26, 3, 10)), "and it comes back");
+        assertFalse(s.picked().contains(key(26, 3, 10)), "the second house is not the build clicked");
+        assertTrue(s.context().contains(key(26, 3, 10)), "but it was seen: it is what 'leave out the other buildings' leaves out");
+        assertFalse(s.context().contains(key(12, 3, 10)));
+        assertTrue(s.otherParts() >= 1);
+        int[] b = s.bounds();
+        assertEquals(10, b[0]);
+        assertTrue(b[3] <= 16, "the box is round the first house only: " + b[3]);
     }
 
     @Test
-    void aBuildFarAwayJoinsAsAFreshFlood() {
+    void aFailedPickSaysWhyAndPicksNothing() {
         TestWorld w = new TestWorld();
-        house(w, 10, 10);
-        house(w, 60, 10);
-        PickSet s = new PickSet(w, Picker.DEFAULT_LIMIT);
-        s.start(key(12, 3, 10), null);
-        run(s);
-        assertFalse(s.picked().contains(key(62, 3, 10)));
-        s.addPart(key(62, 3, 10), null);
-        assertTrue(s.working());
-        run(s);
-        assertTrue(s.picked().contains(key(62, 3, 10)));
-        assertTrue(s.picked().contains(key(12, 3, 10)));
-        assertEquals(2, s.floods().size());
-    }
-
-    @Test
-    void theReachChangesWhatIsPickedAndTheOldPickStaysUntilTheNewOneIsReady() {
-        TestWorld w = new TestWorld();
-        house(w, 10, 10);
-        w.set(13, 7, 12, Blocks.LANTERN);
-        PickSet s = new PickSet(w, Picker.DEFAULT_LIMIT);
-        s.start(key(12, 3, 10), null);
-        run(s);
-        assertTrue(s.picked().contains(key(13, 7, 12)));
-        s.setReach(0);
-        assertTrue(s.working());
-        assertEquals(0, s.reachWanted());
-        assertEquals(1, s.reach());
-        assertTrue(s.picked().contains(key(13, 7, 12)), "still the old pick");
-        run(s);
-        assertEquals(0, s.reach());
-        assertFalse(s.picked().contains(key(13, 7, 12)));
-        s.setReach(9);
-        run(s);
-        assertEquals(Picker.MAX_REACH, s.reach());
-    }
-
-    @Test
-    void whatWasTakenOutStaysOutWhenTheReachChanges() {
-        TestWorld w = new TestWorld();
-        house(w, 10, 10);
-        house(w, 24, 10);
-        for (int x = 17; x <= 23; x++) w.set(x, 1, 12, Blocks.OAK_FENCE);
-        PickSet s = new PickSet(w, Picker.DEFAULT_LIMIT);
-        s.start(key(12, 3, 10), null);
-        run(s);
-        s.addPart(key(26, 3, 10), null);
-        s.removePart(key(26, 3, 10));
-        s.setReach(2);
-        run(s);
-        assertFalse(s.picked().contains(key(26, 3, 10)));
-        assertTrue(s.picked().contains(key(12, 3, 10)));
-    }
-
-    @Test
-    void aCubeOfCellsCanBeTakenOutAndPutBack() {
-        TestWorld w = new TestWorld();
-        house(w, 10, 10);
-        PickSet s = new PickSet(w, Picker.DEFAULT_LIMIT);
-        s.start(key(12, 3, 10), null);
-        run(s);
-        int all = s.picked().size();
-        int gone = s.removeCube(key(12, 3, 14), 1);
-        assertTrue(gone > 0 && gone <= 27);
-        assertEquals(all - gone, s.picked().size());
-        assertFalse(s.picked().contains(key(12, 3, 14)));
-        assertTrue(s.picked().contains(key(12, 3, 10)), "the rest stays");
-        assertEquals(0, s.removeCube(key(12, 3, 14), 1), "nothing left there to take");
-        assertTrue(s.isContext(key(12, 3, 14)), "offered to put back");
-        assertEquals(gone, s.addCube(key(12, 3, 14), 1));
-        assertEquals(all, s.picked().size());
-        assertEquals(0, s.addCube(key(12, 3, 14), 1), "already all in");
-    }
-
-    @Test
-    void aSingleCellOfAPartThatWasLeftOutCanBeAdded() {
-        TestWorld w = new TestWorld();
-        house(w, 10, 10);
-        house(w, 24, 10);
-        for (int x = 17; x <= 23; x++) w.set(x, 1, 12, Blocks.OAK_FENCE);
-        PickSet s = new PickSet(w, Picker.DEFAULT_LIMIT);
-        s.start(key(12, 3, 10), null);
-        run(s);
-        assertFalse(s.picked().contains(key(26, 3, 10)));
-        assertEquals(1, s.addCube(key(26, 3, 10), 0));
-        assertTrue(s.picked().contains(key(26, 3, 10)));
-        assertTrue(s.removeCube(key(26, 3, 10), 0) == 1);
-        assertFalse(s.picked().contains(key(26, 3, 10)));
-        s.start(key(12, 3, 10), null);
-        run(s);
-        assertEquals(1, s.addCube(key(26, 3, 10), 0));
-        s.start(key(12, 3, 10), null);
-        run(s);
-        assertFalse(s.picked().contains(key(26, 3, 10)), "a fresh pick forgets the hand edits");
-    }
-
-    @Test
-    void growTakesTheNearestPartAndShrinkGivesItUpAgain() {
-        TestWorld w = new TestWorld();
-        house(w, 10, 10);
-        house(w, 24, 10);
-        house(w, 40, 10);
-        for (int x = 17; x <= 23; x++) w.set(x, 1, 12, Blocks.OAK_FENCE);
-        for (int x = 31; x <= 39; x++) w.set(x, 1, 12, Blocks.OAK_FENCE);
-        PickSet s = new PickSet(w, Picker.DEFAULT_LIMIT);
-        s.start(key(12, 3, 10), null);
-        run(s);
-        int one = s.picked().size();
-        assertEquals(0, s.shrink(), "only the clicked part: nothing to give up");
-        // nearest first: the fence that joins them may come before the second house, but the second before the third
-        int steps = 0;
-        PickSet.Grown last = null;
-        while (!s.picked().contains(key(26, 3, 10)) && steps < 6) {
-            last = s.grow();
-            assertNotNull(last, "something nearby at step " + steps);
-            assertFalse(s.picked().contains(key(42, 3, 10)), "the far house is not before the near one");
-            steps++;
-        }
-        assertTrue(s.picked().contains(key(26, 3, 10)), "the second house comes in");
-        assertEquals("to the east", last.direction());
-        while (!s.picked().contains(key(42, 3, 10)) && steps < 12) {
-            assertNotNull(s.grow());
-            steps++;
-        }
-        assertTrue(s.picked().contains(key(42, 3, 10)), "then the third");
-        while (s.grow() != null) steps++;
-        assertEquals(null, s.grow(), "nothing left nearby");
-        int taken = 0;
-        while (s.shrink() > 0) taken++;
-        assertTrue(taken >= 2 && taken <= steps + 1, "given up again: " + taken + " of " + steps);
-        assertEquals(one, s.picked().size(), "back to the clicked house");
-        assertEquals(0, s.shrink());
-    }
-
-    @Test
-    void aPartTakenOutByHandIsOfferedAgainByGrow() {
-        TestWorld w = new TestWorld();
-        house(w, 10, 10);
-        house(w, 24, 10);
-        for (int x = 17; x <= 23; x++) w.set(x, 1, 12, Blocks.OAK_FENCE);
-        PickSet s = new PickSet(w, Picker.DEFAULT_LIMIT);
-        s.start(key(12, 3, 10), null);
-        run(s);
-        int one = s.picked().size();
-        s.addPart(key(26, 3, 10), null);
-        s.removePart(key(26, 3, 10));
-        assertEquals(one, s.picked().size());
-        int steps = 0;
-        while (!s.picked().contains(key(26, 3, 10)) && steps++ < 4) {
-            PickSet.Grown gg = s.grow();
-            assertNotNull(gg);
-        }
-        assertTrue(s.picked().contains(key(26, 3, 10)), "it comes back");
-        int sizeBefore = s.picked().size();
-        int gone = s.shrink();
-        assertTrue(gone > 100, "gone " + gone + " of " + sizeBefore + " (one house " + one + ")");
-        assertFalse(s.picked().contains(key(26, 3, 10)), "and goes first when scrolling down");
-    }
-
-    @Test
-    void aFailedPickKeepsTheOldOneAndSaysWhy() {
-        TestWorld w = new TestWorld();
-        house(w, 10, 10);
         w.hut(40, 40, 79, 79, 30, Blocks.STONE_BRICKS, Blocks.STONE_BRICKS, Blocks.STONE_BRICKS);
         PickSet s = new PickSet(w, 400);
-        s.start(key(12, 3, 10), null);
-        run(s);
-        int n = s.picked().size();
-        assertTrue(n > 0);
         s.start(key(50, 10, 40), null);
         run(s);
-        assertEquals(n, s.picked().size(), "the earlier pick is still there");
-        assertTrue(s.picked().contains(key(12, 3, 10)));
+        assertTrue(s.picked().isEmpty());
         String notice = s.takeNotice();
         assertTrue(notice.contains("more than one build"), notice);
         assertEquals("", s.takeNotice(), "a notice is read once");
     }
 
     @Test
-    void aFreshStartForgetsWhatWasTakenOut() {
+    void aFreshStartReplacesThePick() {
         TestWorld w = new TestWorld();
         house(w, 10, 10);
-        house(w, 24, 10);
-        for (int x = 17; x <= 23; x++) w.set(x, 1, 12, Blocks.OAK_FENCE);
+        house(w, 60, 10);
         PickSet s = new PickSet(w, Picker.DEFAULT_LIMIT);
         s.start(key(12, 3, 10), null);
         run(s);
-        s.addPart(key(26, 3, 10), null);
-        s.removePart(key(26, 3, 10));
-        s.start(key(26, 3, 10), null);
+        assertTrue(s.picked().contains(key(12, 3, 10)));
+        s.start(key(62, 3, 10), null);
         run(s);
-        assertTrue(s.picked().contains(key(26, 3, 10)));
+        assertTrue(s.picked().contains(key(62, 3, 10)));
         assertFalse(s.picked().contains(key(12, 3, 10)));
-        assertNotNull(s.bounds());
     }
 
     @Test
@@ -281,7 +103,7 @@ class PickSetTest {
         s.clear();
         assertTrue(s.empty());
         assertTrue(s.picked().isEmpty());
+        assertEquals(0, s.otherParts());
         assertEquals(null, s.bounds());
-        assertFalse(s.working());
     }
 }

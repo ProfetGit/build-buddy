@@ -2,46 +2,32 @@ package io.github.profetgit.cyanotype.pick;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import java.util.ArrayList;
-import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Block;
 import org.jspecify.annotations.Nullable;
 
 /**
- * What the player has picked so far (the Smart Pick tool's state, PRD 7.11): one or more floods, the parts of them that
- * were chosen, the cells taken out again, and the reach. Everything that needs the world runs as a sliced
- * {@link Picker.Job}; until a new state is ready the old one stays on show, and a state that fails (too big) is thrown
- * away with a notice instead of replacing it.
+ * What Smart Pick found for one click (PRD 7.11): the flood from the block clicked, split into parts, and the part the
+ * click was in (with the thin groups that hang on it) as the pick. The pick is only used to fit a box round the build and
+ * to know which neighbouring parts to leave out when asked; the player edits the box, not the pick. The work needs the
+ * world, so it runs as a sliced {@link Picker.Job}; a result that fails (too big) is thrown away with a notice.
  */
 public final class PickSet {
     private final Picker.Field field;
     private final int limit;
 
-    // the committed state
-    private final List<Long> anchors = new ArrayList<>();
-    private final List<Block> forced = new ArrayList<>();
-    private final List<Picker.Result> floods = new ArrayList<>();
-    private final List<Long> chosen = new ArrayList<>();
-    private final LongOpenHashSet removed = new LongOpenHashSet();
-    /** Single cells added by hand from parts that are not chosen (a brush Shift+click), picked unless taken out again. */
-    private final LongOpenHashSet extra = new LongOpenHashSet();
+    private Picker.@Nullable Result flood;
+    private long seed;
     private int reach = Picker.DEFAULT_REACH;
 
-    // derived from it
     private LongOpenHashSet picked = new LongOpenHashSet();
     private LongOpenHashSet doubtful = new LongOpenHashSet();
     private boolean unloaded;
 
-    // the state being worked out
-    private List<Long> nextAnchors;
-    private List<Block> nextForced;
-    private List<Long> nextChosen;
-    private int nextReach;
-    private List<Picker.Result> nextFloods;
-    private Picker.Job job;
+    private Picker.@Nullable Job job;
+    private @Nullable Block nextForced;
+    private long nextSeed;
     private String notice = "";
-    private boolean restart;
     private int version;
 
     public PickSet(Picker.Field field, int limit) {
@@ -51,13 +37,13 @@ public final class PickSet {
 
     // ---- reading
 
-    /** Changes whenever what is picked changes, so a drawing of it knows when to be made again. */
+    /** Changes whenever what is picked changes. */
     public int version() {
         return version;
     }
 
     public boolean empty() {
-        return floods.isEmpty();
+        return flood == null;
     }
 
     public boolean working() {
@@ -66,18 +52,7 @@ public final class PickSet {
 
     /** 0..1 while working. */
     public double progress() {
-        if (job == null) return 1;
-        int n = Math.max(1, nextAnchors.size());
-        return (nextFloods.size() + job.progress()) / n;
-    }
-
-    public int reach() {
-        return reach;
-    }
-
-    /** What the next state will use, while it is being worked out. */
-    public int reachWanted() {
-        return job != null ? nextReach : reach;
+        return job == null ? 1 : job.progress();
     }
 
     /** A message for the player about something that did not work (consumed by reading it). */
@@ -99,28 +74,22 @@ public final class PickSet {
         return unloaded;
     }
 
-    /** Cells that were reached but are not picked (other parts, and parts taken out), for showing and for adding back. */
-    public boolean isContext(long cell) {
-        if (picked.contains(cell)) return false;
-        for (Picker.Result r : floods) if (r.cells.contains(cell)) return true;
-        return false;
-    }
-
-    public List<Picker.Result> floods() {
-        return floods;
-    }
-
-    public int partsAvailable() {
-        int n = 0;
-        for (Picker.Result r : floods) n += r.partCount();
-        return n;
-    }
-
-    /** Everything the picker reached that is not picked: other parts and parts that were taken out. */
+    /** Cells that were reached but are not picked: the other parts. */
     public LongOpenHashSet context() {
         LongOpenHashSet out = new LongOpenHashSet();
-        for (Picker.Result r : floods) for (long c : r.cells) if (!picked.contains(c)) out.add(c);
+        if (flood != null) for (long c : flood.cells) if (!picked.contains(c)) out.add(c);
         return out;
+    }
+
+    /** How many parts the picker reached that are not in the pick. */
+    public int otherParts() {
+        if (flood == null) return 0;
+        IntOpenHashSet in = new IntOpenHashSet();
+        for (long c : picked) {
+            int p = flood.partOf(c);
+            if (p >= 0) in.add(p);
+        }
+        return Math.max(0, flood.partCount() - in.size());
     }
 
     /** Smallest box holding the picked cells: {minX, minY, minZ, maxX, maxY, maxZ}, or null when nothing is picked. */
@@ -143,288 +112,55 @@ public final class PickSet {
 
     /** Starts over from a block. */
     public void start(long seed, @Nullable Block force) {
-        nextAnchors = new ArrayList<>(List.of(seed));
-        nextForced = new ArrayList<>();
-        nextForced.add(force);
-        nextChosen = new ArrayList<>(List.of(seed));
-        restart = true;
-        begin(reach);
-    }
-
-    /** Adds the part a cell belongs to (a part already reached, or a new build elsewhere). */
-    public void addPart(long cell, @Nullable Block force) {
-        if (job != null) return;
-        for (Picker.Result r : floods) {
-            if (r.cells.contains(cell)) {
-                // taken out before? then it comes back
-                removed.removeAll(r.members(r.partOf(cell)));
-                // the newest addition goes last, so scrolling down gives up what was added most recently (the clicked part stays
-                // first); older entries of the same part (another cell of it) are dropped so one scroll gives the whole part up
-                int part = r.partOf(cell);
-                if (r.partOf(chosen.get(0)) != part) {
-                    for (int i = chosen.size() - 1; i >= 1; i--) if (r.partOf(chosen.get(i)) == part) chosen.remove(i);
-                    chosen.add(cell);
-                }
-                derive();
-                return;
-            }
-        }
-        nextAnchors = new ArrayList<>(anchors);
-        nextAnchors.add(cell);
-        nextForced = new ArrayList<>(forced);
-        nextForced.add(force);
-        nextChosen = new ArrayList<>(chosen);
-        nextChosen.add(cell);
-        begin(reach);
-    }
-
-    /** Takes the part a picked cell belongs to out again. @return false when the cell is not picked */
-    public boolean removePart(long cell) {
-        if (job != null || !picked.contains(cell)) return false;
-        for (Picker.Result r : floods) {
-            int p = r.partOf(cell);
-            if (p >= 0) {
-                removed.addAll(r.members(p));
-                derive();
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Takes every picked cell of the cube of side {@code 2 * half + 1} around a cell out: the precise edit, when a whole
-     * part is too much (a lamp post on a wall, a doorstep).
-     * @return how many cells went
-     */
-    public int removeCube(long center, int half) {
-        if (job != null) return 0;
-        int n = 0, cx = BlockPos.getX(center), cy = BlockPos.getY(center), cz = BlockPos.getZ(center);
-        for (int y = cy - half; y <= cy + half; y++) {
-            for (int z = cz - half; z <= cz + half; z++) {
-                for (int x = cx - half; x <= cx + half; x++) {
-                    long c = BlockPos.asLong(x, y, z);
-                    if (!picked.contains(c)) continue;
-                    removed.add(c);
-                    n++;
-                }
-            }
-        }
-        if (n > 0) derive();
-        return n;
-    }
-
-    /**
-     * Puts back the cells of the cube around a cell that the picker reached but that are not picked (parts left out, cells
-     * taken out): the other half of the precise edit.
-     * @return how many cells came in
-     */
-    public int addCube(long center, int half) {
-        if (job != null) return 0;
-        int cx = BlockPos.getX(center), cy = BlockPos.getY(center), cz = BlockPos.getZ(center);
-        LongOpenHashSet add = new LongOpenHashSet();
-        for (int y = cy - half; y <= cy + half; y++) {
-            for (int z = cz - half; z <= cz + half; z++) {
-                for (int x = cx - half; x <= cx + half; x++) {
-                    long c = BlockPos.asLong(x, y, z);
-                    if (!picked.contains(c) && isContext(c)) add.add(c);
-                }
-            }
-        }
-        if (add.isEmpty()) return 0;
-        removed.removeAll(add);
-        extra.addAll(add);
-        derive();
-        return add.size();
-    }
-
-    /** What {@link #grow} took in: the words for the player and how many blocks. */
-    public record Grown(long cell, int blocks, String direction) {
-    }
-
-    /**
-     * Takes in the nearest part the picker has seen but not picked (nearest to the middle of what is picked): the plain way
-     * to add what belongs to the build but was cut from it (the porch, the fence round it) without aiming at it. Parts
-     * already picked or never seen are not offered; one taken out by hand is.
-     * @return what came in, or null when there is nothing nearby left
-     */
-    public @Nullable Grown grow() {
-        if (job != null || picked.isEmpty()) return null;
-        double px = 0, py = 0, pz = 0;
-        for (long c : picked) {
-            px += BlockPos.getX(c);
-            py += BlockPos.getY(c);
-            pz += BlockPos.getZ(c);
-        }
-        px /= picked.size();
-        py /= picked.size();
-        pz /= picked.size();
-        long bestCell = 0;
-        double best = Double.POSITIVE_INFINITY, bx = 0, by = 0, bz = 0;
-        int bestSize = 0;
-        for (Picker.Result r : floods) {
-            for (int p = 0; p < r.partCount(); p++) {
-                var members = r.members(p);
-                if (members.isEmpty() || anyPicked(members)) continue;
-                double cx = 0, cy = 0, cz = 0;
-                for (int i = 0; i < members.size(); i++) {
-                    long c = members.getLong(i);
-                    cx += BlockPos.getX(c);
-                    cy += BlockPos.getY(c);
-                    cz += BlockPos.getZ(c);
-                }
-                cx /= members.size();
-                cy /= members.size();
-                cz /= members.size();
-                double d = (cx - px) * (cx - px) + (cy - py) * (cy - py) + (cz - pz) * (cz - pz);
-                if (d < best) {
-                    best = d;
-                    bestCell = members.getLong(0);
-                    bestSize = members.size();
-                    bx = cx - px;
-                    by = cy - py;
-                    bz = cz - pz;
-                }
-            }
-        }
-        if (bestSize == 0) return null;
-        addPart(bestCell, null);
-        String dir;
-        if (Math.abs(by) > Math.abs(bx) && Math.abs(by) > Math.abs(bz)) dir = by > 0 ? "above" : "below";
-        else if (Math.abs(bx) >= Math.abs(bz)) dir = bx > 0 ? "to the east" : "to the west";
-        else dir = bz > 0 ? "to the south" : "to the north";
-        return new Grown(bestCell, bestSize, dir);
-    }
-
-    /** Whether any of these cells is picked: a part taken out by hand has none, so it is offered again, like a part never added. */
-    private boolean anyPicked(it.unimi.dsi.fastutil.longs.LongList members) {
-        for (int i = 0; i < members.size(); i++) if (picked.contains(members.getLong(i))) return true;
-        return false;
-    }
-
-    /**
-     * Gives up the part chosen last, the other half of scrolling: what {@link #grow} or a Shift+click added comes off again,
-     * the first part (the one clicked) never does.
-     * @return how many blocks went, or 0 when only the first part is left
-     */
-    public int shrink() {
-        if (job != null || chosen.size() <= 1) return 0;
-        int before = picked.size();
-        while (chosen.size() > 1) {
-            chosen.remove(chosen.size() - 1);
-            derive();
-            if (picked.size() < before) break;
-        }
-        return before - picked.size();
-    }
-
-    /** Changes how wide a gap the picker jumps; the old pick stays until the new one is ready. */
-    public void setReach(int newReach) {
-        int r = Math.max(0, Math.min(Picker.MAX_REACH, newReach));
-        if (floods.isEmpty() || (job == null && r == reach) || (job != null && r == nextReach)) return;
-        nextAnchors = new ArrayList<>(anchors);
-        nextForced = new ArrayList<>(forced);
-        nextChosen = new ArrayList<>(chosen);
-        begin(r);
+        nextSeed = seed;
+        nextForced = force;
+        job = new Picker.Job(field, seed, reach, limit, force);
     }
 
     public void clear() {
-        anchors.clear();
-        forced.clear();
-        floods.clear();
-        chosen.clear();
-        removed.clear();
-        extra.clear();
+        flood = null;
         picked = new LongOpenHashSet();
-        version++;
         doubtful = new LongOpenHashSet();
         unloaded = false;
         job = null;
-        nextFloods = null;
         notice = "";
-    }
-
-    private void begin(int wantedReach) {
-        nextReach = wantedReach;
-        nextFloods = new ArrayList<>();
-        job = new Picker.Job(field, nextAnchors.get(0), nextReach, limit, nextForced.get(0));
+        version++;
     }
 
     /** Works for about this long. @return true when nothing is running */
     public boolean step(long budgetNs) {
-        long end = System.nanoTime() + budgetNs;
-        while (job != null) {
-            if (!job.step(Math.max(100_000, end - System.nanoTime()))) return false;
-            if (job.failure() != null) {
-                notice = job.failure();
-                restart = false;
-                job = null;
-                nextFloods = null;
-                return true;
-            }
-            nextFloods.add(job.result());
-            int i = nextFloods.size();
-            if (i < nextAnchors.size()) {
-                job = new Picker.Job(field, nextAnchors.get(i), nextReach, limit, nextForced.get(i));
-            } else {
-                job = null;
-                commit();
-            }
-            if (System.nanoTime() >= end && job != null) return false;
+        if (job == null) return true;
+        if (!job.step(budgetNs)) return false;
+        Picker.Job done = job;
+        job = null;
+        if (done.failure() != null) {
+            notice = done.failure();
+            return true;
         }
+        flood = done.result();
+        seed = nextSeed;
+        derive();
+        if (picked.isEmpty()) notice = "Nothing is left of that pick.";
         return true;
     }
 
-    private void commit() {
-        boolean fresh = floods.isEmpty() || !nextAnchors.equals(anchors);
-        anchors.clear();
-        anchors.addAll(nextAnchors);
-        forced.clear();
-        forced.addAll(nextForced);
-        floods.clear();
-        floods.addAll(nextFloods);
-        chosen.clear();
-        chosen.addAll(nextChosen);
-        reach = nextReach;
-        if (restart) {
-            removed.clear();
-            extra.clear();
-        }
-        restart = false;
-        nextFloods = null;
-        derive();
-        if (picked.isEmpty() && fresh) notice = "Nothing is left of that pick.";
-    }
-
-    /** Works out which cells are picked from the floods, the chosen cells and the removed ones. */
+    /** The picked cells: the part the click was in, with what hangs on it. */
     private void derive() {
-        int expect = 0;
-        for (Picker.Result r : floods) for (int p = 0; p < r.partCount(); p++) expect += r.partSize[p];
-        LongOpenHashSet out = new LongOpenHashSet(Math.min(expect, Picker.DEFAULT_LIMIT * 2)), doubt = new LongOpenHashSet();
-        boolean touched = false;
-        for (Picker.Result r : floods) {
-            IntOpenHashSet want = new IntOpenHashSet();
-            for (long c : chosen) {
-                int p = r.partOf(c);
-                if (p >= 0) want.add(p);
-            }
-            if (want.isEmpty()) continue;
-            touched |= r.touchedUnloaded;
-            boolean anyDoubt = !r.unsure.isEmpty(), anyRemoved = !removed.isEmpty();
-            for (int p : want) {
-                var members = r.members(p);
-                for (int i = 0; i < members.size(); i++) {
-                    long c = members.getLong(i);
-                    if (anyRemoved && removed.contains(c)) continue;
-                    out.add(c);
-                    if (anyDoubt && r.unsure.contains(c)) doubt.add(c);
-                }
+        LongOpenHashSet out = new LongOpenHashSet(), doubt = new LongOpenHashSet();
+        Picker.Result r = flood;
+        int p = r.partOf(seed);
+        if (p >= 0) {
+            var members = r.members(p);
+            boolean anyDoubt = !r.unsure.isEmpty();
+            for (int i = 0; i < members.size(); i++) {
+                long c = members.getLong(i);
+                out.add(c);
+                if (anyDoubt && r.unsure.contains(c)) doubt.add(c);
             }
         }
-        for (long c : extra) if (!removed.contains(c)) out.add(c);
         picked = out;
-        version++;
         doubtful = doubt;
-        unloaded = touched;
+        unloaded = r.touchedUnloaded;
+        version++;
     }
 }
