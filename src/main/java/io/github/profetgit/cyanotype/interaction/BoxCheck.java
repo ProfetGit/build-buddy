@@ -61,9 +61,9 @@ public final class BoxCheck {
         }
     }
 
-    /** Whether a cell is part of a build: a built block, or a log that is a beam and not a trunk (no natural leaf near it). Unloaded cells are nothing. */
+    /** Whether a cell is part of a build: a built block, or a log that is a beam and not a trunk (no natural leaf near it). Unloaded cells are nothing ({@code loaded} takes block coordinates, not chunk ones). */
     static boolean built(Picker.Field f, int x, int y, int z) {
-        if (!f.loaded(x >> 4, z >> 4)) return false;
+        if (!f.loaded(x, z)) return false;
         BlockState s = f.state(x, y, z);
         Kind k = BlockKinds.classify(s);
         if (k == Kind.BUILT) return true;
@@ -72,7 +72,7 @@ public final class BoxCheck {
             for (int dz = -TRUNK_REACH; dz <= TRUNK_REACH; dz++) {
                 for (int dx = -TRUNK_REACH; dx <= TRUNK_REACH; dx++) {
                     int nx = x + dx, nz = z + dz;
-                    if (f.loaded(nx >> 4, nz >> 4) && BlockKinds.isNaturalLeaf(f.state(nx, y + dy, nz))) return false;
+                    if (f.loaded(nx, nz) && BlockKinds.isNaturalLeaf(f.state(nx, y + dy, nz))) return false;
                 }
             }
         }

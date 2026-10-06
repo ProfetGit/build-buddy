@@ -469,10 +469,30 @@ final class PickScenes {
         act(() -> io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(AX + 5, G, 18, AX + 12, G + 9, 26)));
         waitTicks(16);
         shot("pick_9_tall");
+        // far from the world's origin, where only some chunks are loaded: the check must still see the build
+        act(() -> io.github.profetgit.cyanotype.interaction.Selecting.cancel(mc()));
+        camera(3003, G + 10, 3014, 180, 20);
+        until("pick/the far chunks are loaded", 600, () -> mc().level != null && mc().level.getChunkSource().hasChunk(3000 >> 4, 3000 >> 4) && mc().level.getChunkSource().hasChunk(3005 >> 4, 3005 >> 4));
+        waitTicks(10);
+        act(() -> Director.run(mc(), "fill 3000 " + (G + 1) + " 3000 3005 " + (G + 6) + " 3005 minecraft:oak_planks"));
+        waitTicks(20);
+        act(() -> io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(3000, G + 1, 3000, 3005, G + 3, 3005)));
+        waitTicks(16);
+        act(() -> {
+            var c = io.github.profetgit.cyanotype.interaction.Selecting.cuts();
+            int up = net.minecraft.core.Direction.UP.ordinal();
+            check("pick/a box through a build far from the origin is cut on top too", c != null && c.count[up] == 36, c == null ? "no result" : "top " + c.count[up] + ", total " + c.total());
+        });
+        shot("pick_9_far");
         act(() -> {
             io.github.profetgit.cyanotype.interaction.Selecting.cancel(mc());
             Director.hideHud(mc(), true);
+            Director.run(mc(), "fill 3000 " + (G + 1) + " 3000 3005 " + (G + 6) + " 3005 minecraft:air");
         });
+        // back to the spawn area for the scenes that follow
+        camera(23.5, G + 7, 32, 180, 28);
+        until("pick/the spawn chunks are loaded again", 600, () -> mc().level != null && mc().level.getChunkSource().hasChunk(1, 1));
+        waitTicks(20);
         waitTicks(4);
         act(() -> Director.hideHud(mc(), true));
     }

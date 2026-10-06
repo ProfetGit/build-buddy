@@ -22,7 +22,7 @@ class BoxCheckTest {
         TestBootstrap.init();
     }
 
-    private static final class W implements Picker.Field {
+    private static class W implements Picker.Field {
         final Map<Long, BlockState> m = new HashMap<>();
 
         @Override
@@ -139,6 +139,35 @@ class BoxCheckTest {
         assertFalse(BoxCheck.check(w, SelectionBox.of(9, 1, 9, 10, 3, 11), null).any(), "two cells are under the minimum");
         // fit leaves such a box alone
         assertEquals(0, BoxCheck.fit(w, SelectionBox.of(9, 1, 9, 10, 3, 11), null, 96, 8_000_000L).layers());
+    }
+
+    /** A world that only knows the chunks it holds, and is asked in block coordinates like the game's: loaded(x, z) is "is the chunk of block x, z there". */
+    private static final class Chunked extends W {
+        final java.util.Set<Long> chunks = new java.util.HashSet<>();
+
+        @Override
+        public boolean loaded(int x, int z) {
+            return chunks.contains(net.minecraft.world.level.ChunkPos.pack(x >> 4, z >> 4));
+        }
+
+        void hold(int x0, int z0, int x1, int z1) {
+            for (int cx = x0 >> 4; cx <= x1 >> 4; cx++) for (int cz = z0 >> 4; cz <= z1 >> 4; cz++) chunks.add(net.minecraft.world.level.ChunkPos.pack(cx, cz));
+        }
+    }
+
+    @Test
+    void itWorksFarFromTheOriginWhereOnlySomeChunksAreLoaded() {
+        Chunked w = new Chunked();
+        w.fill(5000, 1, -7000, 5002, 20, -6998, Blocks.OAK_PLANKS);
+        w.hold(4990, -7010, 5010, -6990);
+        BoxCheck.Result r = BoxCheck.check(w, SelectionBox.of(4999, 1, -7001, 5003, 10, -6997), null);
+        assertTrue(r.cut(Direction.UP), "cut on top, far from the origin");
+        assertEquals(9, r.count[Direction.UP.ordinal()]);
+        assertEquals(10, BoxCheck.fit(w, SelectionBox.of(4999, 1, -7001, 5003, 10, -6997), null, 96, 8_000_000L).layers());
+        // chunks that are not loaded count as nothing, never as a build
+        Chunked empty = new Chunked();
+        empty.fill(5000, 1, -7000, 5002, 20, -6998, Blocks.OAK_PLANKS);
+        assertFalse(BoxCheck.check(empty, SelectionBox.of(4999, 1, -7001, 5003, 10, -6997), null).any());
     }
 
     @Test
