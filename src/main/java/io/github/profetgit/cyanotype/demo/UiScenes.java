@@ -534,6 +534,30 @@ final class UiScenes {
         });
         waitTicks(8);
         act(() -> check("wheel/an unavailable tool closes the wheel and does nothing", screen() == null && Placements.mode() == Placements.Mode.IDLE, "screen " + screen() + ", mode " + Placements.mode()));
+        act(() -> {
+            var mc = Minecraft.getInstance();
+            for (var t : io.github.profetgit.cyanotype.ui.Tool.values()) {
+                boolean needsBuild = t == io.github.profetgit.cyanotype.ui.Tool.EDIT || t == io.github.profetgit.cyanotype.ui.Tool.LAYERS || t == io.github.profetgit.cyanotype.ui.Tool.BUILD || t == io.github.profetgit.cyanotype.ui.Tool.MATERIALS;
+                check("wheel/with nothing placed " + t.label + (needsBuild ? " says why it cannot be used" : " is available"), needsBuild ? !t.why(mc).isEmpty() : t.why(mc).isEmpty(), "'" + t.why(mc) + "'");
+            }
+            check("wheel/the reason points to the Library", io.github.profetgit.cyanotype.ui.Tool.LAYERS.why(mc).contains("Library"), io.github.profetgit.cyanotype.ui.Tool.LAYERS.why(mc));
+        });
+        // a blueprint that is still being placed (not put down) is not a build to work on yet
+        act(() -> {
+            DevCommands.run("/cyanotype sample");
+            DevCommands.run("/cyanotype place 0 " + (G + 1) + " 6");
+        });
+        waitTicks(10);
+        act(() -> {
+            var mc = Minecraft.getInstance();
+            boolean placing = Placements.mode() == Placements.Mode.PLACING;
+            check("wheel/while a blueprint is still being placed the build tools say to put it down", placing ? io.github.profetgit.cyanotype.ui.Tool.MATERIALS.why(mc).contains("put the blueprint down") : true, "mode " + Placements.mode() + ", '" + io.github.profetgit.cyanotype.ui.Tool.MATERIALS.why(mc) + "'");
+        });
+        act(() -> {
+            for (Placement p : java.util.List.copyOf(Placements.all())) Placements.remove(p);
+            Placements.setMode(Placements.Mode.IDLE);
+        });
+        waitTicks(6);
 
         // letting go in the middle closes it without choosing
         act(() -> {

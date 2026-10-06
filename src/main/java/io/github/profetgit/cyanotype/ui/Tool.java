@@ -23,16 +23,34 @@ public enum Tool {
             mc.gui.setScreen(new LibraryScreen());
         }
     },
-    EDIT("Edit", "move", "Move, turn and flip the placement") {
+    EDIT("Edit", "move", "Move, turn and mirror the placement") {
         @Override
         void run(Minecraft mc) {
             Interaction.enterEdit(mc);
+        }
+
+        @Override
+        public String why(Minecraft mc) {
+            // any placed blueprint can be edited, aimed at or the active one
+            boolean any = false, loading = false;
+            for (Placement p : Placements.all()) {
+                if (p.locked && p.ready()) return "";
+                any = true;
+                if (p.locked) loading = true;
+            }
+            if (!any) return "Nothing placed yet. Open the Library and place a blueprint.";
+            return loading ? "The blueprint is still loading." : "Click to put the blueprint down first.";
         }
     },
     LAYERS("Layers", "layers", "Show only some layers") {
         @Override
         void run(Minecraft mc) {
             Interaction.startLayers(mc);
+        }
+
+        @Override
+        public String why(Minecraft mc) {
+            return needBuild();
         }
     },
     BUILD("Build", "hammer", "Help with building: next block, auto-place") {
@@ -42,14 +60,20 @@ public enum Tool {
         }
 
         @Override
-        boolean enabled(Minecraft mc) {
-            return locked() != null || AutoBuilder.on() || Interaction.guide;
+        public String why(Minecraft mc) {
+            // already helping: the panel stays reachable, to turn it off
+            return AutoBuilder.on() || Interaction.guide ? "" : needBuild();
         }
     },
     MATERIALS("Materials", "list", "What is still needed") {
         @Override
         void run(Minecraft mc) {
             mc.gui.setScreen(new MaterialsScreen());
+        }
+
+        @Override
+        public String why(Minecraft mc) {
+            return needBuild();
         }
     },
     SAVE("Save", "save", "Save a build of yours as a blueprint") {
@@ -69,9 +93,29 @@ public enum Tool {
 
     abstract void run(Minecraft mc);
 
-    /** Tools that cannot be used right now are drawn dim and answer with an error sound. */
+    /**
+     * Why the tool cannot be used right now, in words for the player, or empty when it can. A tool that needs the build you are
+     * working on (Layers, Materials, Build) waits for one: a blueprint that is placed, put down and checked against the world.
+     * Library and Save need nothing; Edit needs any placed blueprint to move.
+     */
+    public String why(Minecraft mc) {
+        return "";
+    }
+
+    /** Tools that cannot be used right now are drawn dim, the reason shows under the wheel, and choosing one answers with an error sound and the reason. */
     boolean enabled(Minecraft mc) {
-        return true;
+        return why(mc).isEmpty();
+    }
+
+    /** What the tools that work on the active build need, in order: something placed, a build picked, put down, loaded, checked. */
+    static String needBuild() {
+        Placement p = Placements.active();
+        if (Placements.all().isEmpty()) return "Place a blueprint first: open the Library.";
+        if (p == null) return "Pick the build you work on: aim at it and tap " + Ui.keyName(io.github.profetgit.cyanotype.interaction.Keys.MAIN) + ".";
+        if (!p.locked) return "Click to put the blueprint down first.";
+        if (!p.ready()) return "The blueprint is still loading.";
+        if (GhostRenderer.verifierOf(p) == null) return "Still checking the world.";
+        return "";
     }
 
     static Placement locked() {

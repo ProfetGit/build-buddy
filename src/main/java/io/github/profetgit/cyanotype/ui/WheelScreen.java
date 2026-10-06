@@ -1,6 +1,7 @@
 package io.github.profetgit.cyanotype.ui;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import io.github.profetgit.cyanotype.interaction.Interaction;
 import io.github.profetgit.cyanotype.interaction.Keys;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -83,7 +84,10 @@ public final class WheelScreen extends Screen {
             chosenNs = System.nanoTime();
             Sfx.play(Sfx.PRESS);
         } else {
-            if (hovered >= 0) Sfx.play(Sfx.ERROR);
+            if (hovered >= 0) {
+                Sfx.play(Sfx.ERROR);
+                Interaction.say(minecraft, tools[hovered].why(minecraft));
+            }
             Sfx.play(Sfx.CLOSE);
             onClose();
         }
@@ -162,7 +166,8 @@ public final class WheelScreen extends Screen {
         } else {
             wedgeVisible = false;
         }
-        float wedgeA = Motion.follow("wheel#wedge", hovered >= 0 ? 1f : 0f, 0.06) * alpha;
+        // a tool that cannot be used now gets only a faint wedge: it is pointed at, not offered
+        float wedgeA = Motion.follow("wheel#wedge", hovered >= 0 ? (tools[hovered].enabled(minecraft) ? 1f : 0.35f) : 0f, 0.06) * alpha;
         if (wedgeA > 0.02f) {
             g.pose().pushMatrix();
             g.pose().translate(cx, cy);
@@ -207,11 +212,12 @@ public final class WheelScreen extends Screen {
         if (hovered >= 0) {
             Tool t = tools[hovered];
             Ui.centered(g, Ui.fit(t.label, (int) (inner * 1.8)), cx, cy - 4, Ui.withAlpha(t.enabled(minecraft) ? Ui.WHITE : Ui.DIM, alpha));
-            String hint = t.hint;
+            String why = t.why(minecraft);
+            String hint = why.isEmpty() ? t.hint : why;
             int hw = Ui.font().width(hint);
             int hy = cy + size / 2 + 26 * scale;
             g.fill(cx - hw / 2 - 4, hy - 2, cx + hw / 2 + 4, hy + 11, Ui.withAlpha(Ui.DEEP, alpha * 0.72f));
-            Ui.centered(g, hint, cx, hy, Ui.withAlpha(t.enabled(minecraft) ? Ui.CYAN : Ui.DIM, alpha));
+            Ui.centered(g, hint, cx, hy, Ui.withAlpha(why.isEmpty() ? Ui.CYAN : Ui.WARN, alpha));
         } else {
             int hy = cy + size / 2 + 26 * scale;
             String hint = "Move to a tool, let go to choose";
