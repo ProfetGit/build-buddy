@@ -50,6 +50,83 @@ final class PasteScenes {
         return new int[]{ok, total};
     }
 
+    /** Frame times (client) and tick times (server) while a big paste and its undo run: the numbers behind "does it lag". Run with PASTE_PERF=noise:100,shell:200. */
+    static void perf() {
+        Director.clean();
+        mode("creative");
+        String[] kinds = System.getProperty("cyanotype.demo.pasteperf", "noise:60,noise:100,shell:200").split(",");
+        for (String kind : kinds) {
+            String[] k = kind.split(":");
+            Placement[] pl = new Placement[1];
+            act(() -> {
+                var bp = k[0].equals("shell") ? Samples.shell(Integer.parseInt(k[1]), 1) : k[0].equals("solid") ? Samples.solid(Integer.parseInt(k[1])) : Samples.noise(Integer.parseInt(k[1]), 0.45);
+                pl[0] = new Placement(kind, bp, "cyanotype:" + kind + ".litematic", Director.DIM, new BlockPos(-50, Director.G + 1, 10), io.github.profetgit.cyanotype.placement.Orientation.NONE);
+                pl[0].locked = true;
+                Placements.add(pl[0]);
+            });
+            until("pastePerf/" + kind + " scanned", 3000, () -> GhostRenderer.verifierOf(pl[0]) != null && GhostRenderer.verifierOf(pl[0]).scanned() && GhostRenderer.verifierOf(pl[0]).settled());
+            Director.camera(0, Director.G + 40, -60, 0, 25);
+            waitTicks(20);
+            // paste
+            long[] t0 = new long[1], heap0 = new long[1], peakHeap = new long[1], tickMax = new long[1];
+            act(() -> {
+                Director.frameNs.clear();
+                Director.measuring = true;
+                t0[0] = System.nanoTime();
+                Runtime rt = Runtime.getRuntime();
+                heap0[0] = rt.totalMemory() - rt.freeMemory();
+                peakHeap[0] = heap0[0];
+                long s0 = System.nanoTime();
+                Paste.start(mc(), pl[0]);
+                System.out.println("[cydemo] PERF paste start took " + (System.nanoTime() - s0) / 1e6 + " ms for " + kind);
+            });
+            until("pastePerf/" + kind + " pasted", 6000, () -> {
+                Runtime rt = Runtime.getRuntime();
+                peakHeap[0] = Math.max(peakHeap[0], rt.totalMemory() - rt.freeMemory());
+                var server = mc().getSingleplayerServer();
+                if (server != null) for (long t : server.getTickTimesNanos()) tickMax[0] = Math.max(tickMax[0], t);
+                return Paste.job() != null && Paste.job().state() == PasteJob.State.DONE;
+            });
+            act(() -> report("paste", kind, t0[0], heap0[0], peakHeap[0], tickMax[0]));
+            waitTicks(60);
+            // undo
+            act(() -> {
+                Director.frameNs.clear();
+                Director.measuring = true;
+                t0[0] = System.nanoTime();
+                tickMax[0] = 0;
+                Paste.undo(mc(), Paste.job());
+            });
+            until("pastePerf/" + kind + " undone", 6000, () -> {
+                var server = mc().getSingleplayerServer();
+                if (server != null) for (long t : server.getTickTimesNanos()) tickMax[0] = Math.max(tickMax[0], t);
+                return Paste.job() != null && Paste.job().state() == PasteJob.State.UNDONE;
+            });
+            act(() -> report("undo", kind, t0[0], heap0[0], peakHeap[0], tickMax[0]));
+            waitTicks(40);
+            act(() -> {
+                for (Placement p : java.util.List.copyOf(Placements.all())) Placements.remove(p);
+                Paste.reset();
+            });
+            waitTicks(60);
+        }
+        act(() -> Director.hideHud(mc(), true));
+    }
+
+    private static void report(String what, String kind, long t0, long heap0, long peak, long tickMax) {
+        Director.measuring = false;
+        java.util.List<Long> sorted = new java.util.ArrayList<>(Director.frameNs);
+        sorted.sort(null);
+        double avg = sorted.stream().mapToLong(Long::longValue).average().orElse(0) / 1e6;
+        double p99 = sorted.isEmpty() ? 0 : sorted.get((int) (sorted.size() * 0.99)) / 1e6, max = sorted.isEmpty() ? 0 : sorted.get(sorted.size() - 1) / 1e6;
+        var server = mc().getSingleplayerServer();
+        PasteJob j = Paste.job();
+        String line = String.format(java.util.Locale.ROOT, "{\"measure\":\"pastePerf/%s %s\",\"wallS\":%.1f,\"frames\":%d,\"avgFrameMs\":%.2f,\"p99FrameMs\":%.2f,\"maxFrameMs\":%.1f,\"serverTickMaxMs\":%.1f,\"serverTickAvgMs\":%.1f,\"blocks\":%d,\"heapGrowMiB\":%.0f}",
+            what, kind, (System.nanoTime() - t0) / 1e9, sorted.size(), avg, p99, max, tickMax / 1e6, server == null ? 0 : server.getAverageTickTimeNanos() / 1e6, j == null ? 0 : j.placed(), (peak - heap0) / 1048576.0);
+        Director.perf.add(line);
+        System.out.println("[cydemo] PERF " + line);
+    }
+
     static void paste() {
         UiScenes.setup();
         mode("creative");

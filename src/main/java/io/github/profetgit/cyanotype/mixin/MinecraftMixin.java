@@ -25,6 +25,7 @@ public abstract class MinecraftMixin {
     @Inject(method = "runTick", at = @At("TAIL"))
     private void cyanotype$frame(boolean advanceGameTime, CallbackInfo ci) {
         io.github.profetgit.cyanotype.ui.Motion.endFrame();
+        io.github.profetgit.cyanotype.paste.Paste.frameEnded();
         if (Director.ACTIVE) Director.onFrame((Minecraft) (Object) this);
     }
 

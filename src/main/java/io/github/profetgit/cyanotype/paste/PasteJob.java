@@ -59,16 +59,17 @@ public final class PasteJob {
     private final ServerLevel level;
     private final List<Part> parts;
     private final long total;
-    private int partIdx;
-    private int cell;
+    private int partIdx, colIdx, lx, ly, lz;
+    private boolean inColumn;
+    private @Nullable ColumnOrder order;
     private volatile State state = State.RUNNING;
     private volatile long placed, same, unloaded;
     private volatile String stopped = "";
     private volatile boolean undoRequested;
 
     // what the cells held before, for the undo
-    private final LongArrayList undoPos = new LongArrayList();
-    private final ShortArrayList undoState = new ShortArrayList();
+    private final LongArrayList undoPos;
+    private final ShortArrayList undoState;
     private final List<BlockState> undoPalette = new ArrayList<>();
     private final Map<BlockState, Integer> undoIndex = new HashMap<>();
     private final Map<Long, CompoundTag> undoEntities = new HashMap<>();
@@ -84,6 +85,15 @@ public final class PasteJob {
             for (short b : p.region.blocks) if (!skip[b & 0xFFFF]) n++;
         }
         this.total = n;
+        // sized once for what can go in: a list that doubles as it grows would briefly hold twice the memory
+        int expect = (int) Math.min(n, 50_000_000L);
+        this.undoPos = new LongArrayList(Math.max(16, expect));
+        this.undoState = new ShortArrayList(Math.max(16, expect));
+    }
+
+    /** What the undo log of a paste of this many blocks needs, in bytes: a position and a state for each, plus room for the lists. */
+    public static long undoBytes(long blocks) {
+        return blocks * 12L + (1L << 20);
     }
 
     /** How many blocks the paste puts in at most: the cells of the blueprint that are not air and not unknown. */
@@ -119,32 +129,62 @@ public final class PasteJob {
         return total == 0 ? 1 : Math.min(1.0, (placed + same + unloaded) / (double) total);
     }
 
-    /** Places blocks for about this long. @return true when the whole blueprint has been put in */
-    public boolean step(long budgetNs) {
+    /** Places blocks for about this long, but not more than {@code maxBlocks} cells of work. @return true when the whole blueprint has been put in */
+    public boolean step(long budgetNs, int maxBlocks) {
         if (state != State.RUNNING) return true;
         long end = System.nanoTime() + budgetNs;
+        long limit = placed + same + maxBlocks;
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         while (partIdx < parts.size()) {
             Part p = parts.get(partIdx);
             OrientedRegion r = p.region;
+            if (order == null) {
+                order = new ColumnOrder(r.sx, r.sz, p.wx, p.wz);
+                colIdx = 0;
+                inColumn = false;
+            }
             short[] blocks = r.blocks;
             int layer = r.sz * r.sx;
-            while (cell < blocks.length) {
-                int idx = cell++;
-                int pal = blocks[idx] & 0xFFFF;
-                BlockState want = r.states[pal];
-                if (want.isAir() || r.unknown[pal]) continue;
-                int lx = idx % r.sx, lz = (idx / r.sx) % r.sz, ly = idx / layer;
-                pos.set(p.wx + lx, p.wy + ly, p.wz + lz);
-                if (!level.hasChunk(pos.getX() >> 4, pos.getZ() >> 4)) {
-                    unloaded++;
-                    continue;
+            while (colIdx < order.count()) {
+                int[] col = order.column(colIdx);
+                if (!inColumn) {
+                    inColumn = true;
+                    lx = col[0];
+                    lz = col[2];
+                    ly = 0;
+                    if (!level.hasChunk(col[4], col[5])) {
+                        // a chunk that is not loaded is left alone, and counted, once for the whole column
+                        for (int y = 0; y < r.sy; y++) for (int z = col[2]; z < col[3]; z++) for (int x = col[0]; x < col[1]; x++) {
+                            int pal = blocks[(y * r.sz + z) * r.sx + x] & 0xFFFF;
+                            if (!r.states[pal].isAir() && !r.unknown[pal]) unloaded++;
+                        }
+                        ly = r.sy;
+                    }
                 }
-                place(pos, want, p.blockEntities.get(idx));
-                if ((cell & 63) == 0 && System.nanoTime() >= end) return false;
+                int budgetCheck = 0;
+                while (ly < r.sy) {
+                    while (lz < col[3]) {
+                        while (lx < col[1]) {
+                            int x = lx++;
+                            int idx = ly * layer + lz * r.sx + x;
+                            int pal = blocks[idx] & 0xFFFF;
+                            BlockState want = r.states[pal];
+                            if (want.isAir() || r.unknown[pal]) continue;
+                            pos.set(p.wx + x, p.wy + ly, p.wz + lz);
+                            place(pos, want, p.blockEntities.get(idx));
+                            if ((++budgetCheck & 63) == 0 && (System.nanoTime() >= end || placed + same >= limit)) return false;
+                        }
+                        lx = col[0];
+                        lz++;
+                    }
+                    lz = col[2];
+                    ly++;
+                }
+                colIdx++;
+                inColumn = false;
             }
             partIdx++;
-            cell = 0;
+            order = null;
         }
         state = State.DONE;
         return true;
@@ -201,22 +241,23 @@ public final class PasteJob {
     }
 
     /** One slice of whatever is to be done: placing, or putting back. @return true when there is nothing more to do */
-    public boolean work(long budgetNs) {
+    public boolean work(long budgetNs, int maxBlocks) {
         if (undoRequested && state != State.UNDOING && state != State.UNDONE) {
             state = State.UNDOING;
             undoAt = undoPos.size();
         }
         return switch (state) {
-            case RUNNING -> step(budgetNs);
-            case UNDOING -> undoStep(budgetNs);
+            case RUNNING -> step(budgetNs, maxBlocks);
+            case UNDOING -> undoStep(budgetNs, maxBlocks);
             default -> true;
         };
     }
 
     /** Puts old blocks back for about this long, newest first. @return true when all are back */
-    public boolean undoStep(long budgetNs) {
+    public boolean undoStep(long budgetNs, int maxBlocks) {
         if (state != State.UNDOING) return true;
         long end = System.nanoTime() + budgetNs;
+        int stopAt = Math.max(0, undoAt - maxBlocks);
         while (undoAt > 0) {
             int i = --undoAt;
             BlockPos at = BlockPos.of(undoPos.getLong(i));
@@ -230,7 +271,7 @@ public final class PasteJob {
                     if (made != null) made.loadWithComponents(TagValueInput.create(ProblemReporter.DISCARDING, level.registryAccess(), data));
                 }
             }
-            if ((i & 63) == 0 && System.nanoTime() >= end) return false;
+            if ((i & 63) == 0 && (System.nanoTime() >= end || i <= stopAt)) return false;
         }
         state = State.UNDONE;
         return true;

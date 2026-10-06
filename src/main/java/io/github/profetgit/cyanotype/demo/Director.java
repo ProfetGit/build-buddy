@@ -208,6 +208,7 @@ public final class Director {
             switch (scene) {
                 case "house" -> houseScene();
                 case "shaderswap" -> ShaderScenes.swap();
+                case "paste-perf" -> PasteScenes.perf();
                 case "perf" -> perfScenes();
                 case "commands" -> commandScene();
                 case "place" -> PlaceScenes.place();

@@ -29,6 +29,15 @@ public final class Paste {
     /** The server thread's share per tick, so a big paste never stalls the world. */
     private static final long SLICE_NS = 8_000_000L;
 
+    /** The most cells of work a tick may do when the game is running smoothly, and the least when it is struggling. */
+    private static final int MAX_PER_TICK = 6000, MIN_PER_TICK = 150;
+    /** How long frames have been taking, the worst of the last few (ms), and the share of {@link #MAX_PER_TICK} the paste allows itself. */
+    private static final double[] RECENT_FRAMES = new double[8];
+    private static int frameAt;
+    private static long lastFrameEndNs;
+    private static double pace = 1.0;
+    private static volatile int blocksPerTick = MAX_PER_TICK;
+
     private static PasteJob job;
     private static @Nullable Placement target;
     private static boolean inFlight, wasDone;
@@ -99,6 +108,18 @@ public final class Paste {
             Sfx.play(Sfx.ERROR);
             return false;
         }
+        // the undo log lives in memory: a paste that would not leave room for it (and for the game) is refused rather than risking a crash
+        long need = PasteJob.undoBytes(preview(p)[0] + preview(p)[1]);
+        Runtime rt = Runtime.getRuntime();
+        long free = rt.maxMemory() - (rt.totalMemory() - rt.freeMemory());
+        if (need > free / 3) {
+            Interaction.say(mc, "This build is too big to paste with this much memory (it needs about " + need / 1048576 + " MB to be undoable, " + free / 1048576 + " MB are free). Give Minecraft more memory, or paste a smaller part.");
+            Sfx.play(Sfx.ERROR);
+            return false;
+        }
+        pace = 1.0;
+        blocksPerTick = MAX_PER_TICK;
+        java.util.Arrays.fill(RECENT_FRAMES, 0);
         List<PasteJob.Part> parts = new ArrayList<>();
         for (Verifier.Part part : v.parts) parts.add(PasteJob.Part.of(part.region, part.wx, part.wy, part.wz));
         job = new PasteJob(level, parts);
@@ -107,6 +128,9 @@ public final class Paste {
         wasDone = false;
         final PasteJob made = job;
         Placements.rememberPaste(p, () -> undo(mc, made));
+        // the ghost steps aside while the build goes in: it would compare and re-draw every block the paste changes, on top of what the game itself does
+        Placements.removeAfterPaste(p);
+        removedForPaste = p;
         Sfx.play(Sfx.PRESS, 1.2f);
         Interaction.say(mc, "Pasting " + String.format(Locale.ROOT, "%,d", job.total()) + " blocks...");
         return true;
@@ -145,6 +169,34 @@ public final class Paste {
         Interaction.say(mc, "Undoing the paste...");
     }
 
+    /** Called at the end of every frame: remembers how long it took while a paste is running, so the paste can slow down when the game struggles. */
+    public static void frameEnded() {
+        long now = System.nanoTime();
+        if (lastFrameEndNs != 0 && busy()) {
+            RECENT_FRAMES[frameAt++ & 7] = (now - lastFrameEndNs) / 1e6;
+        }
+        lastFrameEndNs = now;
+    }
+
+    /**
+     * Adjusts how much the paste does per tick to how the last frames went: frames over about 45 ms mean the client cannot keep up
+     * with the sections it is told to redraw, so the paste does less per tick (it takes longer, the game stays playable); smooth
+     * frames let it speed up again. Never to zero, so it always finishes.
+     */
+    static void adapt() {
+        double worst = 0;
+        for (double f : RECENT_FRAMES) worst = Math.max(worst, f);
+        if (worst > 45) pace = Math.max(MIN_PER_TICK / (double) MAX_PER_TICK, pace * 0.6);
+        else if (worst > 33) pace = Math.max(MIN_PER_TICK / (double) MAX_PER_TICK, pace * 0.85);
+        else if (worst < 24) pace = Math.min(1.0, pace * 1.15 + 0.02);
+        blocksPerTick = Math.max(MIN_PER_TICK, (int) (MAX_PER_TICK * pace));
+    }
+
+    /** Dev checks: how many cells a tick may do right now. */
+    public static int blocksPerTick() {
+        return blocksPerTick;
+    }
+
     /** Once per client tick: hands the server a slice of work, and says what happened when it is done. */
     public static void tick(Minecraft mc) {
         Placement q = queued;
@@ -173,13 +225,14 @@ public final class Paste {
             return;
         }
         if (inFlight) return;
+        adapt();
         if (s == PasteJob.State.RUNNING && !mc.player.isCreative()) j.stop("Stopped: you are not in creative mode any more.");
         MinecraftServer server = mc.getSingleplayerServer();
         if (server == null) return;
         inFlight = true;
         server.execute(() -> {
             try {
-                j.work(SLICE_NS);
+                j.work(SLICE_NS, blocksPerTick);
             } finally {
                 inFlight = false;
             }
@@ -197,11 +250,12 @@ public final class Paste {
             return;
         }
         Sfx.play(j.stopped().isEmpty() ? Sfx.COMPLETE : Sfx.ERROR);
-        // the build is in the world: the ghost has done its job and goes (unless some of it could not go in, then it stays to paste again or build the rest)
-        Placement done = target;
-        if (done != null && j.stopped().isEmpty() && j.unloaded() == 0 && Placements.all().contains(done)) {
-            Placements.removeAfterPaste(done);
-            removedForPaste = done;
+        // the build is in the world and the ghost has done its job (it went when the paste started); it comes back when some of the build could
+        // not go in, so it can be pasted again or built by hand
+        if (!j.stopped().isEmpty() || j.unloaded() > 0) {
+            Placement back = removedForPaste;
+            removedForPaste = null;
+            if (back != null) Placements.putBack(back);
         }
         String text = "Pasted " + String.format(Locale.ROOT, "%,d", j.placed()) + " blocks"
             + (j.same() > 0 ? " (" + String.format(Locale.ROOT, "%,d", j.same()) + " were already right)" : "")
