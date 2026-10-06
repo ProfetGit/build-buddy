@@ -65,6 +65,8 @@ public final class SaveScreen extends Screen {
     /** Where a press on the picture began and which block was under it: a click that stays near is a removal of that block. */
     private double pressX, pressY;
     private int pressCell = -1;
+    /** Why the last attempt to remove a block did nothing, shown under the picture until the next one. */
+    private String removeNote = "";
     /** Remove mode: pointing at a block of the preview lights it up and a click takes it out of the save. Ctrl+Z brings it back. */
     private boolean removeMode;
     /** What was read from the world (before any block was taken out), where its min corner is, and the blocks taken out as world positions, with the ones undone for redo. */
@@ -321,6 +323,7 @@ public final class SaveScreen extends Screen {
         if (!removedSet.add(pos)) return;
         removedStack.add(pos);
         redoStack.clear();
+        removeNote = "";
         Sfx.play(Sfx.RELEASE, 1.1f);
         applyEdits();
     }
@@ -488,27 +491,31 @@ public final class SaveScreen extends Screen {
     private void drawPreviewPanel(GuiGraphicsExtractor g, int[] pp, float inner, int mx, int my) {
         Ui.text(g, "Preview", pp[0] + 10, pp[1] + 8, Ui.withAlpha(Ui.LINE, inner));
         boolean idle = state == State.EDITING;
+        boolean ctrl = idle && Interaction.ctrlDown(minecraft);
+        // pointing at a block lights it up in remove mode, and while Ctrl is held (Ctrl+click removes)
+        preview.setRemoveMode(removeMode || ctrl);
         Ui.button(g, "sv#reset", resetX(pp), pp[1] + 5, RESET_W, 14, "Reset", null, mx, my, false, idle);
         Ui.button(g, "sv#remove", removeX(pp), pp[1] + 5, REMOVE_W, 14, removeMode ? "Stop removing" : "Remove blocks", null, mx, my, removeMode, idle && captured != null);
         int[] r = wide() ? previewRect() : new int[]{pp[0] + 8, pp[1] + 22, pp[2] - 16, pp[3] - 22 - 24};
         double progress = job != null && !job.done() ? job.progress() : -1;
         preview.draw(g, r[0], r[1], r[2], r[3], progress, mx, my);
-        if (removeMode) {
+        if (removeMode || ctrl) {
             // remove mode is unmistakable: a red frame round the picture, a red banner on it, and the hovered block in red
             int red = Ui.withAlpha(0xFFFF6B6B, inner * 0.95f);
             g.fill(r[0], r[1], r[0] + r[2], r[1] + 2, red);
             g.fill(r[0], r[1] + r[3] - 2, r[0] + r[2], r[1] + r[3], red);
             g.fill(r[0], r[1], r[0] + 2, r[1] + r[3], red);
             g.fill(r[0] + r[2] - 2, r[1], r[0] + r[2], r[1] + r[3], red);
-            String banner = "REMOVING: click a block to take it out";
+            String banner = removeMode ? "REMOVING: click a block to take it out" : "CTRL: click a block to take it out";
             int bw = Ui.font().width(banner) + 10;
             g.fill(r[0] + 2, r[1] + 2, r[0] + 2 + bw, r[1] + 15, Ui.withAlpha(0xFFB02A2A, inner * 0.92f));
             Ui.text(g, banner, r[0] + 7, r[1] + 5, Ui.withAlpha(Ui.WHITE, inner));
         }
-        String hint = removedStack.isEmpty()
-            ? (removeMode ? "Remove mode is on. Ctrl+Z puts a block back" : "Drag to turn, right-drag to move, scroll to zoom")
+        String hint = !removeNote.isEmpty() ? removeNote
+            : removedStack.isEmpty()
+            ? (removeMode ? "Remove mode is on. Ctrl+Z puts a block back" : "Drag turns, right-drag moves, scroll zooms, Ctrl+click removes a block")
             : "Took out " + removedStack.size() + (removedStack.size() == 1 ? " block" : " blocks") + ". Ctrl+Z puts it back";
-        Ui.text(g, Ui.fit(hint, pp[2] - 16), pp[0] + 8, pp[1] + pp[3] - 17, Ui.withAlpha(removeMode ? 0xFFFF8A8A : Ui.DIM, inner * 0.95f));
+        Ui.text(g, Ui.fit(hint, pp[2] - 16), pp[0] + 8, pp[1] + pp[3] - 17, Ui.withAlpha(removeMode || !removeNote.isEmpty() ? 0xFFFF8A8A : Ui.DIM, inner * 0.95f));
     }
 
     private static final int RESET_W = 44, REMOVE_W = 90;
@@ -565,11 +572,18 @@ public final class SaveScreen extends Screen {
             }
             int[] r = wide() ? previewRect() : new int[]{px() + 8, py() + 22, pw() - 16, ph() - 22 - 24};
             if (Ui.inside(mx, my, r[0], r[1], r[2], r[3])) {
+                int under = preview.cellAt(event.x() - r[0], event.y() - r[1]);
+                // Ctrl+click takes the block under the pointer out at once, whatever else is switched on: no mode, no drag to tell it from
+                if (event.button() == 0 && (event.hasControlDown() || Interaction.ctrlDown(minecraft))) {
+                    if (under >= 0) removeCell(under);
+                    else removeNote = "No block there. Ctrl+click on a block of the picture";
+                    return true;
+                }
                 draggingPreview = true;
                 pressX = event.x();
                 pressY = event.y();
-                pressCell = removeMode ? preview.hovered() : -1;
-                panningPreview = event.button() == 1 || event.button() == 2 || (event.modifiers() & 1) != 0;
+                pressCell = removeMode ? under : -1;
+                panningPreview = event.button() == 1 || event.button() == 2 || event.hasShiftDown();
                 return true;
             }
         }
@@ -607,8 +621,10 @@ public final class SaveScreen extends Screen {
         if (draggingPreview) {
             draggingPreview = false;
             // a click that stayed where it began is a removal, in remove mode (of the block it began on); a drag is only the view turning
-            if (removeMode && event.button() == 0 && Math.hypot(event.x() - pressX, event.y() - pressY) < 8) {
-                removeCell(pressCell >= 0 ? pressCell : preview.hovered());
+            if (removeMode && event.button() == 0) {
+                if (Math.hypot(event.x() - pressX, event.y() - pressY) >= 8) removeNote = "That was a drag, not a click: it turned the picture";
+                else if (pressCell < 0 && preview.hovered() < 0) removeNote = "No block under the pointer";
+                else removeCell(pressCell >= 0 ? pressCell : preview.hovered());
             }
             return true;
         }

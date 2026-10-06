@@ -148,6 +148,8 @@ public final class BlockLook {
     }
 
     private static @Nullable Look fromModel(BlockState s, BlockStateModelSet models) {
+        // a banner has no baked model (the game draws it with its own renderer): a pole and a flag of its colour are built here
+        if (s.getBlock() instanceof net.minecraft.world.level.block.AbstractBannerBlock banner) return banner(s, banner.getColor().getTextureDiffuseColor() | 0xFF000000);
         BlockStateModel model = models.get(s);
         List<BlockStateModelPart> parts = new ArrayList<>();
         model.collectParts(RandomSource.create(42L), parts);
@@ -178,6 +180,61 @@ public final class BlockLook {
         Quad[] quads = new Quad[all.size()];
         for (int i = 0; i < quads.length; i++) quads[i] = quadOf(all.get(i), s, leaves);
         return new Look(faces, quads);
+    }
+
+    /**
+     * A banner: the pole and the bar are brown boxes, the flag a double-sided quad of the banner's colour (the patterns are not
+     * drawn). A standing banner turns in sixteenths of a circle; a wall banner hangs flat against its wall. Sizes follow the game's
+     * own model (a flag 20 by 40 units, scaled by two thirds).
+     */
+    private static Look banner(BlockState s, int color) {
+        Tex cloth = Tex.flat(color), wood = Tex.flat(0xFF8B6B3F);
+        java.util.List<Quad> q = new ArrayList<>();
+        double turn;
+        double fz;
+        boolean wall = s.getBlock() instanceof net.minecraft.world.level.block.WallBannerBlock;
+        if (wall) {
+            Direction f = s.getValue(net.minecraft.world.level.block.WallBannerBlock.FACING);
+            turn = switch (f) {
+                case SOUTH -> 0;
+                case WEST -> Math.PI / 2;
+                case NORTH -> Math.PI;
+                default -> -Math.PI / 2;
+            };
+            fz = -0.4;
+        } else {
+            turn = s.getValue(net.minecraft.world.level.block.BannerBlock.ROTATION) * Math.PI / 8;
+            fz = 0;
+        }
+        double c = Math.cos(turn), n = Math.sin(turn);
+        double half = 0.4167, top = wall ? 1.0 : 1.75, bottom = top - 1.667;
+        if (!wall) addBox(q, 0.4583, 0, -0.0417, 0.5417, 1.75, 0.0417, wood, c, n);
+        addBox(q, 0.5 - half, top, fz - 0.0417, 0.5 + half, top + 0.0833, fz + 0.0417, wood, c, n);
+        float[][] flag = {{(float) (0.5 - half), (float) top, (float) fz}, {(float) (0.5 + half), (float) top, (float) fz}, {(float) (0.5 + half), (float) bottom, (float) fz}, {(float) (0.5 - half), (float) bottom, (float) fz}};
+        q.add(quadOf(flag, cloth, 4, c, n));
+        Tex[] faces = {cloth, cloth, cloth, cloth, cloth, cloth};
+        return new Look(faces, q.toArray(new Quad[0]));
+    }
+
+    private static void addBox(List<Quad> out, double x0, double y0, double z0, double x1, double y1, double z1, Tex t, double c, double n) {
+        float[][] v = {
+            {(float) x0, (float) y0, (float) z0}, {(float) x1, (float) y0, (float) z0}, {(float) x1, (float) y1, (float) z0}, {(float) x0, (float) y1, (float) z0},
+            {(float) x0, (float) y0, (float) z1}, {(float) x1, (float) y0, (float) z1}, {(float) x1, (float) y1, (float) z1}, {(float) x0, (float) y1, (float) z1}};
+        int[][] side = {{1, 5, 6, 2}, {4, 0, 3, 7}, {3, 2, 6, 7}, {0, 4, 5, 1}, {5, 4, 7, 6}, {0, 1, 2, 3}};
+        int[] dir = {0, 1, 2, 3, 4, 5};
+        for (int i = 0; i < 6; i++) out.add(quadOf(new float[][]{v[side[i][0]], v[side[i][1]], v[side[i][2]], v[side[i][3]]}, t, dir[i], c, n));
+    }
+
+    /** A quad from four corners (in block space, turned about the block's vertical axis through its middle). */
+    private static Quad quadOf(float[][] corners, Tex t, int dir, double c, double n) {
+        float[] p = new float[12];
+        for (int i = 0; i < 4; i++) {
+            double x = corners[i][0] - 0.5, z = corners[i][2] - 0.5;
+            p[i * 3] = (float) (0.5 + x * c - z * n);
+            p[i * 3 + 1] = corners[i][1];
+            p[i * 3 + 2] = (float) (0.5 + x * n + z * c);
+        }
+        return new Quad(p, new float[]{0, 1, 0, 0, 1, 0, 1, 1}, t, dir);
     }
 
     /** Whether a quad is a whole face of the cube: flat on that side of the block and as big as the block. */

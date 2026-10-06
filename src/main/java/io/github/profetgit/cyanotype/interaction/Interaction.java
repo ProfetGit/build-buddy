@@ -88,6 +88,11 @@ public final class Interaction {
         return testModifiers >= 0 ? (testModifiers & 1) != 0 : mc.hasShiftDown() || recentClick(3);
     }
 
+    /** Whether Ctrl is down now, by the keyboard or by what the last mouse press carried (for screens that take Ctrl+click). */
+    public static boolean ctrlDown(Minecraft mc) {
+        return ctrl(mc);
+    }
+
     static boolean ctrl(Minecraft mc) {
         return testModifiers >= 0 ? (testModifiers & 2) != 0 : mc.hasControlDown() || recentClick(192);
     }

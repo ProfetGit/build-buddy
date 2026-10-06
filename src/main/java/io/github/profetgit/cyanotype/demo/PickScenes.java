@@ -237,6 +237,20 @@ final class PickScenes {
             check("pick/remove mode is off again", !sv.removing() && sv.captured().totalBlocks() == houseA[0], "removing " + sv.removing());
         });
         waitTicks(10);
+        act(() -> {
+            SaveScreen sv = (SaveScreen) screen();
+            int[] at = sv.anchor("preview");
+            var ctrlClick = new net.minecraft.client.input.MouseButtonInfo(0, 192);
+            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], ctrlClick), false);
+            check("pick/Ctrl+click takes a block out with remove mode off, on the press", !sv.removing() && sv.removedCount() == 1 && sv.captured().totalBlocks() == houseA[0] - 1, sv.removedCount() + " removed, " + sv.captured().totalBlocks() + " blocks");
+            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], ctrlClick));
+            sv.undoRemovalForDemo();
+            check("pick/and Ctrl+Z puts it back", sv.removedCount() == 0 && sv.captured().totalBlocks() == houseA[0], sv.removedCount() + " removed");
+            var banner = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.BANNER.pick(net.minecraft.world.item.DyeColor.RED).defaultBlockState());
+            var wallBanner = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.WALL_BANNER.pick(net.minecraft.world.item.DyeColor.BLUE).defaultBlockState());
+            check("pick/banners are drawn as a pole and a flag in their colour, not a block", !banner.cube() && banner.model() != null && !wallBanner.cube() && ((banner.face()[0].avg() >> 16) & 255) > ((banner.face()[0].avg()) & 255) && (wallBanner.face()[0].avg() & 255) > ((wallBanner.face()[0].avg() >> 16) & 255), "red " + Integer.toHexString(banner.face()[0].avg()) + ", blue wall " + Integer.toHexString(wallBanner.face()[0].avg()));
+        });
+        waitTicks(6);
         waitTicks(6);
         shot("pick_5_save");
         act(() -> screen().keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN, 0, 0)));
