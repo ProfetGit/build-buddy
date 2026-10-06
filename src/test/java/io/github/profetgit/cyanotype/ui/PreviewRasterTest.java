@@ -146,6 +146,47 @@ class PreviewRasterTest {
         assertTrue(((after >> 16) & 255) > ((before >> 16) & 255) - 1);
     }
 
+    private static BlockLook.Look plane() {
+        // a block that is only a thin upright plane through the middle (like a pane or a plant): two crossing is not needed here
+        BlockLook.Tex red = new BlockLook.Tex(1, 1, new int[]{RED}, RED);
+        BlockLook.Quad q = new BlockLook.Quad(new float[]{0.5f, 0, 0, 0.5f, 1, 0, 0.5f, 1, 1, 0.5f, 0, 1}, new float[]{0, 1, 0, 0, 1, 0, 1, 1}, red, 0);
+        return new BlockLook.Look(new BlockLook.Tex[]{red, red, red, red, red, red}, new BlockLook.Quad[]{q});
+    }
+
+    @Test
+    void aBlockThatIsNotACubeIsDrawnFromItsModelAndNamesItsCell() {
+        PreviewRaster.Scene s = PreviewRaster.scene(new int[]{1}, new BlockLook.Look[]{plane()}, 1, 1, 1);
+        assertEquals(0, s.count, "no cube faces");
+        assertEquals(1, s.custom.length, "but its model is drawn");
+        PreviewRaster.Frame f = PreviewRaster.render(s, new PreviewRaster.View(Math.PI / 2, 0.0, 1.0, 0, 0), 120, 100, 1, -1);
+        assertTrue(covered(f.px()) > 500, "covered " + covered(f.px()));
+        int id = f.ids()[50 * 120 + 60];
+        assertTrue(id < 0, "a model's pixels carry a negative id: " + id);
+        assertEquals(0, s.cellOfId(id));
+        // seen edge-on from the side the plane is almost invisible, and from the front it is seen from either side
+        PreviewRaster.Frame back = PreviewRaster.render(s, new PreviewRaster.View(-Math.PI / 2, 0.0, 1.0, 0, 0), 120, 100, 1, -1);
+        assertTrue(covered(back.px()) > 500, "double sided: " + covered(back.px()));
+    }
+
+    @Test
+    void aCubeNextToAModelBlockShowsTheFaceThatTouchesIt() {
+        // a cube with a plane beside it: the cube's face toward the plane must be drawn, the plane is no wall
+        PreviewRaster.Scene s = PreviewRaster.scene(new int[]{2, 1}, new BlockLook.Look[]{plane(), BlockLook.Look.solid(BLUE)}, 2, 1, 1);
+        // cell 0 is the plane (look 1), cell 1 the cube (look 2): the cube has all six faces, one of them toward the plane
+        assertEquals(6, s.count);
+        PreviewRaster.Scene wall = PreviewRaster.scene(new int[]{2, 2}, new BlockLook.Look[]{plane(), BlockLook.Look.solid(BLUE)}, 2, 1, 1);
+        assertEquals(10, wall.count, "two cubes touching share no faces: 12 - 2");
+    }
+
+    @Test
+    void aModelBlockShutInByCubesIsNotDrawn() {
+        int[] cells = new int[27];
+        Arrays.fill(cells, 2);
+        cells[13] = 1;
+        PreviewRaster.Scene s = PreviewRaster.scene(cells, new BlockLook.Look[]{plane(), BlockLook.Look.solid(BLUE)}, 3, 3, 3);
+        assertEquals(0, s.custom.length);
+    }
+
     @Test
     void aBoxTooBigToPreviewIsRefused() {
         assertEquals(null, PreviewRaster.scene(new io.github.profetgit.cyanotype.blueprint.Blueprint(io.github.profetgit.cyanotype.blueprint.Blueprint.Metadata.of("t"), java.util.List.of())));

@@ -113,6 +113,15 @@ final class PickScenes {
             var grass = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState());
             var planks = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.OAK_PLANKS.defaultBlockState());
             check("pick/blocks have their real textures in the preview", grass.face()[2].px() != null && planks.face()[2].px() != null && grass.face()[2].w() >= 16, "grass top " + grass.face()[2].w() + "x" + grass.face()[2].h());
+            var leaves = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.OAK_LEAVES.defaultBlockState());
+            boolean holes = false;
+            for (int px : leaves.face()[2].px()) if ((px >>> 24) < 128) holes = true;
+            check("pick/leaves are solid cubes with the right green: no see-through texels", leaves.cube() && !holes && ((leaves.face()[2].avg() >> 8) & 255) > ((leaves.face()[2].avg() >> 16) & 255), "cube " + leaves.cube() + ", holes " + holes);
+            var torch = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.TORCH.defaultBlockState());
+            var grassPlant = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.SHORT_GRASS.defaultBlockState());
+            var stair = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.OAK_STAIRS.defaultBlockState());
+            var stone = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
+            check("pick/a torch, grass and a stair are drawn from their models, stone is a cube", !torch.cube() && !grassPlant.cube() && !stair.cube() && stone.cube(), "torch " + torch.cube() + ", grass " + grassPlant.cube() + ", stair " + stair.cube() + ", stone " + stone.cube());
             check("pick/the grass top is green and its side is not", ((grass.face()[2].avg() >> 8) & 255) > ((grass.face()[2].avg() >> 16) & 255) && grass.face()[2].avg() != grass.face()[4].avg(), Integer.toHexString(grass.face()[2].avg()) + " / " + Integer.toHexString(grass.face()[4].avg()));
         });
         // ---- the wheel starts it; the crosshair says what a click would do
@@ -199,8 +208,10 @@ final class PickScenes {
             SaveScreen sv = (SaveScreen) screen();
             var info = new net.minecraft.client.input.MouseButtonInfo(0, 0);
             int[] at = sv.anchor("preview");
+            // a real hand wobbles: the pointer moves a few units between press and release and it is still a click on the block pressed
             sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info), false);
-            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info));
+            sv.mouseDragged(new net.minecraft.client.input.MouseButtonEvent(at[0] + 3, at[1] + 2, info), 3, 2);
+            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0] + 3, at[1] + 2, info));
             check("pick/a click on a block takes it out of what is saved", sv.removedCount() == 1 && sv.captured().totalBlocks() == houseA[0] - 1, sv.removedCount() + " removed, " + sv.captured().totalBlocks() + " blocks");
         });
         waitTicks(14);

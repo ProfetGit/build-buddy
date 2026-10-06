@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.BlockStateModelSet;
+import net.minecraft.client.model.geom.builders.UVPair;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
@@ -46,11 +47,26 @@ public final class BlockLook {
         }
     }
 
-    /** The six faces in the order +x, -x, +y, -y, +z, -z. */
-    public record Look(Tex[] face) {
+    /** One quad of a block's model: corners in the block's own space (0..1), the texture coordinates of each corner (0..1 across the texture, v down), its picture, and the way it faces for the light. */
+    public record Quad(float[] p, float[] uv, Tex tex, int dir) {
+    }
+
+    /**
+     * The six faces in the order +x, -x, +y, -y, +z, -z, and for a block that is not a plain cube (a stair, a slab, a torch, grass,
+     * bamboo, a fence...) its model: the quads to draw instead of the cube. {@code model} is null for a cube.
+     */
+    public record Look(Tex[] face, Quad @Nullable [] model) {
+        public Look(Tex[] face) {
+            this(face, null);
+        }
+
+        public boolean cube() {
+            return model == null;
+        }
+
         public static Look solid(int argb) {
             Tex t = Tex.flat(argb);
-            return new Look(new Tex[]{t, t, t, t, t, t});
+            return new Look(new Tex[]{t, t, t, t, t, t}, null);
         }
 
         /** The colour for the small previews: the average of the sides and the top, weighted toward the top as the eye sees it. */
@@ -136,49 +152,104 @@ public final class BlockLook {
         List<BlockStateModelPart> parts = new ArrayList<>();
         model.collectParts(RandomSource.create(42L), parts);
         if (parts.isEmpty()) return null;
+        boolean leaves = s.getBlock() instanceof LeavesBlock;
         Tex[] faces = new Tex[6];
-        BakedQuad any = null;
+        boolean[] full = new boolean[6];
+        List<BakedQuad> all = new ArrayList<>();
         for (BlockStateModelPart part : parts) {
             for (int d = 0; d < 6; d++) {
-                if (faces[d] != null) continue;
-                List<BakedQuad> quads = part.getQuads(DIRS[d]);
-                if (!quads.isEmpty()) faces[d] = texOf(quads.get(0), s);
+                for (BakedQuad q : part.getQuads(DIRS[d])) {
+                    all.add(q);
+                    if (faces[d] == null) faces[d] = texOf(q, s, leaves);
+                    if (coversFace(q, d)) full[d] = true;
+                }
             }
-            if (any == null) {
-                List<BakedQuad> loose = part.getQuads(null);
-                if (!loose.isEmpty()) any = loose.get(0);
-            }
+            all.addAll(part.getQuads(null));
         }
         // a block with no quad on a side (a plant drawn as two crossed planes, a torch) shows what it has on every side
         Tex fallback = null;
         for (Tex t : faces) if (t != null) fallback = t;
-        if (fallback == null && any != null) fallback = texOf(any, s);
+        if (fallback == null && !all.isEmpty()) fallback = texOf(all.get(0), s, leaves);
         if (fallback == null) return null;
         for (int d = 0; d < 6; d++) if (faces[d] == null) faces[d] = fallback;
-        return new Look(faces);
+        boolean cube = true;
+        for (boolean f : full) cube &= f;
+        if (cube) return new Look(faces, null);
+        Quad[] quads = new Quad[all.size()];
+        for (int i = 0; i < quads.length; i++) quads[i] = quadOf(all.get(i), s, leaves);
+        return new Look(faces, quads);
     }
 
-    private static Tex texOf(BakedQuad quad, BlockState s) {
+    /** Whether a quad is a whole face of the cube: flat on that side of the block and as big as the block. */
+    private static boolean coversFace(BakedQuad q, int d) {
+        int axis = d / 2;
+        float plane = d % 2 == 0 ? 1f : 0f;
+        float lo1 = Float.MAX_VALUE, hi1 = -Float.MAX_VALUE, lo2 = Float.MAX_VALUE, hi2 = -Float.MAX_VALUE;
+        for (int i = 0; i < 4; i++) {
+            float[] c = {q.position(i).x(), q.position(i).y(), q.position(i).z()};
+            if (Math.abs(c[axis] - plane) > 1e-3f) return false;
+            float a = c[(axis + 1) % 3], b = c[(axis + 2) % 3];
+            lo1 = Math.min(lo1, a);
+            hi1 = Math.max(hi1, a);
+            lo2 = Math.min(lo2, b);
+            hi2 = Math.max(hi2, b);
+        }
+        return lo1 < 1e-3f && hi1 > 1 - 1e-3f && lo2 < 1e-3f && hi2 > 1 - 1e-3f;
+    }
+
+    private static Quad quadOf(BakedQuad q, BlockState s, boolean leaves) {
+        float[] p = new float[12], uv = new float[8];
+        var sprite = q.materialInfo().sprite();
+        float u0 = sprite.getU0(), u1 = sprite.getU1(), v0 = sprite.getV0(), v1 = sprite.getV1();
+        for (int i = 0; i < 4; i++) {
+            p[i * 3] = q.position(i).x();
+            p[i * 3 + 1] = q.position(i).y();
+            p[i * 3 + 2] = q.position(i).z();
+            long packed = q.packedUV(i);
+            float u = UVPair.unpackU(packed), v = UVPair.unpackV(packed);
+            uv[i * 2] = u1 == u0 ? 0 : (u - u0) / (u1 - u0);
+            uv[i * 2 + 1] = v1 == v0 ? 0 : (v - v0) / (v1 - v0);
+        }
+        Direction dir = q.direction();
+        // Direction's own order is down, up, north, south, west, east; the previews use +x, -x, +y, -y, +z, -z
+        int mapped = switch (dir == null ? Direction.UP : dir) {
+            case EAST -> 0;
+            case WEST -> 1;
+            case UP -> 2;
+            case DOWN -> 3;
+            case SOUTH -> 4;
+            case NORTH -> 5;
+        };
+        return new Quad(p, uv, texOf(q, s, leaves), mapped);
+    }
+
+    private static Tex texOf(BakedQuad quad, BlockState s, boolean leaves) {
         Identifier name = quad.materialInfo().sprite().contents().name();
         int tint = quad.materialInfo().isTinted() ? tintOf(s) : 0xFFFFFFFF;
-        String key = name + "#" + Integer.toHexString(tint);
+        String key = name + "#" + Integer.toHexString(tint) + (leaves ? "L" : "");
         Tex have = TEXTURES.get(key);
         if (have != null) return have;
-        Tex made = read(name, tint);
+        Tex made = read(name, tint, leaves);
         TEXTURES.put(key, made);
         return made;
     }
 
     private static int tintOf(BlockState s) {
         Block b = s.getBlock();
+        String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(b).getPath();
         if (b instanceof LiquidBlock) return 0xFF3F76E4;
-        if (b instanceof LeavesBlock || b instanceof VineBlock) return 0xFF4FA030;
-        if (b instanceof VegetationBlock) return 0xFF79C05A;
-        return 0xFF79C05A;
+        if (b instanceof LeavesBlock) {
+            if (id.startsWith("birch")) return 0xFF80A755;
+            if (id.startsWith("spruce")) return 0xFF619961;
+            return 0xFF77AB2F;
+        }
+        if (b instanceof VineBlock || id.equals("leaf_litter")) return 0xFF77AB2F;
+        if (id.equals("lily_pad")) return 0xFF208030;
+        return 0xFF91BD59;
     }
 
     /** Reads a block texture through the resource manager (so the active packs apply); the first frame of an animated one. */
-    private static Tex read(Identifier sprite, int tint) {
+    private static Tex read(Identifier sprite, int tint, boolean solid) {
         Identifier file = Identifier.fromNamespaceAndPath(sprite.getNamespace(), "textures/" + sprite.getPath() + ".png");
         Optional<Resource> res = Minecraft.getInstance().getResourceManager().getResource(file);
         if (res.isEmpty()) return Tex.flat(0xFFFF00FF);
@@ -209,6 +280,11 @@ public final class BlockLook {
             }
             if (n == 0) return new Tex(w, h, px, 0xFF000000 | 0x808080);
             int avg = 0xFF000000 | (int) (r / n) << 16 | (int) (g / n) << 8 | (int) (b / n);
+            if (solid) {
+                // leaves are drawn solid: the holes in the texture are the dark inside of the foliage, so nothing can be clicked through
+                int dark = 0xFF000000 | (int) (r / n * 0.45) << 16 | (int) (g / n * 0.45) << 8 | (int) (b / n * 0.45);
+                for (int i = 0; i < px.length; i++) if ((px[i] >>> 24) < 128) px[i] = dark;
+            }
             return new Tex(w, h, px, avg);
         } catch (java.io.IOException | RuntimeException e) {
             return Tex.flat(0xFFFF00FF);

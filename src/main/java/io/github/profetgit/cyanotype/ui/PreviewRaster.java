@@ -34,17 +34,20 @@ public final class PreviewRaster {
         final int[] cells;
         final BlockLook.Look[] looks;
         final int[] faces;
+        /** Cells whose block is not a plain cube (stairs, torches, plants...) and can be seen: their model's quads are drawn. */
+        final int[] custom;
         public final int count;
         /** True when there were too many faces and only some are kept. */
         public final boolean thinned;
 
-        Scene(int ex, int ey, int ez, int[] cells, BlockLook.Look[] looks, int[] faces, int count, boolean thinned) {
+        Scene(int ex, int ey, int ez, int[] cells, BlockLook.Look[] looks, int[] faces, int[] custom, int count, boolean thinned) {
             this.ex = ex;
             this.ey = ey;
             this.ez = ez;
             this.cells = cells;
             this.looks = looks;
             this.faces = faces;
+            this.custom = custom;
             this.count = count;
             this.thinned = thinned;
         }
@@ -57,6 +60,18 @@ public final class PreviewRaster {
         /** The cell a face belongs to, as an index into the box (x fastest, then z, then y). */
         public int cellOfFace(int face) {
             return faces[face] >>> 3;
+        }
+
+        /** The cell an id of the id buffer names: a cube face (id - 1 is its number) or, negative, a cell drawn from its model (-id - 1 is the cell); -1 for nothing. */
+        public int cellOfId(int id) {
+            if (id > 0) return id - 1 < count ? cellOfFace(id - 1) : -1;
+            if (id < 0) return -id - 1 < cells.length ? -id - 1 : -1;
+            return -1;
+        }
+
+        /** Whether anything is drawn at all. */
+        public boolean empty() {
+            return count == 0 && custom.length == 0;
         }
     }
 
@@ -164,6 +179,10 @@ public final class PreviewRaster {
     }
 
     static @Nullable Scene scene(int[] cells, BlockLook.Look[] looks, int ex, int ey, int ez) {
+        boolean[] cube = new boolean[looks.length + 1];
+        for (int i = 0; i < looks.length; i++) cube[i + 1] = looks[i].cube();
+        // the cells drawn from their model: not plain cubes, and not shut in by cubes on every side
+        java.util.ArrayList<Integer> customList = new java.util.ArrayList<>();
         long total = 0;
         for (int pass = 0; pass < 2; pass++) {
             // the first pass counts the faces, the second keeps them (every n-th when there are too many)
@@ -177,10 +196,15 @@ public final class PreviewRaster {
                     int row = (y * ez + z) * ex;
                     for (int x = 0; x < ex; x++) {
                         int i = row + x;
-                        if (cells[i] == 0) continue;
+                        int c = cells[i];
+                        if (c == 0) continue;
+                        if (!cube[c]) {
+                            if (pass == 0 && !enclosed(cells, cube, x, y, z, ex, ey, ez)) customList.add(i);
+                            continue;
+                        }
                         for (int d = 0; d < 6; d++) {
                             int nx = x + N[d][0], ny = y + N[d][1], nz = z + N[d][2];
-                            boolean open = nx < 0 || ny < 0 || nz < 0 || nx >= ex || ny >= ey || nz >= ez || cells[(ny * ez + nz) * ex + nx] == 0;
+                            boolean open = nx < 0 || ny < 0 || nz < 0 || nx >= ex || ny >= ey || nz >= ez || !cube[cells[(ny * ez + nz) * ex + nx]];
                             if (!open) continue;
                             if (pass == 0) {
                                 total++;
@@ -191,10 +215,27 @@ public final class PreviewRaster {
                     }
                 }
             }
-            if (pass == 1) return new Scene(ex, ey, ez, cells, looks, faces, n, total > MAX_FACES);
-            if (total == 0) return new Scene(ex, ey, ez, cells, looks, new int[0], 0, false);
+            if (pass == 1) {
+                int[] custom = new int[customList.size()];
+                for (int k = 0; k < custom.length; k++) custom[k] = customList.get(k);
+                return new Scene(ex, ey, ez, cells, looks, faces, custom, n, total > MAX_FACES);
+            }
+            if (total == 0) {
+                int[] custom = new int[customList.size()];
+                for (int k = 0; k < custom.length; k++) custom[k] = customList.get(k);
+                return new Scene(ex, ey, ez, cells, looks, new int[0], custom, 0, false);
+            }
         }
         return null;
+    }
+
+    /** Whether a cell has a plain cube on every one of its six sides (then nothing of its model can be seen). */
+    private static boolean enclosed(int[] cells, boolean[] cube, int x, int y, int z, int ex, int ey, int ez) {
+        for (int d = 0; d < 6; d++) {
+            int nx = x + N[d][0], ny = y + N[d][1], nz = z + N[d][2];
+            if (nx < 0 || ny < 0 || nz < 0 || nx >= ex || ny >= ey || nz >= ez || !cube[cells[(ny * ez + nz) * ex + nx]]) return false;
+        }
+        return true;
     }
 
     /** How many pixels a block is across when the whole build just fits a picture of this size. */
@@ -210,7 +251,7 @@ public final class PreviewRaster {
      */
     public static Frame render(Scene s, View v, int w, int h, int stride, int hover) {
         int[] px = new int[w * h], ids = new int[w * h];
-        if (s.count == 0) return new Frame(w, h, px, ids);
+        if (s.empty()) return new Frame(w, h, px, ids);
         double[] depth = new double[w * h];
         Arrays.fill(depth, -Double.MAX_VALUE);
         double cy = Math.cos(v.yaw), sy = Math.sin(v.yaw), cp = Math.cos(v.pitch), sp = Math.sin(v.pitch);
@@ -246,6 +287,29 @@ public final class PreviewRaster {
             boolean hot = i == hover;
             tri(px, ids, depth, w, h, fx[0], fy[0], fz[0], fu[0], fv[0], fx[1], fy[1], fz[1], fu[1], fv[1], fx[2], fy[2], fz[2], fu[2], fv[2], tex, useTexture, light, hot, k + 1);
             tri(px, ids, depth, w, h, fx[0], fy[0], fz[0], fu[0], fv[0], fx[2], fy[2], fz[2], fu[2], fv[2], fx[3], fy[3], fz[3], fu[3], fv[3], tex, useTexture, light, hot, k + 1);
+        }
+        // the cells that are not cubes: every quad of their model, seen from either side
+        double[] qx = new double[4], qy = new double[4], qz = new double[4];
+        for (int k = 0; k < s.custom.length; k += stride) {
+            int i = s.custom[k];
+            int x = i % s.ex, z = (i / s.ex) % s.ez, y = i / (s.ex * s.ez);
+            BlockLook.Quad[] model = s.looks[s.cells[i] - 1].model();
+            if (model == null) continue;
+            for (BlockLook.Quad q : model) {
+                for (int c = 0; c < 4; c++) {
+                    double wx = x + q.p()[c * 3] - mx, wy = y + q.p()[c * 3 + 1] - my, wz = z + q.p()[c * 3 + 2] - mz;
+                    double rx = wx * cy - wz * sy, rz = wx * sy + wz * cy;
+                    qx[c] = ox + rx * scale;
+                    qy[c] = oy - (wy * cp - rz * sp) * scale;
+                    qz[c] = wy * sp + rz * cp;
+                }
+                double light = LIGHT[q.dir()] * 0.92 + 0.08;
+                boolean hot = i == hover;
+                boolean useTexture = q.tex().px() != null;
+                float[] uv = q.uv();
+                tri(px, ids, depth, w, h, qx[0], qy[0], qz[0], uv[0], uv[1], qx[1], qy[1], qz[1], uv[2], uv[3], qx[2], qy[2], qz[2], uv[4], uv[5], q.tex(), useTexture, light, hot, -(i + 1));
+                tri(px, ids, depth, w, h, qx[0], qy[0], qz[0], uv[0], uv[1], qx[2], qy[2], qz[2], uv[4], uv[5], qx[3], qy[3], qz[3], uv[6], uv[7], q.tex(), useTexture, light, hot, -(i + 1));
+            }
         }
         return new Frame(w, h, px, ids);
     }
