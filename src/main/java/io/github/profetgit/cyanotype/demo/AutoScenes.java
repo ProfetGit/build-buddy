@@ -144,7 +144,7 @@ final class AutoScenes {
         // ---- the wheel's Build tool opens a panel: Build it myself, Place what I look at, Place everything in reach
         act(() -> check("auto/off to begin with", AutoBuilder.mode() == AutoBuilder.Mode.OFF, "mode " + AutoBuilder.mode()));
         SaveScenes.startThroughTheWheel(Tool.BUILD);
-        act(() -> check("auto/the wheel's Build tool opens its panel", screen() instanceof io.github.profetgit.cyanotype.ui.ChoiceScreen cs && cs.count() == 3, String.valueOf(screen())));
+        act(() -> check("auto/the wheel's Build tool opens its panel", screen() instanceof io.github.profetgit.cyanotype.ui.ChoiceScreen cs && cs.count() == 4, String.valueOf(screen())));
         shot("auto_00_build_panel");
         act(() -> SaveScenes.clickScreen(((io.github.profetgit.cyanotype.ui.ChoiceScreen) screen()).anchor(1)));
         waitTicks(6);
@@ -164,9 +164,9 @@ final class AutoScenes {
         SaveScenes.startThroughTheWheel(Tool.BUILD);
         act(() -> {
             var cs = (io.github.profetgit.cyanotype.ui.ChoiceScreen) screen();
-            SaveScenes.clickScreen(cs.anchor(3));
+            SaveScenes.clickScreen(cs.anchor(4));
             check("auto/the panel's switch turns the next-block marker on", io.github.profetgit.cyanotype.interaction.Interaction.guide, "guide " + io.github.profetgit.cyanotype.interaction.Interaction.guide);
-            SaveScenes.clickScreen(cs.anchor(3));
+            SaveScenes.clickScreen(cs.anchor(4));
             check("auto/and off again", !io.github.profetgit.cyanotype.interaction.Interaction.guide, "guide " + io.github.profetgit.cyanotype.interaction.Interaction.guide);
             screen().keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE, 0, 0));
         });

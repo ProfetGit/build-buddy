@@ -5,5 +5,6 @@
   "key.cyanotype.undo": "Undo (hold Ctrl)",
   "key.cyanotype.redo": "Redo (hold Ctrl)",
   "key.cyanotype.mirror": "Mirror the build (left and right as you see it)",
+  "key.cyanotype.paste": "Paste the build into the world (creative, your own world)",
   "key.cyanotype.remove": "Remove the selected placement"
 }

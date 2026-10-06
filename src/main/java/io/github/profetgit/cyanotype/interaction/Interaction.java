@@ -330,6 +330,9 @@ public final class Interaction {
         while (Keys.TOGGLE.consumeClick()) {
             if (!screen) toggleGhosts(mc);
         }
+        while (Keys.PASTE.consumeClick()) {
+            if (!screen && !GhostRenderer.hidden) io.github.profetgit.cyanotype.ui.Tool.askPaste(mc);
+        }
         while (Keys.MIRROR.consumeClick()) {
             if (!screen && !GhostRenderer.hidden) mirror(mc);
         }
@@ -352,6 +355,7 @@ public final class Interaction {
         if (Selecting.dragging() && (!down || screen)) Selecting.endDrag();
         if (suppressAttack && !down) suppressAttack = false;
         Picking.tick(mc);
+        io.github.profetgit.cyanotype.paste.Paste.tick(mc);
         io.github.profetgit.cyanotype.auto.AutoBuilder.tick(mc);
         GhostRenderer.tickVerifiers(mc);
         PlacementStore.tick();
@@ -490,6 +494,7 @@ public final class Interaction {
             case MOVE -> past + " the last move of " + c.placement().name;
             case RESTORE -> past.equals("Undid") ? "Brought back " + c.placement().name : "Put " + c.placement().name + " back";
             case DELETE -> "Removed " + c.placement().name + " again";
+            case PASTE -> "Taking the paste of " + c.placement().name + " out of the world";
         };
         Sfx.play(Sfx.RELEASE, past.equals("Undid") ? 0.8f : 1.2f);
         say(mc, what);
@@ -512,6 +517,7 @@ public final class Interaction {
     /** Forgets everything in progress (the world changed). */
     public static void reset() {
         Handles.forget();
+        io.github.profetgit.cyanotype.paste.Paste.reset();
         drag = null;
         grab = null;
         grabbed = null;

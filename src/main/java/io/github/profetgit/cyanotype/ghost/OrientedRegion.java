@@ -19,8 +19,16 @@ public final class OrientedRegion {
     public final BlockState[] states;
     /** Per palette slot: a block the game does not know (it stands in as a red block and can never be "correct"). */
     public final boolean[] unknown;
+    private final Orientation orientation;
+    private final int ex, ez, rx, rz;
 
-    private OrientedRegion(Region source, int ox, int oy, int oz, int sx, int sy, int sz, short[] blocks, BlockState[] states, boolean[] unknown) {
+    private OrientedRegion(Region source, int ox, int oy, int oz, int sx, int sy, int sz, short[] blocks, BlockState[] states, boolean[] unknown,
+                           Orientation orientation, int ex, int ez, int rx, int rz) {
+        this.orientation = orientation;
+        this.ex = ex;
+        this.ez = ez;
+        this.rx = rx;
+        this.rz = rz;
         this.source = source;
         this.ox = ox;
         this.oy = oy;
@@ -58,7 +66,19 @@ public final class OrientedRegion {
                 }
             }
         }
-        return new OrientedRegion(r, ox, ry, oz, osx, r.sy, osz, blocks, states, unknown);
+        return new OrientedRegion(r, ox, ry, oz, osx, r.sy, osz, blocks, states, unknown, o, ex, ez, rx, rz);
+    }
+
+    /**
+     * Where a cell of the source region (the position a block entity of the region is stored at) is in this turned box, as an index
+     * into {@link #blocks}, or -1 when it is outside the region.
+     */
+    public int indexOfSource(int x, int y, int z) {
+        if (x < 0 || y < 0 || z < 0 || x >= source.sx || y >= source.sy || z >= source.sz) return -1;
+        int cx = orientation.mapX(rx + x, rz + z, ex, ez) - ox;
+        int cz = orientation.mapZ(rx + x, rz + z, ex, ez) - oz;
+        if (cx < 0 || cz < 0 || cx >= sx || cz >= sz) return -1;
+        return (y * sz + cz) * sx + cx;
     }
 
     /** The palette slot at a local position, or -1 outside the box. */

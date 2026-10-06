@@ -3,6 +3,7 @@ package io.github.profetgit.cyanotype.ui;
 import io.github.profetgit.cyanotype.auto.AutoBuilder;
 import io.github.profetgit.cyanotype.ghost.GhostRenderer;
 import io.github.profetgit.cyanotype.placement.Placement;
+import io.github.profetgit.cyanotype.paste.Paste;
 import io.github.profetgit.cyanotype.placement.Placements;
 import io.github.profetgit.cyanotype.verify.Counts;
 import io.github.profetgit.cyanotype.verify.Verifier;
@@ -26,6 +27,7 @@ public final class CyanotypeHud {
         Motion.frame();
         progress(mc, g);
         autoBadge(mc, g);
+        pasteBadge(mc, g);
         Chips.draw(g);
     }
 
@@ -47,6 +49,22 @@ public final class CyanotypeHud {
         Ui.text(g, "AUTO: ON", x + 18, y + 6, Ui.withAlpha(accent, inner));
         Ui.right(g, mode + "  " + Settings.get().autoRate + "/s", x + w - 8, y + 6, Ui.withAlpha(Ui.LINE, inner));
         Ui.text(g, Ui.fit(AutoBuilder.status(), w - 16), x + 8, y + 18, Ui.withAlpha(Ui.DIM, inner));
+    }
+
+    /** A thin panel under the progress one while a paste (or the undo of one) runs in the world. */
+    private static void pasteBadge(Minecraft mc, GuiGraphicsExtractor g) {
+        double v = Paste.progress();
+        float a = Motion.follow("hud#paste", v >= 0 ? 1f : 0f, 0.12);
+        if (a < 0.02f) return;
+        int w = 196, h = 26, x = (g.guiWidth() - w) / 2, y = 50;
+        double t = System.nanoTime() / 1e9;
+        float inner = Ui.panelOpening(g, x, y, w, h, Motion.reduced() ? 1 : Math.min(1.0, a));
+        if (inner < 0.05f) return;
+        double shown = Math.max(0, v);
+        String what = Paste.undoing() ? "Undoing the paste" : "Pasting into the world";
+        Ui.text(g, what, x + 8, y + 5, Ui.withAlpha(Ui.LINE, inner));
+        Ui.right(g, Math.round(shown * 100) + "%", x + w - 8, y + 5, Ui.withAlpha(Ui.CYAN, inner));
+        Ui.bar(g, "hud#pastebar", x + 8, y + 16, w - 16, 5, shown, t);
     }
 
     private static void progress(Minecraft mc, GuiGraphicsExtractor g) {

@@ -32,7 +32,7 @@ public final class Placements {
      * the same move in opposite directions: a {@link Move} sets a placement to an earlier spot, a {@link Restore} adds a
      * removed placement back, a {@link Delete} takes one away again.
      */
-    private sealed interface Entry permits Move, Restore, Delete {
+    private sealed interface Entry permits Move, Restore, Delete, Pasted {
         Placement placement();
     }
 
@@ -45,8 +45,12 @@ public final class Placements {
     private record Delete(Placement placement) implements Entry {
     }
 
+    /** A paste into the world (creative): undoing it runs {@code undo}, which puts the old blocks back; there is no redo. */
+    private record Pasted(Placement placement, Runnable undo) implements Entry {
+    }
+
     public enum Kind {
-        MOVE, RESTORE, DELETE
+        MOVE, RESTORE, DELETE, PASTE
     }
 
     /** What an undo or redo just did. */
@@ -169,6 +173,12 @@ public final class Placements {
         REDO.clear();
     }
 
+    /** Remembers that the blueprint was pasted into the world, so Ctrl+Z can take it out again in its turn among the other changes. */
+    public static void rememberPaste(Placement p, Runnable undo) {
+        push(UNDO, new Pasted(p, undo));
+        REDO.clear();
+    }
+
     /** Drops the snapshot just taken, when nothing changed after all (a grab without a move). */
     public static void forgetLast() {
         if (!UNDO.isEmpty() && UNDO.peek() instanceof Move) UNDO.pop();
@@ -189,6 +199,7 @@ public final class Placements {
             case Move m -> ALL.contains(m.placement);
             case Restore r -> !ALL.contains(r.placement);
             case Delete d -> ALL.contains(d.placement);
+            case Pasted x -> true;
         };
     }
 
@@ -218,6 +229,10 @@ public final class Placements {
                     detach(p);
                     push(to, new Restore(p, index));
                     return new Change(Kind.DELETE, p);
+                }
+                case Pasted x -> {
+                    x.undo.run();
+                    return new Change(Kind.PASTE, p);
                 }
             }
         }

@@ -410,6 +410,14 @@ def drag_mark():
     return i
 
 
+def paste():
+    """A block coming down onto the world: an arrow over a slab."""
+    i = Icon()
+    i.layer(lambda s: s.rect(1, 12, 14, 14, W))
+    i.layer(lambda s: (s.rect(6, 1, 9, 6, B), s.poly([(2.5, 6), (13.5, 6), (8, 11.5)], B)))
+    return i
+
+
 def scroll_mark():
     """What scrolling looks like on the dark chips: an arrowhead up and one down. 5 x 11."""
     i = Icon(5, 11)
@@ -424,7 +432,7 @@ ICONS = [
     ("gear", gear), ("eye", eye), ("eye_off", eye_off), ("trash", trash), ("undo", undo), ("redo", lambda: undo().mirrored()),
     ("wand", wand), ("cube", cube), ("sweep", sweep), ("select", select), ("check", check), ("cross", cross),
     ("mouse_left", lambda: mouse(left=True)), ("mouse_right", lambda: mouse(right=True)), ("mouse_wheel", lambda: mouse(wheel=True)), ("mouse_none", lambda: mouse()),
-    ("keycap", keycap), ("mark_drag", drag_mark), ("mark_scroll", scroll_mark),
+    ("keycap", keycap), ("mark_drag", drag_mark), ("mark_scroll", scroll_mark), ("paste", paste),
 ]
 
 

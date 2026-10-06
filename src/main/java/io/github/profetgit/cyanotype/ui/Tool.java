@@ -5,6 +5,7 @@ import io.github.profetgit.cyanotype.ghost.GhostRenderer;
 import io.github.profetgit.cyanotype.interaction.Interaction;
 import io.github.profetgit.cyanotype.interaction.Picking;
 import io.github.profetgit.cyanotype.interaction.Selecting;
+import io.github.profetgit.cyanotype.paste.Paste;
 import io.github.profetgit.cyanotype.placement.Placement;
 import io.github.profetgit.cyanotype.placement.Placements;
 import net.minecraft.client.Minecraft;
@@ -87,13 +88,45 @@ public enum Tool {
             new ChoiceScreen.Choice("hammer", "Place what I look at", "Hold use on a ghost block and it goes down at once. Nothing else can be placed.", ready, AutoBuilder.mode() == AutoBuilder.Mode.ASSIST,
                 () -> AutoBuilder.request(mc, AutoBuilder.Mode.ASSIST)),
             new ChoiceScreen.Choice("sweep", "Place everything in reach", "Builds what is near you, lowest layer first, while you walk.", ready, AutoBuilder.mode() == AutoBuilder.Mode.SWEEP,
-                () -> AutoBuilder.request(mc, AutoBuilder.Mode.SWEEP)));
+                () -> AutoBuilder.request(mc, AutoBuilder.Mode.SWEEP)),
+            pasteChoice(mc, ready));
         ChoiceScreen.Toggle next = new ChoiceScreen.Toggle("Mark the next block to build", "A marker and an arrow show where to build next.", () -> Interaction.guide, v -> {
             Interaction.reveal();
             Interaction.guide = v;
             Interaction.say(mc, v ? "Showing the next block to build." : "Next-block marker off.");
         });
         return new ChoiceScreen("Build", need + "It stops when you are hurt or open a screen.", choices, ready ? next : null);
+    }
+
+    /** The Build panel's creative row: paste the whole build into the world; dim, with the reason, when it cannot be done. */
+    private static ChoiceScreen.Choice pasteChoice(Minecraft mc, boolean ready) {
+        String why = Paste.unavailable(mc);
+        boolean ok = ready && why.isEmpty() && Paste.ready(Placements.active()) && !Paste.busy();
+        String desc = !why.isEmpty() ? why : !ready ? "Place a blueprint first." : Paste.busy() ? "A paste is running." : "Creative: puts the whole build in the world at once. Ctrl+Z undoes it.";
+        return new ChoiceScreen.Choice("paste", "Paste it into the world", desc, ok, false, () -> askPaste(mc));
+    }
+
+    /** Asks before pasting the active build into the world: how many blocks go in, how many that are in the way are replaced. Esc or Not now keeps everything. */
+    public static void askPaste(Minecraft mc) {
+        Placement p = locked();
+        String why = Paste.unavailable(mc);
+        if (!why.isEmpty()) {
+            Interaction.say(mc, why);
+            Sfx.play(Sfx.ERROR);
+            return;
+        }
+        if (p == null || !Paste.ready(p)) {
+            Interaction.say(mc, p == null ? "Place a blueprint first." : "Still checking the world. Try again in a moment.");
+            Sfx.play(Sfx.ERROR);
+            return;
+        }
+        long[] n = Paste.preview(p);
+        String sizes = String.format(java.util.Locale.ROOT, "%,d", n[0]) + " blocks go in" + (n[1] > 0 ? ", replacing " + String.format(java.util.Locale.ROOT, "%,d", n[1]) + " that are in the way" : "")
+            + (n[2] > 0 ? " (" + String.format(java.util.Locale.ROOT, "%,d", n[2]) + " are already right)" : "") + ". Ctrl+Z undoes it.";
+        java.util.List<ChoiceScreen.Choice> choices = java.util.List.of(
+            new ChoiceScreen.Choice("cross", "Not now", "Nothing changes.", true, false, () -> { }),
+            new ChoiceScreen.Choice("paste", "Paste " + p.name, sizes, n[0] + n[1] > 0, false, () -> Paste.start(mc, p)));
+        mc.gui.setScreen(new ChoiceScreen("Paste it into the world?", "It goes where the ghost is, in this world only.", choices, null));
     }
 
     /** What Save offers: pick a whole build with one click, or select a box. */
