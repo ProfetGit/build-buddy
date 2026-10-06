@@ -68,7 +68,17 @@ public final class SaveScreen extends Screen {
     /** What was read from the world (before any block was taken out), where its min corner is, and the blocks taken out as world positions, with the ones undone for redo. */
     private Blueprint base;
     private int[] origin = {0, 0, 0};
-    private final it.unimi.dsi.fastutil.longs.LongArrayList removedStack = new it.unimi.dsi.fastutil.longs.LongArrayList(), redoStack = new it.unimi.dsi.fastutil.longs.LongArrayList();
+    /** Each removal (a click on a tree, a stroke of the eraser, one block) is one step of undo: the world positions it took out. */
+    private final java.util.ArrayList<long[]> removedStack = new java.util.ArrayList<>(), redoStack = new java.util.ArrayList<>();
+    /** What the last removal took, for the line under the picture. */
+    private String tookNote = "";
+    /** Ctrl+press on the picture: a click (on release) takes a thing or a block, a drag erases what it passes over. */
+    private boolean erasing, eraseMoved, eraseSingle;
+    private int eraseUnder = -1;
+    private double eraseX, eraseY, eraseLastX, eraseLastY;
+    private final it.unimi.dsi.fastutil.ints.IntOpenHashSet eraseCells = new it.unimi.dsi.fastutil.ints.IntOpenHashSet();
+    private final java.util.ArrayList<double[]> eraseTrail = new java.util.ArrayList<>();
+    private static final double BRUSH = 6;
     private final it.unimi.dsi.fastutil.longs.LongOpenHashSet removedSet = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
     private String error = "";
     private String down = "";
@@ -304,42 +314,55 @@ public final class SaveScreen extends Screen {
         preview.setBlueprint(captured);
     }
 
-    /** Takes the block of the preview under the pointer out of the save (remove mode). */
-    private void removeCell(int cell) {
+    /** Takes cells of the preview (indexes into the box) out of the save as one step of undo. */
+    private void removeCells(int[] cells, String what) {
         int[] size = preview.boxSize();
-        if (cell < 0 || size == null || base == null) return;
-        int x = cell % size[0], z = (cell / size[0]) % size[2], y = cell / (size[0] * size[2]);
-        long pos = net.minecraft.core.BlockPos.asLong(origin[0] + x, origin[1] + y, origin[2] + z);
-        if (!removedSet.add(pos)) return;
-        removedStack.add(pos);
+        if (size == null || base == null || cells.length == 0) return;
+        long[] step = new long[cells.length];
+        int n = 0;
+        for (int cell : cells) {
+            int x = cell % size[0], z = (cell / size[0]) % size[2], y = cell / (size[0] * size[2]);
+            long pos = net.minecraft.core.BlockPos.asLong(origin[0] + x, origin[1] + y, origin[2] + z);
+            if (removedSet.add(pos)) step[n++] = pos;
+        }
+        if (n == 0) return;
+        removedStack.add(java.util.Arrays.copyOf(step, n));
         redoStack.clear();
         removeNote = "";
-        Sfx.play(Sfx.RELEASE, 1.1f);
+        tookNote = what.isEmpty() ? "Took out " + n + (n == 1 ? " block" : " blocks") : "Took out " + what;
+        Sfx.play(Sfx.RELEASE, n > 1 ? 0.9f : 1.1f);
         applyEdits();
     }
 
-    /** Ctrl+Z: puts the last block taken out back. */
+    /** The words for taking a group out: "a tree (312 blocks)", or nothing for one block. */
+    private String describe(Groups.Type type, int count) {
+        return type == Groups.Type.BLOCK ? "" : type.said + " (" + count + " blocks)";
+    }
+
+    /** Ctrl+Z: puts the last removal back. */
     private void undoRemoval() {
         if (removedStack.isEmpty()) {
             Sfx.play(Sfx.ERROR, 0.8f);
             return;
         }
-        long pos = removedStack.removeLong(removedStack.size() - 1);
-        removedSet.remove(pos);
-        redoStack.add(pos);
+        long[] step = removedStack.remove(removedStack.size() - 1);
+        for (long pos : step) removedSet.remove(pos);
+        redoStack.add(step);
+        tookNote = "";
         Sfx.play(Sfx.PRESS, 0.9f);
         applyEdits();
     }
 
-    /** Ctrl+Y or Ctrl+Shift+Z: takes the block put back out again. */
+    /** Ctrl+Y or Ctrl+Shift+Z: takes the removal put back out again. */
     private void redoRemoval() {
         if (redoStack.isEmpty()) {
             Sfx.play(Sfx.ERROR, 0.8f);
             return;
         }
-        long pos = redoStack.removeLong(redoStack.size() - 1);
-        removedSet.add(pos);
-        removedStack.add(pos);
+        long[] step = redoStack.remove(redoStack.size() - 1);
+        for (long pos : step) removedSet.add(pos);
+        removedStack.add(step);
+        tookNote = "";
         Sfx.play(Sfx.RELEASE, 1.1f);
         applyEdits();
     }
@@ -483,7 +506,9 @@ public final class SaveScreen extends Screen {
         boolean idle = state == State.EDITING;
         boolean ctrl = idle && Interaction.ctrlDown(minecraft);
         // pointing at a block lights it up while Ctrl is held (Ctrl+click takes it out)
-        preview.setRemoveMode(ctrl);
+        preview.setRemoveMode(ctrl && !(erasing && eraseMoved));
+        // Shift with Ctrl: just the one block, so the whole tree does not light up
+        preview.setWhole(!Interaction.shiftDown(minecraft));
         Ui.button(g, "sv#reset", resetX(pp), pp[1] + 5, RESET_W, 14, "Reset view", null, mx, my, false, idle);
         int[] r = pictureRect();
         double progress = job != null && !job.done() ? job.progress() : -1;
@@ -495,24 +520,49 @@ public final class SaveScreen extends Screen {
             g.fill(r[0], r[1] + r[3] - 2, r[0] + r[2], r[1] + r[3], red);
             g.fill(r[0], r[1], r[0] + 2, r[1] + r[3], red);
             g.fill(r[0] + r[2] - 2, r[1], r[0] + r[2], r[1] + r[3], red);
-            String banner = "CTRL: click a block to take it out";
+            String banner = banner();
             int bw = Ui.font().width(banner) + 10;
             g.fill(r[0] + 2, r[1] + 2, r[0] + 2 + bw, r[1] + 15, Ui.withAlpha(0xFFB02A2A, inner * 0.92f));
             Ui.text(g, banner, r[0] + 7, r[1] + 5, Ui.withAlpha(Ui.WHITE, inner));
         }
+        if (erasing && eraseMoved) {
+            // the brush's path: where the eraser has been, in red, until the button goes up
+            int trail = Ui.withAlpha(0xFFFF6B6B, inner * 0.28f);
+            int rad = (int) BRUSH;
+            for (double[] pt : eraseTrail) {
+                int cx = (int) pt[0], cy = (int) pt[1];
+                if (cx < r[0] || cy < r[1] || cx >= r[0] + r[2] || cy >= r[1] + r[3]) continue;
+                for (int dy = -rad; dy <= rad; dy++) {
+                    int half = (int) Math.sqrt(rad * rad - dy * dy);
+                    g.fill(Math.max(r[0], cx - half), Math.max(r[1], cy + dy), Math.min(r[0] + r[2], cx + half), Math.min(r[1] + r[3], cy + dy + 1), trail);
+                }
+            }
+        }
         // what was done, or why a click did nothing, in the corner under the picture; then the shortcuts
         String note = !removeNote.isEmpty() ? removeNote
-            : removedStack.isEmpty() ? ""
-            : "Took out " + removedStack.size() + (removedStack.size() == 1 ? " block" : " blocks") + ". Ctrl+Z puts it back";
+            : removedStack.isEmpty() || tookNote.isEmpty() ? ""
+            : tookNote + ". Ctrl+Z puts it back";
         int ly = r[1] + r[3] + 4;
         if (!note.isEmpty()) Ui.text(g, Ui.fit(note, pp[2] - 16), pp[0] + 8, ly, Ui.withAlpha(removeNote.isEmpty() ? Ui.CYAN : 0xFFFF8A8A, inner));
         drawShortcuts(g, pp[0] + 8, ly + (note.isEmpty() ? 0 : 11), pp[2] - 16, inner, ctrl);
     }
 
+    /** What a click would do right now with Ctrl held, in the red banner over the picture. */
+    private String banner() {
+        if (erasing && eraseMoved) return "Erasing: let go to take these blocks out";
+        int cell = preview.hovered();
+        if (cell < 0) return "CTRL: click a block to take it out";
+        boolean single = Interaction.shiftDown(minecraft);
+        Groups.Type type = single ? Groups.Type.BLOCK : preview.groupType(cell);
+        if (type == null || type == Groups.Type.BLOCK) return "Click: take out this block";
+        return "Click: take out " + type.pointing + " (" + preview.groupSize(cell) + " blocks)";
+    }
+
     /** What the mouse and keys do in the preview, as the same key and mouse pictures the cursor hints use. */
     private static final String[][] SHORTCUTS = {
         {"Drag", "Turn"}, {"Right drag", "Move"}, {"Scroll", "Zoom"},
-        {"Ctrl+Click", "Remove a block"}, {"Ctrl+Z / Y", "Undo / Redo"}};
+        {"Ctrl+Click", "Remove a tree, the ground or a block"}, {"Ctrl+Shift+Click", "One block only"}, {"Ctrl+Drag", "Erase"},
+        {"Ctrl+Z / Y", "Undo / Redo"}};
 
     private void drawShortcuts(GuiGraphicsExtractor g, int x, int y, int w, float inner, boolean ctrl) {
         int cx = x, cy = y;
@@ -535,7 +585,7 @@ public final class SaveScreen extends Screen {
         return new int[]{pp[0] + 8, pp[1] + 22, pp[2] - 16, pp[3] - 22 - SHORTCUT_H};
     }
 
-    private static final int SHORTCUT_H = 64;
+    private static final int SHORTCUT_H = 80;
 
     private static final int RESET_W = 70;
 
@@ -585,9 +635,16 @@ public final class SaveScreen extends Screen {
                 boolean left = event.button() == InputConstants.MOUSE_BUTTON_LEFT;
                 // Ctrl+click takes the block under the pointer out, on the press: no mode, and nothing to tell from a drag
                 if (left && (event.hasControlDown() || Interaction.ctrlDown(minecraft))) {
-                    int under = preview.cellAt(event.x() - r[0], event.y() - r[1]);
-                    if (under >= 0) removeCell(under);
-                    else removeNote = "No block there. Ctrl+click on a block of the picture";
+                    // taken on release: a click takes the thing under it, a drag erases what it passes over
+                    erasing = true;
+                    eraseMoved = false;
+                    eraseSingle = event.hasShiftDown() || Interaction.shiftDown(minecraft);
+                    eraseX = eraseLastX = event.x();
+                    eraseY = eraseLastY = event.y();
+                    eraseUnder = preview.cellAt(event.x() - r[0], event.y() - r[1]);
+                    eraseCells.clear();
+                    eraseTrail.clear();
+                    removeNote = "";
                     return true;
                 }
                 draggingPreview = true;
@@ -630,6 +687,10 @@ public final class SaveScreen extends Screen {
             draggingPreview = false;
             return true;
         }
+        if (erasing && event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
+            finishErasing();
+            return true;
+        }
         String was = down;
         down = "";
         if (was.equals("back") && Ui.inside(mx, my, backX(), buttonY(), 70, 16)) {
@@ -654,7 +715,49 @@ public final class SaveScreen extends Screen {
             preview.drag(dx, dy, panningPreview);
             return true;
         }
+        if (erasing) {
+            // a few units of movement make it a stroke; the points in between are filled in so a quick sweep leaves no gaps
+            if (!eraseMoved && Math.hypot(event.x() - eraseX, event.y() - eraseY) < 5) return true;
+            if (!eraseMoved) {
+                eraseMoved = true;
+                brush(eraseX, eraseY);
+            }
+            double len = Math.hypot(event.x() - eraseLastX, event.y() - eraseLastY);
+            int steps = Math.max(1, (int) (len / 3));
+            for (int i = 1; i <= steps; i++) {
+                brush(eraseLastX + (event.x() - eraseLastX) * i / steps, eraseLastY + (event.y() - eraseLastY) * i / steps);
+            }
+            eraseLastX = event.x();
+            eraseLastY = event.y();
+            return true;
+        }
         return super.mouseDragged(event, dx, dy);
+    }
+
+    /** The eraser touches the blocks under a round brush at a point of the screen. */
+    private void brush(double x, double y) {
+        int[] r = pictureRect();
+        eraseTrail.add(new double[]{x, y});
+        for (int cell : preview.cellsNear(x - r[0], y - r[1], BRUSH)) eraseCells.add(cell);
+    }
+
+    /** The mouse button went up after a Ctrl press: take a thing or a block (a click), or everything the brush passed over (a stroke). */
+    private void finishErasing() {
+        erasing = false;
+        if (eraseMoved) {
+            int[] cells = eraseCells.toIntArray();
+            removeCells(cells, "");
+            if (cells.length == 0) removeNote = "The eraser did not touch a block";
+        } else if (eraseUnder >= 0) {
+            Groups.Type type = eraseSingle ? Groups.Type.BLOCK : preview.groupType(eraseUnder);
+            int[] cells = preview.cellsOf(eraseUnder, !eraseSingle);
+            removeCells(cells, describe(type == null ? Groups.Type.BLOCK : type, cells.length));
+        } else {
+            removeNote = "No block there. Ctrl+click on a block of the picture";
+        }
+        eraseCells.clear();
+        eraseTrail.clear();
+        eraseMoved = false;
     }
 
     @Override
@@ -771,6 +874,13 @@ public final class SaveScreen extends Screen {
     }
 
     public int removedCount() {
+        int n = 0;
+        for (long[] step : removedStack) n += step.length;
+        return n;
+    }
+
+    /** Dev demo: how many separate removals (steps of undo) there are. */
+    public int removalSteps() {
         return removedStack.size();
     }
 
@@ -781,6 +891,19 @@ public final class SaveScreen extends Screen {
 
     public void redoRemovalForDemo() {
         redoRemoval();
+    }
+
+    /** Dev demo: a screen point over a block of a kind of group in the picture, or null. */
+    public int @org.jspecify.annotations.Nullable [] anchorOfGroup(Groups.Type type) {
+        double[] p = preview.pointOfGroup(type);
+        if (p == null) return null;
+        int[] r = pictureRect();
+        return new int[]{(int) (r[0] + p[0]), (int) (r[1] + p[1])};
+    }
+
+    /** Dev demo: the words in the red banner now. */
+    public String bannerText() {
+        return banner();
     }
 
     public int[] anchor(String which) {

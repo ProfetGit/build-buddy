@@ -39,8 +39,11 @@ public final class PreviewRaster {
         public final int count;
         /** True when there were too many faces and only some are kept. */
         public final boolean thinned;
+        /** What each cell is for grouping ({@link Groups#code}), or null when that is not known (every block then stands alone). */
+        final byte @Nullable [] kinds;
+        private volatile @Nullable Groups groups;
 
-        Scene(int ex, int ey, int ez, int[] cells, BlockLook.Look[] looks, int[] faces, int[] custom, int count, boolean thinned) {
+        Scene(int ex, int ey, int ez, int[] cells, BlockLook.Look[] looks, int[] faces, int[] custom, int count, boolean thinned, byte @Nullable [] kinds) {
             this.ex = ex;
             this.ey = ey;
             this.ez = ez;
@@ -50,6 +53,19 @@ public final class PreviewRaster {
             this.custom = custom;
             this.count = count;
             this.thinned = thinned;
+            this.kinds = kinds;
+        }
+
+        /** The things of the box that go as one (a tree, the ground...); worked out the first time it is asked for. */
+        public Groups groups() {
+            Groups g = groups;
+            if (g == null) {
+                synchronized (this) {
+                    g = groups;
+                    if (g == null) groups = g = kinds == null ? Groups.none() : Groups.of(kinds, ex, ey, ez);
+                }
+            }
+            return g;
         }
 
         /** Half the length of the diagonal of the box: how far from the middle anything can be. */
@@ -131,10 +147,12 @@ public final class PreviewRaster {
         int ex = bp.sizeX, ey = bp.sizeY, ez = bp.sizeZ;
         if (ex <= 0 || ey <= 0 || ez <= 0 || (long) ex * ey * ez > MAX_CELLS) return null;
         int[] cells = new int[ex * ey * ez];
+        byte[] kinds = new byte[cells.length];
         Map<BlockState, Integer> ids = new HashMap<>();
         java.util.List<BlockLook.Look> looks = new java.util.ArrayList<>();
         for (Region r : bp.regions) {
             int[] pal = new int[r.palette.length];
+            byte[] palKind = new byte[r.palette.length];
             for (int i = 0; i < pal.length; i++) {
                 PaletteEntry e = r.palette[i];
                 if (e.isAir()) continue;
@@ -146,18 +164,22 @@ public final class PreviewRaster {
                     ids.put(st, id);
                 }
                 pal[i] = id;
+                palKind[i] = Groups.code(st);
             }
             for (int y = 0; y < r.sy; y++) {
                 for (int z = 0; z < r.sz; z++) {
                     for (int x = 0; x < r.sx; x++) {
-                        int c = pal[r.blocks[(y * r.sz + z) * r.sx + x] & 0xFFFF];
+                        int pi = r.blocks[(y * r.sz + z) * r.sx + x] & 0xFFFF;
+                        int c = pal[pi];
                         if (c == 0) continue;
-                        cells[((r.y - bp.minY + y) * ez + (r.z - bp.minZ + z)) * ex + (r.x - bp.minX + x)] = c;
+                        int at = ((r.y - bp.minY + y) * ez + (r.z - bp.minZ + z)) * ex + (r.x - bp.minX + x);
+                        cells[at] = c;
+                        kinds[at] = palKind[pi];
                     }
                 }
             }
         }
-        return scene(cells, looks.toArray(new BlockLook.Look[0]), ex, ey, ez);
+        return scene(cells, looks.toArray(new BlockLook.Look[0]), ex, ey, ez, kinds);
     }
 
     /** From a grid of colours (0 = air), for tests: every distinct colour is a flat look. */
@@ -179,6 +201,10 @@ public final class PreviewRaster {
     }
 
     static @Nullable Scene scene(int[] cells, BlockLook.Look[] looks, int ex, int ey, int ez) {
+        return scene(cells, looks, ex, ey, ez, null);
+    }
+
+    static @Nullable Scene scene(int[] cells, BlockLook.Look[] looks, int ex, int ey, int ez, byte @Nullable [] kinds) {
         // what hides the faces behind it: a plain cube that is not see-through; water shows what is behind it and is no wall
         boolean[] cube = new boolean[looks.length + 1], water = new boolean[looks.length + 1], isCube = new boolean[looks.length + 1];
         for (int i = 0; i < looks.length; i++) {
@@ -226,12 +252,12 @@ public final class PreviewRaster {
             if (pass == 1) {
                 int[] custom = new int[customList.size()];
                 for (int k = 0; k < custom.length; k++) custom[k] = customList.get(k);
-                return new Scene(ex, ey, ez, cells, looks, faces, custom, n, total > MAX_FACES);
+                return new Scene(ex, ey, ez, cells, looks, faces, custom, n, total > MAX_FACES, kinds);
             }
             if (total == 0) {
                 int[] custom = new int[customList.size()];
                 for (int k = 0; k < custom.length; k++) custom[k] = customList.get(k);
-                return new Scene(ex, ey, ez, cells, looks, new int[0], custom, 0, false);
+                return new Scene(ex, ey, ez, cells, looks, new int[0], custom, 0, false, kinds);
             }
         }
         return null;
@@ -259,16 +285,24 @@ public final class PreviewRaster {
      * @param hover  the cell to light up (an index into the box), or -1
      */
     public static Frame render(Scene s, View v, int w, int h, int stride, int hover) {
+        return render(s, v, w, h, stride, hover, false);
+    }
+
+    /** As above; with {@code whole} the hovered cell's whole group (a tree, the ground) lights up, not just the cell. */
+    public static Frame render(Scene s, View v, int w, int h, int stride, int hover, boolean whole) {
         int[] px = new int[w * h], ids = new int[w * h];
         if (s.empty()) return new Frame(w, h, px, ids);
         float[] depth = new float[w * h];
         Arrays.fill(depth, -Float.MAX_VALUE);
+        int[] all = whole && hover >= 0 ? s.groups().labels() : null;
+        int lit = all == null ? 0 : s.groups().labelOf(hover);
+        int[] labels = lit == 0 ? null : all;
         int bands = Math.max(1, Math.min(Math.min(BANDS, h / 40), (int) Math.min(8, ((long) s.count + s.custom.length) / 400 + 1)));
         if (bands == 1) {
-            band(s, v, w, h, stride, hover, px, ids, depth, 0, h);
+            band(s, v, w, h, stride, hover, labels, lit, px, ids, depth, 0, h);
         } else {
             int rows = (h + bands - 1) / bands;
-            java.util.stream.IntStream.range(0, bands).parallel().forEach(b -> band(s, v, w, h, stride, hover, px, ids, depth, b * rows, Math.min(h, (b + 1) * rows)));
+            java.util.stream.IntStream.range(0, bands).parallel().forEach(b -> band(s, v, w, h, stride, hover, labels, lit, px, ids, depth, b * rows, Math.min(h, (b + 1) * rows)));
         }
         return new Frame(w, h, px, ids);
     }
@@ -276,7 +310,7 @@ public final class PreviewRaster {
     private static final int BANDS = Math.max(1, Math.min(8, Runtime.getRuntime().availableProcessors() / 2));
 
     /** Draws the rows {@code y0 <= y < y1} of the picture. */
-    private static void band(Scene s, View v, int w, int h, int stride, int hover, int[] px, int[] ids, float[] depth, int y0, int y1) {
+    private static void band(Scene s, View v, int w, int h, int stride, int hover, int @Nullable [] labels, int lit, int[] px, int[] ids, float[] depth, int y0, int y1) {
         double cy = Math.cos(v.yaw), sy = Math.sin(v.yaw), cp = Math.cos(v.pitch), sp = Math.sin(v.pitch);
         double scale = fit(s, w, h) * v.zoom;
         boolean textured = scale >= TEXTURE_FROM;
@@ -326,7 +360,7 @@ public final class PreviewRaster {
                 BlockLook.Tex tex = s.looks[s.cells[i] - 1].face()[d];
                 boolean useTexture = textured && tex.px() != null;
                 double light = LIGHT[d] * (useTexture ? 1.0 : 0.94 + 0.12 * jitter(i));
-                boolean hot = i == hover;
+                boolean hot = i == hover || (labels != null && labels[i] == lit);
                 tri(px, ids, depth, w, y0, y1, fx[0], fy[0], fz[0], fu[0], fv[0], fx[1], fy[1], fz[1], fu[1], fv[1], fx[2], fy[2], fz[2], fu[2], fv[2], tex, useTexture, light, hot, k + 1, wet);
                 tri(px, ids, depth, w, y0, y1, fx[0], fy[0], fz[0], fu[0], fv[0], fx[2], fy[2], fz[2], fu[2], fv[2], fx[3], fy[3], fz[3], fu[3], fv[3], tex, useTexture, light, hot, k + 1, wet);
             }
@@ -350,7 +384,7 @@ public final class PreviewRaster {
                 }
                 if (maxY < y0 - 1 || minY > y1 + 1) continue;
                 double light = LIGHT[q.dir()] * 0.92 + 0.08;
-                boolean hot = i == hover;
+                boolean hot = i == hover || (labels != null && labels[i] == lit);
                 boolean useTexture = q.tex().px() != null;
                 float[] uv = q.uv();
                 tri(px, ids, depth, w, y0, y1, qx[0], qy[0], qz[0], uv[0], uv[1], qx[1], qy[1], qz[1], uv[2], uv[3], qx[2], qy[2], qz[2], uv[4], uv[5], q.tex(), useTexture, light, hot, -(i + 1), false);

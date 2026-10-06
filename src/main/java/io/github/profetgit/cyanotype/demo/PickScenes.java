@@ -344,6 +344,101 @@ final class PickScenes {
         act(() -> tap(Keys.MAIN));
         waitTicks(4);
         act(() -> check("pick/V cancels and forgets", Placements.mode() == Placements.Mode.IDLE, "mode " + Placements.mode()));
+
+        // ---- taking out whole things in the Save preview: a tree, the ground, one block, a stroke of the eraser
+        act(() -> {
+            SaveScreen sv = new SaveScreen(io.github.profetgit.cyanotype.interaction.SelectionBox.of(AX + 5, G, 18, AX + 12, G + 8, 26));
+            mc().gui.setScreen(sv);
+        });
+        waitTicks(4);
+        act(() -> ((SaveScreen) screen()).setKeeps(true, true, false));
+        until("pick/the tree box is read and drawn", 400, () -> screen() instanceof SaveScreen sv && sv.readyToSave() && sv.preview().faces() > 0);
+        waitTicks(14);
+        int[][] pointer = new int[1][];
+        act(() -> {
+            SaveScreen sv = (SaveScreen) screen();
+            pointer[0] = sv.anchorOfGroup(io.github.profetgit.cyanotype.ui.Groups.Type.TREE);
+            check("pick/the picture shows a tree and the ground as things", pointer[0] != null && sv.anchorOfGroup(io.github.profetgit.cyanotype.ui.Groups.Type.GROUND) != null, "tree " + java.util.Arrays.toString(pointer[0]));
+            Interaction.testModifiers = 2;
+            io.github.profetgit.cyanotype.ui.Ui.testMouse = pointer[0];
+        });
+        waitTicks(16);
+        act(() -> {
+            SaveScreen sv = (SaveScreen) screen();
+            var pv = sv.preview();
+            check("pick/Ctrl over a tree says what a click takes", pv.groupType(pv.hovered()) == io.github.profetgit.cyanotype.ui.Groups.Type.TREE && pv.groupSize(pv.hovered()) == 83 && sv.bannerText().contains("this tree (83 blocks)"), sv.bannerText() + ", size " + pv.groupSize(pv.hovered()));
+        });
+        shot("pick_8_tree_hover");
+        act(() -> {
+            SaveScreen sv = (SaveScreen) screen();
+            int[] at = pointer[0];
+            long total = sv.captured().totalBlocks();
+            var ctrlClick = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 192);
+            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], ctrlClick), false);
+            check("pick/nothing is taken until the button goes up", sv.removedCount() == 0, sv.removedCount() + " removed");
+            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], ctrlClick));
+            check("pick/Ctrl+click takes the whole tree out in one step", sv.removedCount() == 83 && sv.removalSteps() == 1 && sv.captured().totalBlocks() == total - 83, sv.removedCount() + " removed in " + sv.removalSteps() + " steps");
+        });
+        until("pick/the picture without the tree is drawn", 200, () -> ((SaveScreen) screen()).preview().current());
+        waitTicks(6);
+        shot("pick_8_tree_gone");
+        act(() -> {
+            SaveScreen sv = (SaveScreen) screen();
+            sv.keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_Z, 0, 192));
+            check("pick/Ctrl+Z puts the whole tree back at once", sv.removedCount() == 0, sv.removedCount() + " removed");
+        });
+        until("pick/the tree is drawn again", 200, () -> ((SaveScreen) screen()).preview().current());
+        waitTicks(6);
+        act(() -> {
+            SaveScreen sv = (SaveScreen) screen();
+            pointer[0] = sv.anchorOfGroup(io.github.profetgit.cyanotype.ui.Groups.Type.GROUND);
+            io.github.profetgit.cyanotype.ui.Ui.testMouse = pointer[0];
+        });
+        waitTicks(14);
+        act(() -> {
+            SaveScreen sv = (SaveScreen) screen();
+            var pv = sv.preview();
+            check("pick/Ctrl over the grass says it takes the ground", pv.groupType(pv.hovered()) == io.github.profetgit.cyanotype.ui.Groups.Type.GROUND && pv.groupSize(pv.hovered()) > 50 && sv.bannerText().contains("the ground"), sv.bannerText() + " at " + java.util.Arrays.toString(pointer[0]) + " hovered " + pv.hovered());
+        });
+        shot("pick_8_ground_hover");
+        act(() -> {
+            SaveScreen sv = (SaveScreen) screen();
+            int[] at = pointer[0];
+            int size = sv.preview().groupSize(sv.preview().hovered());
+            // Ctrl+Shift+click: one block only
+            Interaction.testModifiers = 3;
+            var one = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 195);
+            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], one), false);
+            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], one));
+            check("pick/Ctrl+Shift+click takes one block of the ground only", sv.removedCount() == 1 && size > 1, sv.removedCount() + " removed, ground was " + size);
+            Interaction.testModifiers = 2;
+            // a stroke of the eraser across the picture takes what it passes over, as one step
+            var ctrl = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 192);
+            int before = sv.removedCount(), steps = sv.removalSteps();
+            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], ctrl), false);
+            for (int i = 1; i <= 8; i++) sv.mouseDragged(new net.minecraft.client.input.MouseButtonEvent(at[0] + i * 6, at[1] - i * 2, ctrl), 6, -2);
+            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0] + 48, at[1] - 16, ctrl));
+            check("pick/a Ctrl stroke erases the blocks under it in one step", sv.removedCount() > before + 3 && sv.removalSteps() == steps + 1, sv.removedCount() + " removed (before " + before + "), " + sv.removalSteps() + " steps");
+        });
+        waitTicks(16);
+        shot("pick_8_stroke");
+        act(() -> {
+            SaveScreen sv = (SaveScreen) screen();
+            // a plain Ctrl+click on the ground takes all of it
+            Interaction.testModifiers = 2;
+            var ctrl = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 192);
+            int[] at = sv.anchorOfGroup(io.github.profetgit.cyanotype.ui.Groups.Type.GROUND);
+            int before = sv.removedCount();
+            if (at != null) {
+                sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], ctrl), false);
+                sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], ctrl));
+            }
+            check("pick/Ctrl+click on what is left of the ground takes all of it", at != null && sv.removedCount() > before + 30, sv.removedCount() + " removed, was " + before);
+            Interaction.testModifiers = -1;
+            io.github.profetgit.cyanotype.ui.Ui.testMouse = null;
+            mc().gui.setScreen(null);
+        });
+        waitTicks(4);
         act(() -> Director.hideHud(mc(), true));
     }
 

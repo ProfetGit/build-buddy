@@ -40,7 +40,7 @@ public final class BuildPreview {
     private volatile int frameSeq;
     private int uploadedSeq = -1;
     private volatile int hoverCell = -1;
-    private volatile boolean removeMode;
+    private volatile boolean removeMode, whole = true;
     private volatile int wantW = 1, wantH = 1, wantRes = 1;
     private volatile long lastMoveNs;
     private DynamicTexture texture;
@@ -67,6 +67,7 @@ public final class BuildPreview {
         building = true;
         Util.backgroundExecutor().execute(() -> {
             PreviewRaster.Scene s = PreviewRaster.scene(bp);
+            if (s != null) s.groups();
             tooBig = s == null;
             scene = s;
             building = false;
@@ -80,6 +81,12 @@ public final class BuildPreview {
         return s == null ? -1 : s.count + s.custom.length;
     }
 
+    /** Whether the picture shown is of the newest scene (nothing newer is waiting to be drawn): for the demo. */
+    public boolean current() {
+        Shown sh = shown;
+        return sh != null && sh.scene() == scene && !building && !busy.get();
+    }
+
     public PreviewRaster.View view() {
         return view;
     }
@@ -91,6 +98,78 @@ public final class BuildPreview {
             hoverCell = -1;
             request();
         }
+    }
+
+    /** Whether the hovered block lights up with everything that goes with it (a whole tree, the ground), or alone. */
+    public void setWhole(boolean on) {
+        if (whole != on) {
+            whole = on;
+            if (removeMode && hoverCell >= 0) request();
+        }
+    }
+
+    /** What taking the block under the pointer would take: its group (a tree, the ground...) or the one block; null when there is no scene or no block. */
+    public Groups.@Nullable Type groupType(int cell) {
+        PreviewRaster.Scene s = scene;
+        return s == null || cell < 0 ? null : s.groups().typeOf(cell);
+    }
+
+    /** How many blocks go with a cell when it is taken as a whole. */
+    public int groupSize(int cell) {
+        PreviewRaster.Scene s = scene;
+        return s == null || cell < 0 ? 0 : s.groups().sizeOf(cell);
+    }
+
+    /** The cells (indexes into the box) that go with a cell when it is taken as a whole; just the cell when {@code whole} is off or it stands alone. */
+    public int[] cellsOf(int cell, boolean whole) {
+        PreviewRaster.Scene s = scene;
+        if (s == null || cell < 0) return new int[0];
+        return whole ? s.groups().cellsOf(cell) : new int[]{cell};
+    }
+
+    /** The cells of the picture within a radius (GUI units) of a point ({@code gx, gy} from the picture's top left): what a brush there would touch. */
+    public int[] cellsNear(double gx, double gy, double radius) {
+        Shown sh = shown;
+        if (sh == null) return new int[0];
+        int k = sh.res() * sh.ss();
+        PreviewRaster.Frame f = sh.frame();
+        int r = (int) Math.ceil(radius * k), cx = (int) (gx * k), cy = (int) (gy * k);
+        // one sample every few pixels is enough: blocks are bigger than that
+        int step = Math.max(1, k);
+        it.unimi.dsi.fastutil.ints.IntOpenHashSet out = new it.unimi.dsi.fastutil.ints.IntOpenHashSet();
+        for (int y = cy - r; y <= cy + r; y += step) {
+            for (int x = cx - r; x <= cx + r; x += step) {
+                if (x < 0 || y < 0 || x >= f.w() || y >= f.h()) continue;
+                if ((x - cx) * (x - cx) + (y - cy) * (y - cy) > r * r) continue;
+                int cell = sh.scene().cellOfId(f.ids()[y * f.w() + x]);
+                if (cell >= 0) out.add(cell);
+            }
+        }
+        return out.toIntArray();
+    }
+
+    /** A point of the picture (GUI units from its top left) over a block of the given kind of group, or null: for the demo. */
+    public double @Nullable [] pointOfGroup(Groups.Type type) {
+        Shown sh = shown;
+        if (sh == null) return null;
+        int k = sh.res() * sh.ss();
+        PreviewRaster.Frame f = sh.frame();
+        // a point well inside the group (its neighbours a couple of GUI units off are the same kind), not on an edge
+        int m = 2 * k;
+        for (int y = f.h() - 1 - m; y >= m; y -= 3) {
+            for (int x = m; x < f.w() - m; x += 3) {
+                if (kindAt(sh, x, y) == type && kindAt(sh, x - m, y) == type && kindAt(sh, x + m, y) == type && kindAt(sh, x, y - m) == type && kindAt(sh, x, y + m) == type) {
+                    return new double[]{(x + 0.5) / k, (y + 0.5) / k};
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Groups.@Nullable Type kindAt(Shown sh, int x, int y) {
+        PreviewRaster.Frame f = sh.frame();
+        int cell = sh.scene().cellOfId(f.ids()[y * f.w() + x]);
+        return cell < 0 ? null : sh.scene().groups().typeOf(cell);
     }
 
     /** The cell under a point of the picture ({@code gx, gy} in GUI units from its top left), as an index into the box, or -1. */
@@ -272,6 +351,7 @@ public final class BuildPreview {
         int best = (long) tw * th * 4 > MAX_SAMPLES ? 1 : 2;
         int ss = moving ? 1 : best;
         int hover = hoverCell;
+        boolean wholeNow = whole;
         // "low" = a better picture will be drawn when the hand stops; one that is already the best never asks again
         boolean low = stride > 1 || ss < best;
         Util.backgroundExecutor().execute(() -> {
@@ -279,7 +359,7 @@ public final class BuildPreview {
                 // the pan is in GUI units; the picture is drawn in samples
                 double k = (double) res * ss;
                 PreviewRaster.View scaled = new PreviewRaster.View(v.yaw(), v.pitch(), v.zoom(), v.panX() * k, v.panY() * k);
-                PreviewRaster.Frame made = PreviewRaster.render(s, scaled, tw * ss, th * ss, stride, hover);
+                PreviewRaster.Frame made = PreviewRaster.render(s, scaled, tw * ss, th * ss, stride, hover, wholeNow);
                 shown = new Shown(made, resolve(made, ss, tw, th), s, ss, res, low);
                 frameSeq++;
             } catch (RuntimeException e) {

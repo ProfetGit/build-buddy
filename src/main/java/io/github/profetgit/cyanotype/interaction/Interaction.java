@@ -84,6 +84,11 @@ public final class Interaction {
         return (clickMods & mask) != 0 && System.nanoTime() - clickNs < 250_000_000L;
     }
 
+    /** Whether Shift is down now, by the keyboard or by what the last mouse press carried (for screens that take Shift+click). */
+    public static boolean shiftDown(Minecraft mc) {
+        return shift(mc);
+    }
+
     static boolean shift(Minecraft mc) {
         return testModifiers >= 0 ? (testModifiers & 1) != 0 : mc.hasShiftDown() || recentClick(3);
     }
