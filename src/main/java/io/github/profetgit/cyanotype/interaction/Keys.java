@@ -19,6 +19,7 @@ public final class Keys {
     public static final KeyMapping REDO = new KeyMapping("key.cyanotype.redo", InputConstants.KEY_Y, CATEGORY);
     public static final KeyMapping MIRROR = new KeyMapping("key.cyanotype.mirror", InputConstants.KEY_M, CATEGORY);
     public static final KeyMapping PASTE = new KeyMapping("key.cyanotype.paste", InputConstants.KEY_P, CATEGORY);
+    public static final KeyMapping FIT = new KeyMapping("key.cyanotype.fit", InputConstants.KEY_X, CATEGORY);
     public static final KeyMapping REMOVE = new KeyMapping("key.cyanotype.remove", InputConstants.KEY_DELETE, CATEGORY);
 
     private Keys() {

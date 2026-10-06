@@ -419,6 +419,12 @@ final class Handles {
 
     /** The placement's box as corner brackets (the blueprint look) over a faint full outline for the one being edited. */
     static void outline(AABB b, int color, boolean strong) {
+        brackets(b, color, strong);
+        if (strong) Gizmos.cuboid(b, GizmoStyle.stroke(alpha(color, 0.28), 1.5f));
+    }
+
+    /** Only the corner brackets of {@link #outline}. */
+    static void brackets(AABB b, int color, boolean strong) {
         double[] size = {b.maxX - b.minX, b.maxY - b.minY, b.maxZ - b.minZ};
         double[] len = {Math.max(0.6, Math.min(2.5, size[0] * 0.28)), Math.max(0.6, Math.min(2.5, size[1] * 0.28)), Math.max(0.6, Math.min(2.5, size[2] * 0.28))};
         int bracket = strong ? color : alpha(color, 0.55);
@@ -433,6 +439,5 @@ final class Handles {
                 }
             }
         }
-        if (strong) Gizmos.cuboid(b, GizmoStyle.stroke(alpha(color, 0.28), 1.5f));
     }
 }

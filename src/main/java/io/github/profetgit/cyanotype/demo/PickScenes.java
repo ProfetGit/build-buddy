@@ -439,6 +439,41 @@ final class PickScenes {
             mc().gui.setScreen(null);
         });
         waitTicks(4);
+
+        // ---- the Save area box says when it cuts a build in two, and the fit key grows it
+        camera(27, G + 8, 35, 180, 25);
+        waitTicks(10);
+        act(() -> {
+            Director.hideHud(mc(), false);
+            Placements.clear();
+            io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(AX, G + 1, Z0, AX + 6, G + 3, Z1));
+        });
+        waitTicks(16);
+        act(() -> {
+            var c = io.github.profetgit.cyanotype.interaction.Selecting.cuts();
+            int up = net.minecraft.core.Direction.UP.ordinal();
+            check("pick/a box that stops under the roof is cut on top", c != null && c.cut(net.minecraft.core.Direction.UP) && c.count[up] == 34, c == null ? "no result" : "top " + c.count[up]);
+            check("pick/and on no other side (a lone fence post is not a building)", c != null && c.total() == c.count[up], c == null ? "no result" : "total " + c.total());
+        });
+        shot("pick_9_cut_top");
+        act(() -> io.github.profetgit.cyanotype.interaction.Selecting.fit(mc()));
+        waitTicks(14);
+        act(() -> {
+            var b = io.github.profetgit.cyanotype.interaction.Selecting.box();
+            var c = io.github.profetgit.cyanotype.interaction.Selecting.cuts();
+            check("pick/the fit key grows the box up over the roof and no further", b != null && b.y1() == G + 4 && b.y0() == G + 1 && b.x0() == AX && b.x1() == AX + 6, String.valueOf(b));
+            check("pick/after fitting nothing is cut off", c != null && !c.any(), c == null ? "no result" : "total " + c.total());
+        });
+        shot("pick_9_fitted");
+        // a tall box: the ruler on the nearest vertical edge, far edges dashed
+        act(() -> io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(AX + 5, G, 18, AX + 12, G + 9, 26)));
+        waitTicks(16);
+        shot("pick_9_tall");
+        act(() -> {
+            io.github.profetgit.cyanotype.interaction.Selecting.cancel(mc());
+            Director.hideHud(mc(), true);
+        });
+        waitTicks(4);
         act(() -> Director.hideHud(mc(), true));
     }
 

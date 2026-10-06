@@ -48,6 +48,10 @@ public final class Selecting {
     private static SaveScreen.@Nullable Pick fromPick;
     private static Handles handles;
     private static Handles.Handle hover;
+    /** Where the box cuts a build, worked out when the box changes and again every half second (the world changes as people build). */
+    private static BoxCheck.@Nullable Result cuts;
+    private static @Nullable SelectionBox cutsFor;
+    private static long cutsNs;
     /** Where the last frame was seen from: a click picks what the frame showed. */
     private static Vec3 camPos = Vec3.ZERO, camLook = new Vec3(0, 0, 1);
 
@@ -125,6 +129,8 @@ public final class Selecting {
         hover = null;
         dragHandle = null;
         dragStart = null;
+        cuts = null;
+        cutsFor = null;
     }
 
     // ---- input
@@ -228,7 +234,7 @@ public final class Selecting {
             case SECOND -> {
                 BlockPos cell = aim(mc, camera, look, lift);
                 SelectionBox b = SelectionBox.of(first.getX(), first.getY(), first.getZ(), cell.getX(), cell.getY(), cell.getZ());
-                drawBox(b, camera, true);
+                drawBox(b, camera, true, null, false);
                 Interaction.chips(mc, new Chips.Chip("Click", "Second corner"), new Chips.Chip("Scroll", "Raise / lower it"), new Chips.Chip("Right click", "Back"), new Chips.Chip(cancel, "Cancel"));
             }
             case ADJUST -> adjust(mc, camera, look, cancel);
@@ -238,17 +244,56 @@ public final class Selecting {
     private static void adjust(Minecraft mc, Vec3 camera, Vec3 look, String cancel) {
         if (dragHandle != null) updateDrag(camera, look);
         handles = new Handles(box.x0(), box.y0(), box.z0(), box.sizeX(), box.sizeY(), box.sizeZ(), camera, look, true);
+        refreshCuts(mc);
         if (dragHandle != null) {
             for (Handles.Handle h : handles.handles) if (h.id.equals(dragHandle.id)) hover = h;
             Interaction.chips(mc, new Chips.Chip("Release", "Set this side"));
         } else {
             hover = handles.pick(camera, look);
-            Interaction.chips(mc, new Chips.Chip("Drag", hover == null ? "An arrow resizes the box" : "Move the " + face(hover.dir) + " side"),
-                new Chips.Chip("Right click", "Save it..."), new Chips.Chip(cancel, "Cancel"));
+            boolean cutOff = cuts != null && cuts.any();
+            Chips.Chip drag = new Chips.Chip("Drag", hover == null ? "An arrow resizes the box" : "Move the " + face(hover.dir) + " side");
+            Chips.Chip save = new Chips.Chip("Right click", "Save it...");
+            if (cutOff) Interaction.chips(mc, drag, new Chips.Chip(Ui.keyName(Keys.FIT), "Fit the box to the build"), save, new Chips.Chip(cancel, "Cancel"));
+            else Interaction.chips(mc, drag, save, new Chips.Chip(cancel, "Cancel"));
         }
         handles.animate(hover, dragHandle == null ? null : hover, Interaction.dt());
-        drawBox(box, camera, false);
+        drawBox(box, camera, false, hover == null ? null : hover.dir, dragHandle != null);
+        if (cuts != null) BoxFrame.cuts(cuts, box.aabb(), camera, System.nanoTime() / 1e9);
+        BoxFrame.ruler(box.aabb(), box.sizeY(), camera);
         handles.emit();
+    }
+
+    private static void refreshCuts(Minecraft mc) {
+        long now = System.nanoTime();
+        if (cuts != null && box.equals(cutsFor) && now - cutsNs < 500_000_000L) return;
+        cuts = BoxCheck.check(new LevelSource(mc.level), box, ignoredBuildings());
+        cutsFor = box;
+        cutsNs = now;
+    }
+
+    /** The other buildings Smart Pick left out are not "cut": the box was fitted to leave them out. */
+    private static java.util.function.@Nullable LongPredicate ignoredBuildings() {
+        return fromPick == null ? null : fromPick.others()::contains;
+    }
+
+    /** The fit key: grows the box on every side that cuts a build, until none does (at most 96 layers in all). */
+    public static void fit(Minecraft mc) {
+        if (stage != Stage.ADJUST || box == null || mc.level == null) return;
+        BoxCheck.Fit f = BoxCheck.fit(new LevelSource(mc.level), box, ignoredBuildings(), 96, Capture.MAX_VOLUME);
+        if (f.layers() == 0) {
+            Sfx.play(Sfx.CLOSE, 1.2f);
+            Interaction.say(mc, "Nothing is cut off");
+            return;
+        }
+        box = f.box();
+        cuts = null;
+        Sfx.play(Sfx.LOCK, 1.1f);
+        Interaction.say(mc, "Box grown to " + box.sizeText() + (f.stopped() ? ". It is still cut: press " + Ui.keyName(Keys.FIT) + " again" : ""));
+    }
+
+    /** Dev demo: where the box cuts a build now (null until the first frame). */
+    public static BoxCheck.@Nullable Result cuts() {
+        return cuts;
     }
 
     private static void updateDrag(Vec3 camera, Vec3 look) {
@@ -299,10 +344,9 @@ public final class Selecting {
         Gizmos.cuboid(b, GizmoStyle.strokeAndFill(alpha(CYAN, a), 3.0f, alpha(CYAN, 0.16))).setAlwaysOnTop();
     }
 
-    private static void drawBox(SelectionBox b, Vec3 camera, boolean following) {
+    private static void drawBox(SelectionBox b, Vec3 camera, boolean following, @Nullable Direction pointed, boolean dragging) {
         AABB a = b.aabb().inflate(0.004);
-        Gizmos.cuboid(a, GizmoStyle.strokeAndFill(alpha(CYAN, following ? 0.75 : 0.95), following ? 2.4f : 3.0f, alpha(CYAN, 0.09))).setAlwaysOnTop();
-        Handles.outline(a, CYAN, true);
+        BoxFrame.box(a, camera, following, pointed, dragging);
         Vec3 c = a.getCenter();
         double dist = camera.distanceTo(c);
         float scale = Handles.labelScale(dist, 0.8, 0.055);
@@ -311,6 +355,8 @@ public final class Selecting {
         double halfW = Math.abs(right.x) * (a.maxX - a.minX) / 2 + Math.abs(right.z) * (a.maxZ - a.minZ) / 2;
         double lx = following ? c.x : c.x - right.x * (halfW + 1.2 * scale), lz = following ? c.z : c.z - right.z * (halfW + 1.2 * scale);
         String text = b.sizeText() + (b.volume() > 1 ? "   " + String.format(Locale.ROOT, "%,d", b.volume()) + " cells" : "");
+        // once the box is set it says whether it cuts anything off
+        if (!following && cuts != null && !cuts.skipped && !cuts.any()) text += "   nothing cut off";
         Handles.label(new Vec3(lx, a.maxY + 0.7 + 0.05 * dist + 0.5 * scale, lz), text, scale, 0xFFFFFFFF, CYAN);
     }
 
