@@ -114,6 +114,20 @@ public final class Placements {
         REDO.clear();
     }
 
+    /** Takes the ghost away once its build is in the world, keeping the undo history: Ctrl+Z on the paste brings the ghost back ({@link #putBack}). */
+    public static void removeAfterPaste(Placement p) {
+        detach(p);
+    }
+
+    /** Puts a ghost back where it was (undoing a paste): locked, selected, and in Edit mode as it was when it was pasted. */
+    public static void putBack(Placement p) {
+        if (ALL.contains(p)) return;
+        ALL.add(p);
+        active = p;
+        mode = Mode.EDIT;
+        PlacementStore.markDirty();
+    }
+
     private static void detach(Placement p) {
         ALL.remove(p);
         // a material highlight belongs to a placement's verifier: it goes with it

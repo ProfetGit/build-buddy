@@ -33,6 +33,11 @@ public final class Paste {
     private static @Nullable Placement target;
     private static boolean inFlight, wasDone;
     private static long finishedNs;
+    /** A placement to paste as soon as the world has been looked at (the key was pressed before the check finished), and since when. */
+    private static @Nullable Placement queued;
+    private static long queuedNs;
+    /** The ghost taken away because its build was pasted: it comes back with the undo. */
+    private static @Nullable Placement removedForPaste;
 
     private Paste() {
     }
@@ -107,6 +112,30 @@ public final class Paste {
         return true;
     }
 
+    /** Pastes a placement now, or as soon as the world has been looked at when that is still going on. No question: Ctrl+Z undoes it. */
+    public static void pasteWhenReady(Minecraft mc, Placement p) {
+        String why = unavailable(mc);
+        if (!why.isEmpty()) {
+            Interaction.say(mc, why);
+            Sfx.play(Sfx.ERROR);
+            return;
+        }
+        if (busy()) {
+            Interaction.say(mc, "A paste is already running.");
+            Sfx.play(Sfx.ERROR);
+            return;
+        }
+        if (ready(p)) {
+            queued = null;
+            start(mc, p);
+            return;
+        }
+        queued = p;
+        queuedNs = System.nanoTime();
+        Sfx.play(Sfx.PRESS, 1.2f);
+        Interaction.say(mc, "Checking the world, then pasting...");
+    }
+
     /** Undoes a paste (what went in comes out, what was overwritten comes back). Called by the undo history. */
     public static void undo(Minecraft mc, PasteJob j) {
         if (j == null) return;
@@ -118,6 +147,19 @@ public final class Paste {
 
     /** Once per client tick: hands the server a slice of work, and says what happened when it is done. */
     public static void tick(Minecraft mc) {
+        Placement q = queued;
+        if (q != null && mc.level != null) {
+            if (!Placements.all().contains(q)) {
+                queued = null;
+            } else if (ready(q) && !busy()) {
+                queued = null;
+                start(mc, q);
+            } else if (System.nanoTime() - queuedNs > 30_000_000_000L) {
+                queued = null;
+                Interaction.say(mc, "Could not paste: the world is still being checked. Try again.");
+                Sfx.play(Sfx.ERROR);
+            }
+        }
         PasteJob j = job;
         if (j == null || mc.level == null || mc.player == null) return;
         PasteJob.State s = j.state();
@@ -146,11 +188,21 @@ public final class Paste {
 
     private static void report(Minecraft mc, PasteJob j, PasteJob.State s) {
         if (s == PasteJob.State.UNDONE) {
+            // undoing a paste brings back the ghost that went when it was pasted
+            Placement back = removedForPaste;
+            removedForPaste = null;
+            if (back != null) Placements.putBack(back);
             Sfx.play(Sfx.CLOSE, 1.1f);
             Interaction.say(mc, "Undone: " + String.format(Locale.ROOT, "%,d", j.undoable()) + " blocks put back.");
             return;
         }
         Sfx.play(j.stopped().isEmpty() ? Sfx.COMPLETE : Sfx.ERROR);
+        // the build is in the world: the ghost has done its job and goes (unless some of it could not go in, then it stays to paste again or build the rest)
+        Placement done = target;
+        if (done != null && j.stopped().isEmpty() && j.unloaded() == 0 && Placements.all().contains(done)) {
+            Placements.removeAfterPaste(done);
+            removedForPaste = done;
+        }
         String text = "Pasted " + String.format(Locale.ROOT, "%,d", j.placed()) + " blocks"
             + (j.same() > 0 ? " (" + String.format(Locale.ROOT, "%,d", j.same()) + " were already right)" : "")
             + (j.unloaded() > 0 ? ". " + String.format(Locale.ROOT, "%,d", j.unloaded()) + " were in chunks that are not loaded: walk closer and paste again" : "")
@@ -176,6 +228,8 @@ public final class Paste {
         if (job != null && job.state() == PasteJob.State.RUNNING) job.stop("");
         job = null;
         target = null;
+        queued = null;
+        removedForPaste = null;
         inFlight = false;
         wasDone = false;
     }

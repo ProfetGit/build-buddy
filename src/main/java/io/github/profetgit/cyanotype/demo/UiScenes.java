@@ -439,22 +439,41 @@ final class UiScenes {
     /** Removing a placement: the wheel's Remove tool, the question, Keep, and Remove with the keyboard. */
     static void remove() {
         setup();
+        // the same place and aim whatever scene came before
+        camera(5.5, G + 5, -14, 0, 14);
+        waitTicks(10);
+        act(() -> PlaceScenes.aim(Minecraft.getInstance(), 5.5, G + 4, 12));
+        waitTicks(6);
         // the Delete key: on the ghost under the crosshair, or on the one being edited, and never while hidden
         act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.REMOVE));
         waitTicks(6);
-        act(() -> check("remove/Delete on the aimed ghost asks first", screen() instanceof io.github.profetgit.cyanotype.ui.RemoveScreen rs && rs.asks().get(0) == house, String.valueOf(screen())));
-        act(() -> key(com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE));
-        waitTicks(4);
-        act(() -> check("remove/Esc keeps it", screen() == null && Placements.all().contains(house), "screen " + screen()));
+        act(() -> check("remove/Delete once only says what it would remove: nothing goes, no screen opens", screen() == null && Placements.all().contains(house), "screen " + screen()));
+        // a second press long after the first is a first press again (real time: the client may tick faster than 20 a second here)
+        long[] t0 = {0};
+        act(() -> t0[0] = System.nanoTime());
+        until("remove/three and a half seconds pass", 600, () -> System.nanoTime() - t0[0] > 3_500_000_000L);
+        act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.REMOVE));
+        waitTicks(6);
+        act(() -> check("remove/a second Delete that comes too late does not remove", Placements.all().contains(house), "gone"));
+        // Delete twice in a row removes it, and Ctrl+Z brings it back
+        act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.REMOVE));
+        waitTicks(6);
+        act(() -> check("remove/Delete twice in a row removes the aimed ghost", !Placements.all().contains(house) && screen() == null, "still there"));
+        PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, false);
+        waitTicks(6);
+        act(() -> check("remove/Ctrl+Z brings it back", Placements.all().contains(house), "gone"));
         act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.MAIN));
         waitTicks(6);
         act(() -> check("remove/editing: the hints say Delete removes", Placements.mode() == Placements.Mode.EDIT, "mode " + Placements.mode()));
         shot("remove_key_chips");
         act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.REMOVE));
+        waitTicks(5);
+        act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.REMOVE));
         waitTicks(6);
-        act(() -> check("remove/Delete while editing asks about the edited placement", screen() instanceof io.github.profetgit.cyanotype.ui.RemoveScreen rs && rs.asks().get(0) == house, String.valueOf(screen())));
-        act(() -> key(com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE));
-        waitTicks(4);
+        act(() -> check("remove/Delete twice while editing removes the edited placement", !Placements.all().contains(house), "still there"));
+        PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, false);
+        waitTicks(6);
+        act(() -> check("remove/and Ctrl+Z puts it back", Placements.all().contains(house), "gone"));
         act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.TOGGLE));
         waitTicks(4);
         act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.REMOVE));

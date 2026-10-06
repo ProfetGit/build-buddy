@@ -111,21 +111,6 @@ public final class WheelScreen extends Screen {
         return true;
     }
 
-    /** Where the name chip of a segment goes: x, y, width, height. Names to the sides sit beside the ring, those above and below under or over it. */
-    private static int[] labelRect(int cx, int cy, int size, int scale, double ang, int textWidth, int extra) {
-        int lx = (int) Math.round(cx + Math.cos(ang) * (size / 2.0 + 12 * scale + extra)), ly = (int) Math.round(cy + Math.sin(ang) * (size / 2.0 + 10 * scale + extra));
-        int chipX = Math.cos(ang) > 0.3 ? lx - 6 : Math.cos(ang) < -0.3 ? lx + 6 - textWidth - 4 : lx - textWidth / 2 - 2;
-        int chipY = ly - 6 + (Math.abs(Math.cos(ang)) <= 0.3 ? (Math.sin(ang) > 0 ? 3 : -3) : 0);
-        return new int[]{chipX, chipY, textWidth + 4, 12};
-    }
-
-    private static boolean overlaps(int[] r, java.util.List<int[]> others) {
-        for (int[] o : others) {
-            if (r[0] < o[0] + o[2] + 2 && o[0] < r[0] + r[2] + 2 && r[1] < o[1] + o[3] + 1 && o[1] < r[1] + r[3] + 1) return true;
-        }
-        return false;
-    }
-
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int rawX, int rawY, float partial) {
         Motion.frame();
@@ -179,7 +164,6 @@ public final class WheelScreen extends Screen {
         // the ring is wide enough to leave a margin and a neighbour is not closer than the icon
         double ringR = (inner + rim) / 2, arc = 2 * Math.PI * ringR / n;
         int box = (rim - inner) >= 40 && arc >= 38 ? 32 : 16;
-        java.util.List<int[]> placed = new java.util.ArrayList<>();
         for (int i = 0; i < n; i++) {
             Tool t = tools[i];
             boolean on = t.enabled(minecraft);
@@ -193,20 +177,6 @@ public final class WheelScreen extends Screen {
             int hop = (int) Math.round(lift * (box / 16) + (pulseK - 1) * 10);
             boolean dark = hot && on;
             Ui.icon(g, t.icon, ix - box / 2, iy - box / 2 - hop, dark, box, on ? alpha : alpha * 0.4f);
-            // the name outside the wheel, pushed further out when it would sit on a neighbour's
-            double ang = WheelGeometry.center(i, n) - Math.PI / 2;
-            int col = !on ? 0xFF5E7C99 : hot ? Ui.WHITE : Ui.DIM;
-            String label = t.label;
-            int tw = Ui.font().width(label);
-            int[] rect = null;
-            for (int extra = 0; extra <= 33; extra += 11) {
-                rect = labelRect(cx, cy, size, scale, ang, tw, extra);
-                if (!overlaps(rect, placed)) break;
-            }
-            placed.add(rect);
-            // a navy chip behind the name so it reads over sky and grass alike
-            g.fill(rect[0], rect[1], rect[0] + rect[2], rect[1] + rect[3], Ui.withAlpha(Ui.DEEP, alpha * 0.72f));
-            Ui.text(g, label, rect[0] + 2, rect[1] + 2, Ui.withAlpha(col, alpha));
         }
         // the middle names the segment; what it does goes under the wheel
         if (hovered >= 0) {

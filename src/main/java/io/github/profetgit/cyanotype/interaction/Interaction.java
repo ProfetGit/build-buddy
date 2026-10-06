@@ -341,7 +341,7 @@ public final class Interaction {
             if (!screen) toggleGhosts(mc);
         }
         while (Keys.PASTE.consumeClick()) {
-            if (!screen && !GhostRenderer.hidden) io.github.profetgit.cyanotype.ui.Tool.askPaste(mc);
+            if (!screen && !GhostRenderer.hidden) pasteKey(mc);
         }
         while (Keys.MIRROR.consumeClick()) {
             if (!screen && !GhostRenderer.hidden) mirror(mc);
@@ -510,11 +510,72 @@ public final class Interaction {
         say(mc, what);
     }
 
-    /** The Delete key: asks whether to remove the selected placement (the one being edited, or the one the crosshair is on). */
+    /** The placement Delete or P is about: the one being edited, or the one the crosshair is on when nothing is being edited. */
+    private static Placement targetOfKey(Minecraft mc) {
+        return Placements.mode() == Mode.EDIT ? Placements.active() : Placements.mode() == Mode.IDLE ? aimedPlacement(mc) : null;
+    }
+
+    private static Placement pendingRemove;
+    private static long pendingRemoveNs;
+
+    /** How long the second press of Delete counts as the answer to the first. */
+    private static final long REMOVE_AGAIN_NS = 3_000_000_000L;
+
+    /** The Delete key: a first press says what it would remove, a second press within a few seconds removes it (Ctrl+Z brings it back). */
     private static void askRemove(Minecraft mc) {
-        Placement p = Placements.mode() == Mode.EDIT ? Placements.active() : Placements.mode() == Mode.IDLE ? aimedPlacement(mc) : null;
+        Placement p = targetOfKey(mc);
         if (p == null) return;
-        mc.gui.setScreen(new io.github.profetgit.cyanotype.ui.RemoveScreen(p));
+        long now = System.nanoTime();
+        if (pendingRemove == p && now - pendingRemoveNs < REMOVE_AGAIN_NS) {
+            pendingRemove = null;
+            String name = p.name;
+            Placements.removeUndoable(p);
+            Sfx.play(Sfx.CLOSE, 0.8f);
+            say(mc, "Removed " + name + ". Ctrl+Z brings it back.");
+            return;
+        }
+        pendingRemove = p;
+        pendingRemoveNs = now;
+        Sfx.play(Sfx.PRESS, 0.9f);
+        say(mc, "Press " + Ui.keyName(Keys.REMOVE) + " again to remove " + p.name);
+    }
+
+    /**
+     * The paste key (creative, in a world you host): while a ghost follows the crosshair it is put down where it is and pasted;
+     * a placed ghost, the one being edited or the one the crosshair is on, is pasted. No menu and no question: the ghost goes once
+     * the build is in the world, and Ctrl+Z takes the build out again and brings the ghost back.
+     */
+    private static void pasteKey(Minecraft mc) {
+        Mode mode = Placements.mode();
+        Placement p = Placements.active();
+        if (mode == Mode.IDLE) {
+            Placement aimed = aimedPlacement(mc);
+            if (aimed != null) p = aimed;
+        }
+        if (p == null || !p.ready() || mode == Mode.SELECT || mode == Mode.PICK || mode == Mode.LAYERS) {
+            say(mc, "Nothing to paste: pick a build in the Library and put it down first.");
+            Sfx.play(Sfx.ERROR);
+            return;
+        }
+        String why = io.github.profetgit.cyanotype.paste.Paste.unavailable(mc);
+        if (!why.isEmpty()) {
+            say(mc, why);
+            Sfx.play(Sfx.ERROR);
+            return;
+        }
+        if (mode == Mode.PLACING && !p.locked) lock(p);
+        if (!p.locked) {
+            say(mc, "Click to put the blueprint down first.");
+            Sfx.play(Sfx.ERROR);
+            return;
+        }
+        Placements.select(p);
+        io.github.profetgit.cyanotype.paste.Paste.pasteWhenReady(mc, p);
+    }
+
+    /** Whether the paste key does something now, for the hints: creative in a world you host. */
+    private static boolean canPasteHere(Minecraft mc) {
+        return io.github.profetgit.cyanotype.paste.Paste.unavailable(mc).isEmpty();
     }
 
     /** Toggles the show-or-hide of every ghost. */
@@ -526,6 +587,7 @@ public final class Interaction {
 
     /** Forgets everything in progress (the world changed). */
     public static void reset() {
+        pendingRemove = null;
         Handles.forget();
         io.github.profetgit.cyanotype.paste.Paste.reset();
         drag = null;
@@ -562,8 +624,13 @@ public final class Interaction {
             if (p == null || p.locked) Placements.setMode(Mode.IDLE);
         } else if (mode == Mode.PLACING) {
             follow(mc, p, pos, look);
-            chips(mc, new Chips.Chip("Scroll", "Turn"), new Chips.Chip("Shift+Scroll", "Up / down"), new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"),
-                new Chips.Chip("Click", "Lock in place"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Cancel"));
+            if (canPasteHere(mc)) {
+                chips(mc, new Chips.Chip("Scroll", "Turn"), new Chips.Chip("Shift+Scroll", "Up / down"), new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"),
+                    new Chips.Chip("Click", "Lock in place"), new Chips.Chip(Ui.keyName(Keys.PASTE), "Paste it here"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Cancel"));
+            } else {
+                chips(mc, new Chips.Chip("Scroll", "Turn"), new Chips.Chip("Shift+Scroll", "Up / down"), new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"),
+                    new Chips.Chip("Click", "Lock in place"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Cancel"));
+            }
         } else if (mode == Mode.LAYERS) {
             if (p == null || !p.locked || !p.ready()) {
                 Placements.setMode(Mode.IDLE);
@@ -615,9 +682,16 @@ public final class Interaction {
             String first = hover == null ? (onBody(p) ? "Carry the build" : "Carry (aim at the build)")
                 : hover.kind == Handles.Kind.MOVE ? (endOn(hover.to.subtract(hover.from).normalize(), look) ? "Step to the side to drag it" : "Move " + axisWords(hover.axis))
                 : "Turn in quarter turns";
-            chips(mc, new Chips.Chip("Drag", first), new Chips.Chip("Scroll", "Push " + word(nudgeDir)), new Chips.Chip("Ctrl+Scroll", "Turn"),
-                new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"), new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo"),
-                new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
+            if (canPasteHere(mc)) {
+                chips(mc, new Chips.Chip("Drag", first), new Chips.Chip("Scroll", "Push " + word(nudgeDir)), new Chips.Chip("Ctrl+Scroll", "Turn"),
+                    new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"), new Chips.Chip(Ui.keyName(Keys.PASTE), "Paste it into the world"),
+                    new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo"),
+                    new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove (press twice)"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
+            } else {
+                chips(mc, new Chips.Chip("Drag", first), new Chips.Chip("Scroll", "Push " + word(nudgeDir)), new Chips.Chip("Ctrl+Scroll", "Turn"),
+                    new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"), new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo"),
+                    new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove (press twice)"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
+            }
         }
         handles.animate(hover, drag == null ? null : drag.handle, dt(), drag == null ? nudgeDir.getAxis() : null);
         handles.emit();

@@ -179,10 +179,10 @@ public final class SettingsScreen extends Screen {
 
     private int heightOf(Row row, int w) {
         return switch (row) {
-            case Toggle t -> 14 + Ui.wrap(t.desc, w - 16, 2).size() * 9 + 6;
-            case Slider s -> 12 + Ui.wrap(s.desc, w, 2).size() * 9 + TRACK_H + 10;
-            case Action a -> 22;
-            case Note n -> 14 + Ui.wrap(n.body, w, 6).size() * 9;
+            case Toggle t -> 14 + Ui.wrap(t.desc, w - 16, Integer.MAX_VALUE).size() * 9 + 6;
+            case Slider s -> 12 + Ui.wrap(s.desc, w, Integer.MAX_VALUE).size() * 9 + TRACK_H + 10;
+            case Action a -> Math.max(22, 6 + Ui.wrap(a.desc, w - 98, Integer.MAX_VALUE).size() * 9);
+            case Note n -> 14 + Ui.wrap(n.body, w, Integer.MAX_VALUE).size() * 9;
         };
     }
 
@@ -292,7 +292,7 @@ public final class SettingsScreen extends Screen {
         Ui.text(g, tg.label, l.x + 16, l.y + 1, Ui.withAlpha(over ? Ui.WHITE : Ui.LINE, a));
         Ui.right(g, on ? "On" : "Off", l.x + l.w, l.y + 1, Ui.withAlpha(on ? Ui.CYAN : Ui.DIM, a));
         int dy = l.y + 13;
-        for (String line : Ui.wrap(tg.desc, l.w - 16, 2)) {
+        for (String line : Ui.wrap(tg.desc, l.w - 16, Integer.MAX_VALUE)) {
             Ui.text(g, line, l.x + 16, dy, Ui.withAlpha(Ui.DIM, a));
             dy += 9;
         }
@@ -304,7 +304,7 @@ public final class SettingsScreen extends Screen {
         Ui.text(g, sl.label, l.x, l.y + 1, Ui.withAlpha(over || dragging.equals(sl.id) ? Ui.WHITE : Ui.LINE, a));
         Ui.right(g, sl.format.apply(sl.get.getAsDouble()), l.x + l.w, l.y + 1, Ui.withAlpha(Ui.CYAN, a));
         int dy = l.y + 12;
-        for (String line : Ui.wrap(sl.desc, l.w, 2)) {
+        for (String line : Ui.wrap(sl.desc, l.w, Integer.MAX_VALUE)) {
             Ui.text(g, line, l.x, dy, Ui.withAlpha(Ui.DIM, a));
             dy += 9;
         }
@@ -315,13 +315,17 @@ public final class SettingsScreen extends Screen {
         boolean confirm = System.nanoTime() - confirmNs < 3_000_000_000L;
         String label = confirm ? "Click again" : ac.label;
         Ui.button(g, "set#" + ac.id, l.x, l.y + 1, 90, 16, label, null, mx, my, down.equals(ac.id), true);
-        Ui.text(g, Ui.fit(confirm ? "This puts every setting back." : ac.desc, l.w - 98), l.x + 98, l.y + 5, Ui.withAlpha(confirm ? Ui.WARN : Ui.DIM, a));
+        int dy = l.y + 5;
+        for (String line : Ui.wrap(confirm ? "This puts every setting back." : ac.desc, l.w - 98, Integer.MAX_VALUE)) {
+            Ui.text(g, line, l.x + 98, dy, Ui.withAlpha(confirm ? Ui.WARN : Ui.DIM, a));
+            dy += 9;
+        }
     }
 
     private void note(GuiGraphicsExtractor g, Note n, Laid l, float a) {
         Ui.text(g, n.title, l.x, l.y + 2, Ui.withAlpha(Ui.LINE, a));
         int dy = l.y + 14;
-        for (String line : Ui.wrap(n.body, l.w, 6)) {
+        for (String line : Ui.wrap(n.body, l.w, Integer.MAX_VALUE)) {
             Ui.text(g, line, l.x, dy, Ui.withAlpha(Ui.DIM, a));
             dy += 9;
         }
