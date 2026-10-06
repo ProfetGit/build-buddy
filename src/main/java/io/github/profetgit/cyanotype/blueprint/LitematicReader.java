@@ -116,10 +116,18 @@ public final class LitematicReader {
         }
 
         ListTag teTag = tag.getListOrEmpty("TileEntities");
-        ListTag fixedPalette = paletteTag;
         List<CompoundTag> blockEntities = new ArrayList<>(teTag.size());
         for (int i = 0; i < teTag.size(); i++) blockEntities.add(teTag.getCompoundOrEmpty(i).copy());
+        return finishRegion(name, x, y, z, sx, sy, sz, paletteTag, blocks, blockEntities, fileData, current);
+    }
 
+    /**
+     * Makes a region from a palette of {Name, Properties} entries, the block indices and the block entities (each with local x, y, z),
+     * all as written by a game of data version {@code fileData}: an older one goes through the game's own data fixer first, so renamed
+     * blocks update. Shared by every format the mod reads.
+     */
+    static Region finishRegion(String name, int x, int y, int z, int sx, int sy, int sz, ListTag paletteTag, short[] blocks, List<CompoundTag> blockEntities, int fileData, int current) {
+        ListTag fixedPalette = paletteTag;
         if (fileData > 0 && fileData < current) {
             CompoundTag structure = new CompoundTag();
             ListTag sizeTag = new ListTag();

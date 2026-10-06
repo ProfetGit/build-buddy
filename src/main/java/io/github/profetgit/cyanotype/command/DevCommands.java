@@ -96,7 +96,7 @@ public final class DevCommands {
     private static void list() {
         List<Path> files = BlueprintLibrary.files();
         if (files.isEmpty()) {
-            say("No .litematic files yet. Put some in " + BlueprintLibrary.saveDir() + ", or try /cyanotype sample.");
+            say("No schematic files (.litematic, .schem, .schematic) yet. Put some in " + BlueprintLibrary.saveDir() + ", or try /cyanotype sample.");
             return;
         }
         for (Path p : files) say(p.getFileName().toString());
@@ -117,7 +117,7 @@ public final class DevCommands {
         BlueprintLibrary.load(found, bp -> {
             loaded = bp;
             loadedRef = BlueprintLibrary.refOf(found);
-            loadedName = bp.meta.name().isBlank() ? found.getFileName().toString().replaceFirst("(?i)\\.litematic$", "") : bp.meta.name();
+            loadedName = bp.meta.name().isBlank() ? found.getFileName().toString().replaceFirst("(?i)\\.(litematic|schem|schematic)$", "") : bp.meta.name();
             say(loadedName + ": " + bp.sizeX + " x " + bp.sizeY + " x " + bp.sizeZ + ", " + bp.totalBlocks() + " blocks, " + bp.regions.size() + " region(s), read in " + (System.nanoTime() - t0) / 1_000_000 + " ms.");
             if (!bp.unknownBlocks().isEmpty()) say("Unknown blocks (shown red): " + String.join(", ", bp.unknownBlocks()));
             say("Now /cyanotype place, then aim and click.");

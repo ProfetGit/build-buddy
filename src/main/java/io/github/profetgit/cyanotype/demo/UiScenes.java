@@ -168,7 +168,28 @@ final class UiScenes {
                 java.nio.file.Path dir = io.github.profetgit.cyanotype.placement.BlueprintLibrary.saveDir();
                 write(dir, "late-arrival", Samples.uniform(3, 3, 3));
                 java.nio.file.Files.writeString(dir.resolve("late-arrival.cyanotype.json"), "{\"tags\":[\"fresh\"]}");
-                java.nio.file.Files.write(dir.resolve("old-house.schematic"), new byte[]{1, 2, 3});
+                // an old MCEdit .schematic (stone, gold block, wool) and a Sponge .schem (planks), as other tools write them
+                net.minecraft.nbt.CompoundTag legacy = new net.minecraft.nbt.CompoundTag(), root = new net.minecraft.nbt.CompoundTag();
+                legacy.putShort("Width", (short) 3);
+                legacy.putShort("Height", (short) 1);
+                legacy.putShort("Length", (short) 1);
+                legacy.putString("Materials", "Alpha");
+                legacy.putByteArray("Blocks", new byte[]{1, 41, 35});
+                legacy.putByteArray("Data", new byte[]{0, 0, 14});
+                root.put("Schematic", legacy);
+                net.minecraft.nbt.NbtIo.writeCompressed(root, dir.resolve("old-house.schematic"));
+                net.minecraft.nbt.CompoundTag sp = new net.minecraft.nbt.CompoundTag(), pal = new net.minecraft.nbt.CompoundTag(), spRoot = new net.minecraft.nbt.CompoundTag();
+                pal.putInt("minecraft:air", 0);
+                pal.putInt("minecraft:oak_planks", 1);
+                sp.putInt("Version", 2);
+                sp.putInt("DataVersion", net.minecraft.SharedConstants.getCurrentVersion().dataVersion().version());
+                sp.putShort("Width", (short) 2);
+                sp.putShort("Height", (short) 2);
+                sp.putShort("Length", (short) 2);
+                sp.put("Palette", pal);
+                sp.putByteArray("BlockData", new byte[]{1, 1, 1, 1, 0, 1, 1, 0});
+                spRoot.put("Schematic", sp);
+                net.minecraft.nbt.NbtIo.writeCompressed(spRoot, dir.resolve("sponge-shed.schem"));
             } catch (java.io.IOException e) {
                 check("library/live files written", false, e.toString());
             }
@@ -178,9 +199,11 @@ final class UiScenes {
             var list = ((io.github.profetgit.cyanotype.ui.LibraryScreen) screen()).entries();
             var late = list.stream().filter(e -> e.fileName.equals("late-arrival.litematic")).findFirst().orElse(null);
             var old = list.stream().filter(e -> e.fileName.equals("old-house.schematic")).findFirst().orElse(null);
-            check("library/a file added to the folder appears by itself", late != null && list.size() == 9, list.size() + " entries");
+            var spongy = list.stream().filter(e -> e.fileName.equals("sponge-shed.schem")).findFirst().orElse(null);
+            check("library/a file added to the folder appears by itself", late != null && list.size() == 10, list.size() + " entries");
             check("library/its older tags file moved into the index and is gone", late != null && late.tags.contains("fresh") && !java.nio.file.Files.exists(io.github.profetgit.cyanotype.placement.BlueprintLibrary.saveDir().resolve("late-arrival.cyanotype.json")), late == null ? "none" : String.valueOf(late.tags));
-            check("library/a .schematic is listed and says it cannot be opened yet", old != null && old.error != null && old.error.contains("not supported"), old == null ? "none" : String.valueOf(old.error));
+            check("library/an old .schematic opens: three blocks, no error", old != null && old.error == null && old.info != null && old.info.blocks() == 3, old == null ? "none" : old.error + " / " + old.info);
+            check("library/a Sponge .schem opens: six blocks, no error", spongy != null && spongy.error == null && spongy.info != null && spongy.info.blocks() == 6 && spongy.info.sx() == 2, spongy == null ? "none" : spongy.error + " / " + spongy.info);
         });
         shot("library_6b_live");
         act(() -> {
@@ -188,6 +211,7 @@ final class UiScenes {
                 java.nio.file.Path dir = io.github.profetgit.cyanotype.placement.BlueprintLibrary.saveDir();
                 java.nio.file.Files.deleteIfExists(dir.resolve("late-arrival.litematic"));
                 java.nio.file.Files.deleteIfExists(dir.resolve("old-house.schematic"));
+                java.nio.file.Files.deleteIfExists(dir.resolve("sponge-shed.schem"));
             } catch (java.io.IOException e) {
                 check("library/live files removed", false, e.toString());
             }

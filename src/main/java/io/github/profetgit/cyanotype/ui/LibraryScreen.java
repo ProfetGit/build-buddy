@@ -24,7 +24,7 @@ import net.minecraft.resources.Identifier;
 
 /**
  * Every blueprint the player has, as a grid of cards: a small preview that turns while the mouse is on it, the name, the
- * size and the number of blocks. Type to search, pick a sort, click a card to start placing it, drop a .litematic file on
+ * size and the number of blocks. Type to search, pick a sort, click a card to start placing it, drop a schematic file on
  * the window to add it (PRD 7.1). With no files it says how to get some.
  */
 public final class LibraryScreen extends Screen {
@@ -55,7 +55,7 @@ public final class LibraryScreen extends Screen {
         @Override
         public void place(Path file) {
             onClose();
-            String title = file.getFileName().toString().replaceFirst("(?i)\\.litematic$", ""), ref = BlueprintLibrary.refOf(file);
+            String title = file.getFileName().toString().replaceFirst("(?i)\\.(litematic|schem|schematic)$", ""), ref = BlueprintLibrary.refOf(file);
             BlueprintLibrary.load(file, bp -> Interaction.startPlacing(title, bp, ref), why -> Interaction.say(minecraft, "Could not open " + file.getFileName() + ": " + why));
         }
 
@@ -387,7 +387,7 @@ public final class LibraryScreen extends Screen {
         Ui.icon(g, "folder", cx - 7, cy - 22, false);
         if (model.all().isEmpty()) {
             Ui.centered(g, "No blueprints yet", cx, cy, Ui.withAlpha(Ui.LINE, a));
-            Ui.centered(g, "Drop a .litematic file onto the window,", cx, cy + 14, Ui.withAlpha(Ui.DIM, a));
+            Ui.centered(g, "Drop a schematic file (.litematic, .schem) onto the window,", cx, cy + 14, Ui.withAlpha(Ui.DIM, a));
             Ui.centered(g, "or put one in the blueprints folder.", cx, cy + 25, Ui.withAlpha(Ui.DIM, a));
         } else {
             Ui.centered(g, "Nothing matches that", cx, cy, Ui.withAlpha(Ui.LINE, a));
@@ -557,14 +557,15 @@ public final class LibraryScreen extends Screen {
         int added = 0, skipped = 0;
         for (Path f : files) {
             String name = f.getFileName().toString();
-            if (!name.toLowerCase(Locale.ROOT).endsWith(".litematic")) {
+            if (!io.github.profetgit.cyanotype.blueprint.SchematicReader.opens(name)) {
                 skipped++;
                 continue;
             }
             try {
                 Files.createDirectories(BlueprintLibrary.saveDir());
                 Path target = BlueprintLibrary.saveDir().resolve(name);
-                for (int n = 2; Files.exists(target); n++) target = BlueprintLibrary.saveDir().resolve(name.replaceFirst("(?i)\\.litematic$", "") + " " + n + ".litematic");
+                String ext = name.substring(name.lastIndexOf('.'));
+                for (int n = 2; Files.exists(target); n++) target = BlueprintLibrary.saveDir().resolve(name.substring(0, name.lastIndexOf('.')) + " " + n + ext);
                 Files.copy(f, target, StandardCopyOption.COPY_ATTRIBUTES);
                 added++;
             } catch (IOException e) {
@@ -576,7 +577,7 @@ public final class LibraryScreen extends Screen {
         lastQuery = null;
         if (added > 0) Sfx.play(Sfx.COMPLETE);
         else Sfx.play(Sfx.ERROR);
-        say(added > 0 ? "Added " + added + (added == 1 ? " blueprint" : " blueprints") + (skipped > 0 ? ", skipped " + skipped : "") : "Only .litematic files can be added.");
+        say(added > 0 ? "Added " + added + (added == 1 ? " blueprint" : " blueprints") + (skipped > 0 ? ", skipped " + skipped : "") : "Only .litematic, .schem and .schematic files can be added.");
     }
 
     /** Dev demo: the Community tab's pane. */

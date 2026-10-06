@@ -2,7 +2,6 @@ package io.github.profetgit.cyanotype.placement;
 
 import io.github.profetgit.cyanotype.Cyanotype;
 import io.github.profetgit.cyanotype.blueprint.Blueprint;
-import io.github.profetgit.cyanotype.blueprint.LitematicReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -44,30 +43,13 @@ public final class BlueprintLibrary {
         return io.github.profetgit.cyanotype.ui.Settings.get().saveToSchematics ? litematicaDir() : ownDir();
     }
 
-    /** Every .litematic in both folders, sorted by name within each. */
+    /** Every schematic (.litematic, .schem, .schematic) in both folders, sorted by name within each. */
     public static List<Path> files() {
         List<Path> out = new ArrayList<>();
         for (Path dir : List.of(ownDir(), litematicaDir())) {
             if (!Files.isDirectory(dir)) continue;
             try (Stream<Path> s = Files.list(dir)) {
-                s.filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".litematic")).sorted().forEach(out::add);
-            } catch (IOException e) {
-                Cyanotype.LOG.warn("Cannot list {}", dir, e);
-            }
-        }
-        return out;
-    }
-
-    /** Files in the folders that are schematics of a kind this version cannot open (.schem, .schematic): the Library lists them with the reason. */
-    public static List<Path> foreignFiles() {
-        List<Path> out = new ArrayList<>();
-        for (Path dir : List.of(ownDir(), litematicaDir())) {
-            if (!Files.isDirectory(dir)) continue;
-            try (Stream<Path> s = Files.list(dir)) {
-                s.filter(p -> {
-                    String n = p.getFileName().toString().toLowerCase(Locale.ROOT);
-                    return n.endsWith(".schem") || n.endsWith(".schematic");
-                }).sorted().forEach(out::add);
+                s.filter(p -> io.github.profetgit.cyanotype.blueprint.SchematicReader.opens(p.getFileName().toString())).sorted().forEach(out::add);
             } catch (IOException e) {
                 Cyanotype.LOG.warn("Cannot list {}", dir, e);
             }
@@ -93,7 +75,7 @@ public final class BlueprintLibrary {
     public static Path find(String name) {
         for (Path p : files()) {
             String n = p.getFileName().toString();
-            if (n.equalsIgnoreCase(name) || n.equalsIgnoreCase(name + ".litematic")) return p;
+            if (n.equalsIgnoreCase(name) || n.equalsIgnoreCase(name + ".litematic") || n.equalsIgnoreCase(name + ".schem") || n.equalsIgnoreCase(name + ".schematic")) return p;
         }
         return null;
     }
@@ -110,7 +92,7 @@ public final class BlueprintLibrary {
                     if (c != null && c.modified == modified && c.size == size) bp = c.blueprint;
                 }
                 if (bp == null) {
-                    bp = LitematicReader.read(key);
+                    bp = io.github.profetgit.cyanotype.blueprint.SchematicReader.read(key);
                     synchronized (CACHE) {
                         CACHE.put(key, new Cached(modified, size, bp));
                     }

@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * What the Library screen shows: every .litematic in the blueprint folders, what is known about each (read on a worker
+ * What the Library screen shows: every schematic (.litematic, .schem, .schematic) in the blueprint folders, what is known about each (read on a worker
  * thread, a few at a time), and the search and sort over them. No drawing here.
  */
 public final class LibraryModel {
@@ -98,8 +98,7 @@ public final class LibraryModel {
         io.github.profetgit.cyanotype.placement.LibraryIndex.prune();
         List<Entry> old = new ArrayList<>(entries);
         entries.clear();
-        List<Path> listed = new ArrayList<>(BlueprintLibrary.files());
-        listed.addAll(BlueprintLibrary.foreignFiles());
+        List<Path> listed = BlueprintLibrary.files();
         lastSignature = signature(listed);
         for (Path p : listed) {
             long modified = 0, bytes = 0;
@@ -132,9 +131,7 @@ public final class LibraryModel {
 
     /** Whether a file was added, removed or changed in the folders since the last look. Cheap: a listing and a stat per file. */
     public boolean changedOnDisk() {
-        List<Path> listed = new ArrayList<>(BlueprintLibrary.files());
-        listed.addAll(BlueprintLibrary.foreignFiles());
-        return !signature(listed).equals(lastSignature);
+        return !signature(BlueprintLibrary.files()).equals(lastSignature);
     }
 
     static List<String> readTags(Path file) {
@@ -177,14 +174,9 @@ public final class LibraryModel {
         if (e.requested) return;
         e.requested = true;
         int res = res();
-        String lower = e.fileName.toLowerCase(Locale.ROOT);
-        if (!lower.endsWith(".litematic")) {
-            e.error = "This version opens .litematic files only; " + (lower.endsWith(".schematic") ? ".schematic is the old MCEdit format" : ".schem is the Sponge/WorldEdit format") + ". It is not supported yet";
-            return;
-        }
         net.minecraft.util.Util.backgroundExecutor().execute(() -> {
             try {
-                Blueprint bp = io.github.profetgit.cyanotype.blueprint.LitematicReader.read(e.file);
+                Blueprint bp = io.github.profetgit.cyanotype.blueprint.SchematicReader.read(e.file);
                 e.info = Info.of(bp);
                 int w = THUMB_SHOW_W * res, h = THUMB_SHOW_H * res;
                 int[][] frames = Thumbnail.texturedFrames(bp, THUMB_FRAMES, w, h, res >= 3 ? 2 : 3);
