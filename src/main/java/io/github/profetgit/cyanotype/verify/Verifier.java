@@ -84,6 +84,15 @@ public final class Verifier {
     private boolean enqueued;
     private int pollTick;
     private long changes;
+    /** Sections looked at at least once, of all of them: until every one has been, the counts say nothing about the build. */
+    private int checkedSections;
+    private final int totalSections;
+    /** The most blocks that were still to do since the first full look: the length of the way, what progress is measured against. */
+    private int peakTodo;
+    /** When the build last became finished and has stayed so (nanoTime), or 0. */
+    private long doneSince;
+    /** A finished build must stay finished this long before it is called done (a block flickering through a recheck is not). */
+    static long doneHoldNs = 500_000_000L;
 
     public Verifier(List<OrientedRegion> regions, int originX, int originY, int originZ, Matcher matcher) {
         this.originX = originX;
@@ -96,6 +105,9 @@ public final class Verifier {
             h = Math.max(h, r.oy + r.sy);
         }
         this.height = h;
+        int total = 0;
+        for (Part p : parts) total += p.sections();
+        this.totalSections = total;
         this.layers = new int[h][STATES];
         for (Part p : parts) {
             int x0 = Math.floorDiv(p.wx, 16), x1 = Math.floorDiv(p.wx + p.region.sx - 1, 16);
@@ -115,6 +127,64 @@ public final class Verifier {
 
     public Counts counts() {
         return new Counts(counts[CORRECT], counts[MISSING], counts[WRONG], counts[UNKNOWN], counts[UNLOADED]);
+    }
+
+    /** How the build stands, for the people who read it: see {@link Phase}. */
+    public enum Phase {
+        /** The first look at the world is not finished: nothing is known yet, so nothing is claimed. */
+        CHECKING,
+        /** Looked at everything and there is nothing to judge (all air, unknown or not loaded). */
+        EMPTY,
+        BUILDING,
+        /** Everything is placed, and it has stayed so for half a second. */
+        DONE
+    }
+
+    /** Whether every section has been looked at once. */
+    public boolean scanned() {
+        return checkedSections >= totalSections;
+    }
+
+    /** How much of the first look is done, 0..1. */
+    public double scanFraction() {
+        return totalSections == 0 ? 1.0 : Math.min(1.0, checkedSections / (double) totalSections);
+    }
+
+    public Phase phase() {
+        if (!scanned()) return Phase.CHECKING;
+        Counts c = counts();
+        if (done()) return Phase.DONE;
+        if (c.judged() == 0) return Phase.EMPTY;
+        return Phase.BUILDING;
+    }
+
+    /** True once everything judged is right, nothing is unloaded, nothing is waiting to be rechecked, and it has stayed so for a moment. */
+    public boolean done() {
+        return doneSince != 0 && System.nanoTime() - doneSince >= doneHoldNs;
+    }
+
+    /**
+     * How far the build has come, 0..1: of the blocks that were to be placed when the world was first looked at, the share
+     * that no longer are. Blocks that already stood right before anything was placed (the world's own dirt, a tree of the same
+     * wood) are not progress, so a fresh placement starts at 0 and not at some per cent. Breaking something that was done
+     * lengthens the way (the peak of what was to do) instead of making progress negative.
+     */
+    public double progress() {
+        if (!scanned()) return 0;
+        int todo = counts[MISSING] + counts[WRONG];
+        if (todo == 0) return counts().judged() == 0 ? 0 : 1.0;
+        return Math.max(0, 1.0 - todo / (double) Math.max(peakTodo, todo));
+    }
+
+    /** One line about how it stands, for labels and lists: "checking 40%", "done", "12% 5000 to go". */
+    public String summary() {
+        Counts c = counts();
+        return switch (phase()) {
+            case CHECKING -> "checking " + Math.round(scanFraction() * 100) + "%";
+            case EMPTY -> c.unloaded() > 0 ? c.unloaded() + " not loaded" : "-";
+            case DONE -> "done";
+            case BUILDING -> Math.round(progress() * 100) + "%  " + c.todo() + " to go" + (c.unloaded() > 0 ? "  (" + c.unloaded() + " not loaded)" : "");
+        };
     }
 
     /** Cells in a state in one layer (height above the placement's base). */
@@ -260,7 +330,10 @@ public final class Verifier {
                 it.remove();
             }
             for (int i = 0; i < batch.size(); i++) recheck(world, batch.getLong(i));
-            if (System.nanoTime() >= deadline) return true;
+            if (System.nanoTime() >= deadline) {
+                settle(true);
+                return true;
+            }
         }
         while (!queue.isEmpty()) {
             int[] job = queue.poll();
@@ -269,7 +342,22 @@ public final class Verifier {
             checkSection(world, p, job[1]);
             if (System.nanoTime() >= deadline) break;
         }
-        return !queue.isEmpty() || !dirty.isEmpty();
+        boolean left = !queue.isEmpty() || !dirty.isEmpty();
+        settle(left);
+        return left;
+    }
+
+    /** Keeps the headline numbers honest after a slice of work: the length of the way, and whether it has stayed finished. */
+    private void settle(boolean workLeft) {
+        if (!scanned()) {
+            doneSince = 0;
+            return;
+        }
+        int todo = counts[MISSING] + counts[WRONG];
+        peakTodo = Math.max(peakTodo, todo);
+        boolean finished = !workLeft && todo == 0 && counts[UNLOADED] == 0 && counts().judged() > 0;
+        if (!finished) doneSince = 0;
+        else if (doneSince == 0) doneSince = System.nanoTime();
     }
 
     private void enqueueAll(double nx, double ny, double nz) {
@@ -333,6 +421,7 @@ public final class Verifier {
         p.hasUnloaded[sec] = unloaded;
         if (!p.checked[sec]) {
             p.checked[sec] = true;
+            checkedSections++;
             p.version[sec]++;
             changes++;
         }

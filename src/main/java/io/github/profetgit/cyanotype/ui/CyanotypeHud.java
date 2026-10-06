@@ -15,6 +15,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
  */
 public final class CyanotypeHud {
     private static boolean wasDone;
+    private static Verifier lastVerifier;
     private static long doneAtNs;
 
     private CyanotypeHud() {
@@ -53,6 +54,21 @@ public final class CyanotypeHud {
         Verifier v = p == null || !p.locked ? null : GhostRenderer.verifierOf(p);
         boolean show = v != null && !GhostRenderer.hidden && (Placements.mode() != Placements.Mode.IDLE || near(mc, p, 96));
         float a = Motion.follow("hud#progress", show ? 1f : 0f, 0.15);
+        // what the verifier says, every frame, whether or not the panel is on show: the done sound belongs to the moment the
+        // build is finished, not to the moment the panel appears, and never to a verifier that has only just been made
+        Verifier.Phase phase = v == null ? Verifier.Phase.CHECKING : v.phase();
+        if (v != lastVerifier) {
+            lastVerifier = v;
+            wasDone = phase == Verifier.Phase.DONE;
+        }
+        boolean done = phase == Verifier.Phase.DONE;
+        if (done && !wasDone && show) {
+            doneAtNs = System.nanoTime();
+            Sfx.play(Sfx.COMPLETE);
+        } else if (done && !wasDone) {
+            doneAtNs = System.nanoTime() - 10_000_000_000L;
+        }
+        wasDone = done;
         if (v == null || a < 0.02f) return;
         Counts c = v.counts();
         int w = 196, h = 40, x = (g.guiWidth() - w) / 2, y = 6 - (int) Math.round((1 - a) * 12);
@@ -67,20 +83,25 @@ public final class CyanotypeHud {
         } else {
             Ui.right(g, p.sizeX() + " x " + p.sizeY() + " x " + p.sizeZ(), x + w - 8, y + 6, Ui.withAlpha(Ui.DIM, inner));
         }
-        Ui.bar(g, "hud#bar", x + 8, y + 18, w - 16, 8, c.progress(), t);
-        String status = c.done() ? "Done" : c.judged() == 0 ? (c.unloaded() > 0 ? c.unloaded() + " blocks not loaded" : "Nothing to build")
-            : Math.round(c.progress() * 100) + "%   " + c.todo() + " to go" + (c.unloaded() > 0 ? "   (" + c.unloaded() + " not loaded)" : "");
-        Ui.centered(g, status, x + w / 2, y + 29, Ui.withAlpha(c.done() ? Ui.GOOD : Ui.CYAN, inner));
-        stamp(g, c.done(), x, y, w, h, t);
+        double fraction = switch (phase) {
+            case CHECKING -> v.scanFraction();
+            case EMPTY -> 0;
+            case BUILDING -> v.progress();
+            case DONE -> 1;
+        };
+        Ui.bar(g, "hud#bar", x + 8, y + 18, w - 16, 8, fraction, t);
+        String status = switch (phase) {
+            case CHECKING -> "Checking the world...  " + Math.round(v.scanFraction() * 100) + "%";
+            case EMPTY -> c.unloaded() > 0 ? c.unloaded() + " blocks not loaded" : "Nothing to build";
+            case DONE -> "Done";
+            case BUILDING -> Math.round(v.progress() * 100) + "%   " + c.todo() + " to go" + (c.unloaded() > 0 ? "   (" + c.unloaded() + " not loaded)" : "");
+        };
+        Ui.centered(g, status, x + w / 2, y + 29, Ui.withAlpha(phase == Verifier.Phase.DONE ? Ui.GOOD : phase == Verifier.Phase.CHECKING ? Ui.DIM : Ui.CYAN, inner));
+        stamp(g, done, x, y, w, h, t);
     }
 
     /** The "done" moment: a sound, a ring of small sparkles, and a stamped mark over the corner of the panel. */
     private static void stamp(GuiGraphicsExtractor g, boolean done, int x, int y, int w, int h, double t) {
-        if (done && !wasDone) {
-            doneAtNs = System.nanoTime();
-            Sfx.play(Sfx.COMPLETE);
-        }
-        wasDone = done;
         if (!done) return;
         double since = (System.nanoTime() - doneAtNs) / 1e9;
         if (since > 600) return;

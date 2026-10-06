@@ -119,8 +119,12 @@ public final class PlacedScreen extends Screen {
             Verifier v = GhostRenderer.verifierOf(p);
             String info = p.sizeX() + " x " + p.sizeY() + " x " + p.sizeZ();
             if (v != null) {
-                Counts c = v.counts();
-                info += c.done() ? "   done" : c.judged() == 0 ? "" : "   " + Math.round(c.progress() * 100) + "%";
+                info += switch (v.phase()) {
+                    case CHECKING -> "   checking...";
+                    case EMPTY -> "";
+                    case DONE -> "   done";
+                    case BUILDING -> "   " + Math.round(v.progress() * 100) + "%";
+                };
             } else if (p.status == Placement.Status.MISSING) {
                 info = "file missing";
             } else if (p.status == Placement.Status.FAILED) {

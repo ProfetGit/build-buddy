@@ -264,7 +264,7 @@ public final class DevCommands {
             return;
         }
         Counts c = v.counts();
-        say(p.name + ": " + Math.round(c.progress() * 100) + "% built. " + c.correct() + " right, " + c.missing() + " missing, " + c.wrong() + " wrong"
+        say(p.name + ": " + (v.scanned() ? Math.round(v.progress() * 100) + "% built. " : "still checking the world (" + Math.round(v.scanFraction() * 100) + "%). ") + c.correct() + " right, " + c.missing() + " missing, " + c.wrong() + " wrong"
             + (c.unknown() > 0 ? ", " + c.unknown() + " unknown blocks" : "") + (c.unloaded() > 0 ? ", " + c.unloaded() + " in chunks that are not loaded" : "") + (v.settled() ? "." : " (still checking)."));
         for (int l = 0; l < v.height; l++) {
             int todo = v.layerCount(l, Verifier.MISSING) + v.layerCount(l, Verifier.WRONG);

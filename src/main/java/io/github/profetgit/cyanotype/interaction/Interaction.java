@@ -937,7 +937,7 @@ public final class Interaction {
                     float dimScale = Handles.labelScale(dist, 0.55, 0.036);
                     String sizeText = p.sizeX() + " x " + p.sizeY() + " x " + p.sizeZ();
                     Verifier v = GhostRenderer.verifierOf(p);
-                    if (v != null) sizeText += "   " + progressText(v.counts());
+                    if (v != null) sizeText += "   " + v.summary();
                     Handles.label(new Vec3(lx, box.maxY + lift - 0.2 * nameScale, lz), sizeText, dimScale, 0xFFB8D8FF, 0x66FFFFFF);
                 }
             }
@@ -946,12 +946,6 @@ public final class Interaction {
         CellHighlight.emit(camera);
     }
 
-    /** "42%  310 to go" or "done". */
-    public static String progressText(Counts c) {
-        if (c.done()) return "done";
-        if (c.judged() == 0) return c.unloaded() > 0 ? c.unloaded() + " not loaded" : "-";
-        return Math.round(c.progress() * 100) + "%  " + c.todo() + " to go" + (c.unloaded() > 0 ? "  (" + c.unloaded() + " not loaded)" : "");
-    }
 
     /** Marks the nearest block still to do in the lowest unfinished layer, and says where it is. */
     private static void nextBlock(Minecraft mc, Vec3 camera, Placement active) {

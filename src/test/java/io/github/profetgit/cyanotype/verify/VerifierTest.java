@@ -292,4 +292,102 @@ class VerifierTest {
         // strict wants every property
         assertFalse(Matcher.STRICT.matches(door.setValue(DoorBlock.OPEN, true), door));
     }
+
+    // ---- the headline numbers: honest while checking, not fooled by what already stood, done only when it has stayed done
+
+    @Test
+    void aNewVerifierSaysNothingUntilItHasLookedAtTheWorld() {
+        Blueprint bp = blueprint(4, 3, 4, (c, k) -> c[1] == 0 ? STONE : null);
+        Verifier v = verifier(bp, Orientation.NONE, 0, 64, 0);
+        // before any work every count is zero, which must not read as "done" (it used to: a build that was moved or turned
+        // got a new verifier, and the new one said "complete" with its sound until it had looked)
+        assertEquals(Verifier.Phase.CHECKING, v.phase());
+        assertFalse(v.done());
+        assertEquals(0.0, v.progress(), 1e-9);
+        assertEquals(0.0, v.scanFraction(), 1e-9);
+        assertTrue(v.summary().startsWith("checking"));
+        FakeWorld w = new FakeWorld();
+        v.process(w, 50_000_000L, 0, 0, 0);
+        v.process(w, 50_000_000L, 0, 0, 0);
+        assertTrue(v.scanned());
+        assertEquals(Verifier.Phase.BUILDING, v.phase());
+    }
+
+    @Test
+    void whatAlreadyStoodRightBeforeAnythingWasPlacedIsNotProgress() {
+        // the world already has stone where a third of the floor goes (the placement overlaps natural blocks)
+        Blueprint bp = blueprint(6, 1, 6, (c, k) -> STONE);
+        Verifier v = verifier(bp, Orientation.NONE, 0, 64, 0);
+        FakeWorld w = new FakeWorld();
+        for (int x = 0; x < 6; x++) for (int z = 0; z < 2; z++) w.set(x, 64, z, STONE);
+        run(v, w);
+        assertEquals(12, v.counts().correct());
+        assertEquals(24, v.counts().todo());
+        assertEquals(0.0, v.progress(), 1e-9, "nothing has been placed: 0%, not 33%");
+        for (int x = 0; x < 6; x++) w.set(x, 64, 2, STONE);
+        for (int x = 0; x < 6; x++) v.markDirty(BlockPos.asLong(x, 64, 2));
+        run(v, w);
+        assertEquals(6 / 24.0, v.progress(), 1e-9, "six of the 24 that were to place");
+        assertFalse(v.done());
+    }
+
+    @Test
+    void doneNeedsTheScanTheHoldAndNothingWaiting() {
+        Verifier.doneHoldNs = 0;
+        try {
+            Blueprint bp = blueprint(4, 1, 4, (c, k) -> STONE);
+            Verifier v = verifier(bp, Orientation.NONE, 0, 64, 0);
+            FakeWorld w = new FakeWorld();
+            run(v, w);
+            assertFalse(v.done());
+            buildAll(v, w);
+            for (int x = 0; x < 4; x++) for (int z = 0; z < 4; z++) v.markDirty(BlockPos.asLong(x, 64, z));
+            run(v, w);
+            assertTrue(v.done());
+            assertEquals(Verifier.Phase.DONE, v.phase());
+            assertEquals(1.0, v.progress(), 1e-9);
+            // breaking one block takes it back out of done at once
+            w.set(1, 64, 1, Blocks.AIR.defaultBlockState());
+            v.markDirty(BlockPos.asLong(1, 64, 1));
+            run(v, w);
+            assertFalse(v.done());
+            assertEquals(Verifier.Phase.BUILDING, v.phase());
+            assertTrue(v.progress() < 1.0 && v.progress() >= 0.0);
+            // a new verifier for the same finished build (the placement was moved over it) is not done until it has looked
+            Verifier again = verifier(bp, Orientation.NONE, 0, 64, 0);
+            assertFalse(again.done());
+            assertEquals(Verifier.Phase.CHECKING, again.phase());
+        } finally {
+            Verifier.doneHoldNs = 500_000_000L;
+        }
+    }
+
+    @Test
+    void aFinishedBuildMustStayFinishedForAMomentToBeCalledDone() {
+        Blueprint bp = blueprint(2, 1, 2, (c, k) -> STONE);
+        Verifier v = verifier(bp, Orientation.NONE, 0, 64, 0);
+        FakeWorld w = new FakeWorld();
+        buildAll(v, w);
+        run(v, w);
+        assertEquals(4, v.counts().correct());
+        assertFalse(v.done(), "the instant it is right it is not yet 'done'");
+        assertEquals(Verifier.Phase.BUILDING, v.phase(), "it is held back as building for that moment");
+    }
+
+    @Test
+    void unloadedChunksKeepItFromBeingDone() {
+        Verifier.doneHoldNs = 0;
+        try {
+            Blueprint bp = blueprint(4, 1, 4, (c, k) -> STONE);
+            Verifier v = verifier(bp, Orientation.NONE, 0, 64, 0);
+            FakeWorld w = new FakeWorld();
+            buildAll(v, w);
+            w.unloaded.add(0L);
+            run(v, w);
+            assertTrue(v.scanned());
+            assertFalse(v.done());
+        } finally {
+            Verifier.doneHoldNs = 500_000_000L;
+        }
+    }
 }
