@@ -10,3 +10,7 @@ logs/
 __pycache__/
 run/
 dev/sounds/out/
+dev/icon/out/
+dev/icon/contact*.png
+dev/icon/review*.png
+dev/icon/sprites/review*.png

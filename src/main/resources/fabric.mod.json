@@ -7,6 +7,7 @@
   "authors": ["${author}"],
   "contact": { "homepage": "${homepage}" },
   "license": "LicenseRef-All-Rights-Reserved",
+  "icon": "assets/cyanotype/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": ["io.github.profetgit.cyanotype.Cyanotype"]
