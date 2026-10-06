@@ -180,11 +180,12 @@ final class NudgeScenes {
         until("mega/baked and drawn", 1200, () -> GhostRenderer.verifierOf(house) != null && GhostRenderer.settled() && GhostRenderer.drawn(house));
         look(-12, G + 40, 110, -90, 5);
         act(() -> {
-            for (String id : new String[]{"move-x", "move+y", "move-y"}) {
-                Vec3 a = Interaction.handleAnchor(id);
-                double d = a == null ? 1e9 : a.distanceTo(mc().player.getEyePosition());
-                check("mega/the " + id + " arrow is within reach of a walk on a 160-block build", d < 40, String.format("%.1f blocks away", d));
-            }
+            Vec3 w = Interaction.handleAnchor("move-x"), e = Interaction.handleAnchor("move+x");
+            double d = w == null ? 1e9 : w.distanceTo(mc().player.getEyePosition());
+            check("mega/the west arrow stands within reach of a walk on a 160-block build", d < 40, String.format("%.1f blocks away", d));
+            check("mega/the west and east arrows are the same height and mirror each other", w != null && e != null && Math.abs(w.y - e.y) < 1e-6 && Math.abs(w.z - e.z) < 1e-6, w + " / " + e);
+            Vec3 up = Interaction.handleAnchor("move+y"), down = Interaction.handleAnchor("move-y");
+            check("mega/the up and down arrows stand on one vertical line", up != null && down != null && Math.abs(up.x - down.x) < 1e-6 && Math.abs(up.z - down.z) < 1e-6, up + " / " + down);
         });
         shot("mega_0_arrows");
         // grab the up arrow where it stands and drag it three blocks: it works though the top is 160 blocks up

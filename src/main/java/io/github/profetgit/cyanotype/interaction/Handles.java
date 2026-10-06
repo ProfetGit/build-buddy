@@ -66,12 +66,14 @@ final class Handles {
     final Vec3 look;
     /** Distance to the camera, for text that has to stay readable. */
     final double distance;
-    /** The most a face arrow is scaled up for distance: further away it stays this size and the build is just far. */
+    /** The most an arrow is scaled up for distance: further away it stays this size and the build is just far. */
     static final double MAX_ARROW_SCALE = 8.0;
     /** The smallest a handle's grab box gets, per block of distance: about 30 pixels on a 1080p screen whatever the build's size. */
     static final double PICK_PER_BLOCK = 0.025;
     /** The widest the turn ring is drawn, in blocks of radius. */
     static final double RING_MAX = 24.0;
+    /** The highest above the base the sideways arrows of a tall build stand: what a player can reach from the ground. */
+    static final double REACH_HEIGHT = 6.0;
 
     /**
      * How big the arrows of a build are drawn, in the unit the arrow shapes are built from (a face arrow is 2.8 units long).
@@ -104,24 +106,17 @@ final class Handles {
         double ref = Math.max(sx, Math.max(sy, sz));
         this.scale = arrowScale(dist, ref, 12.0);
 
-        // a face arrow stands on the point of its face nearest the camera, not at the face's middle: on a build a hundred
-        // blocks tall the middle of the top is out of sight and out of reach, the nearest point never is
-        double[] lo = {x0, y0, z0}, size = {sx, sy, sz}, cam = {camera.x, camera.y, camera.z};
+        // the arrows stand on fixed places of the build and never move with the camera, so a player can walk round to the side
+        // of an arrow that points at them. Each pair mirrors: the same spot on both faces. Up and down stand at the middle of
+        // the footprint; the four sideways ones at the middle of their face, as high as the middle of the build, but on a tall
+        // build no higher than a player can reach standing (6 above the base)
+        double armY = y0 + Math.min(sy / 2, REACH_HEIGHT);
         for (Direction d : Direction.values()) {
-            int a = d.getAxis().ordinal();
-            double[] at = new double[3];
-            for (int i = 0; i < 3; i++) {
-                if (i == a) {
-                    at[i] = lo[i] + (d.getAxisDirection() == Direction.AxisDirection.POSITIVE ? size[i] : 0);
-                } else {
-                    double inset = Math.min(1.0, size[i] / 2);
-                    at[i] = Math.max(lo[i] + inset, Math.min(lo[i] + size[i] - inset, cam[i]));
-                }
-            }
-            Vec3 face = new Vec3(at[0], at[1], at[2]);
-            // on a tall build the top and bottom are out of reach whatever the camera does: the up and down arrows then stand
-            // beside the nearest wall at eye level instead
-            if (d.getAxis() == Direction.Axis.Y && tall(camera, face, sy)) face = sideMount(camera, d, lo, size);
+            Vec3 face = switch (d.getAxis()) {
+                case X -> new Vec3(d.getAxisDirection() == Direction.AxisDirection.POSITIVE ? x0 + sx : x0, armY, cz);
+                case Z -> new Vec3(cx, armY, d.getAxisDirection() == Direction.AxisDirection.POSITIVE ? z0 + sz : z0);
+                case Y -> new Vec3(cx, d.getAxisDirection() == Direction.AxisDirection.POSITIVE ? y0 + sy : y0, cz);
+            };
             double fd = camera.distanceTo(face);
             double s = arrowScale(fd, ref, MAX_ARROW_SCALE);
             double gap = 0.45 * s, len = 2.8 * s, spick = Math.max(0.45 * s, PICK_PER_BLOCK * fd);
@@ -136,36 +131,6 @@ final class Handles {
         ring = new Ring(cx, cz, y0 + 0.05, radius, Math.max(0.45 * scale, PICK_PER_BLOCK * dist), scale);
         if (facesOnly) return;
         handles.add(new Handle(Kind.RING, null, Direction.Axis.Y, RING_COLOR, Vec3.ZERO, Vec3.ZERO, new double[0][], scale));
-    }
-
-    /** Whether a face point is too far above or below the camera to be a good place for an arrow: a build over 16 blocks tall, with the point more than 20 away. */
-    static boolean tall(Vec3 camera, Vec3 point, double height) {
-        return height > 16 && camera.distanceTo(point) > 20;
-    }
-
-    /** The wall of the box nearest the camera's horizontal position: {outward x, outward z, tangent x, tangent z, wall x, wall z}. */
-    private static double[] nearestWall(Vec3 camera, double[] lo, double[] size) {
-        double qx = Math.max(lo[0], Math.min(lo[0] + size[0], camera.x)), qz = Math.max(lo[2], Math.min(lo[2] + size[2], camera.z));
-        double dxLo = qx - lo[0], dxHi = lo[0] + size[0] - qx, dzLo = qz - lo[2], dzHi = lo[2] + size[2] - qz;
-        double m = Math.min(Math.min(dxLo, dxHi), Math.min(dzLo, dzHi));
-        if (m == dxLo) return new double[]{-1, 0, 0, 1, lo[0], qz};
-        if (m == dxHi) return new double[]{1, 0, 0, 1, lo[0] + size[0], qz};
-        if (m == dzLo) return new double[]{0, -1, 1, 0, qx, lo[2]};
-        return new double[]{0, 1, 1, 0, qx, lo[2] + size[2]};
-    }
-
-    private static Vec3 tangentOf(Vec3 camera, double[] lo, double[] size) {
-        double[] w = nearestWall(camera, lo, size);
-        return new Vec3(w[2], 0, w[3]);
-    }
-
-    /** Where an up or down arrow stands on a tall build: just outside the nearest wall at the camera's height, up to the left, down to the right. */
-    private static Vec3 sideMount(Vec3 camera, Direction d, double[] lo, double[] size) {
-        double[] w = nearestWall(camera, lo, size);
-        double y = Math.max(lo[1] + 1, Math.min(lo[1] + size[1] - 1, camera.y));
-        double s = arrowScale(camera.distanceTo(new Vec3(w[4], y, w[5])), Math.max(size[0], Math.max(size[1], size[2])), MAX_ARROW_SCALE);
-        double side = (d == Direction.UP ? 1 : -1) * 1.6 * s, out = 1.2 * s;
-        return new Vec3(w[4] + w[0] * out + w[2] * side, y, w[5] + w[1] * out + w[3] * side);
     }
 
     static int axisColor(Direction.Axis a) {

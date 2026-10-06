@@ -20,43 +20,41 @@ class HandlesGeometryTest {
     }
 
     @Test
-    void aSmallBuildKeepsItsArrowsAtTheMiddleOfEachFaceOrNearIt() {
-        Vec3 cam = new Vec3(5, 6, -12);
-        Handles h = new Handles(0, 0, 0, 10, 10, 10, cam, new Vec3(0, 0, 1));
-        // the camera is straight in front of the middle: the north arrow stands there
-        assertEquals(5.0, base(move(h, Direction.NORTH)).x, 1e-6);
-        assertEquals(6.0, base(move(h, Direction.NORTH)).y, 1e-6);
-        assertTrue(base(move(h, Direction.NORTH)).z < 0);
-        // and the top arrow is above the top, as it always was (a short build is not tall)
-        assertTrue(base(move(h, Direction.UP)).y > 10);
-    }
-
-    @Test
-    void onAHugeBuildEveryArrowStandsNearTheCamera() {
-        Vec3 cam = new Vec3(-6, 90, 100);
-        Handles h = new Handles(0, 0, 0, 200, 200, 200, cam, new Vec3(1, 0, 0));
-        // the middle of the east face is 200 blocks away; the arrows of the faces the camera is by are within a short walk
-        for (Direction d : new Direction[]{Direction.WEST, Direction.UP, Direction.DOWN}) {
-            double dist = base(move(h, d)).distanceTo(cam);
-            assertTrue(dist < 40, d + " arrow " + dist + " blocks from the camera");
+    void theArrowsStandOnFixedPlacesAndNeverFollowTheCamera() {
+        Handles a = new Handles(0, 0, 0, 12, 8, 14, new Vec3(-20, 3, 7), new Vec3(1, 0, 0));
+        Handles b = new Handles(0, 0, 0, 12, 8, 14, new Vec3(30, 20, -9), new Vec3(-1, -0.4, 0.2).normalize());
+        for (Direction d : Direction.values()) {
+            // the arrow is bigger or smaller with the distance, but it stands on the same line of the build
+            double[] pa = {base(move(a, d)).x, base(move(a, d)).y, base(move(a, d)).z}, pb = {base(move(b, d)).x, base(move(b, d)).y, base(move(b, d)).z};
+            for (int i = 0; i < 3; i++) {
+                if (i != d.getAxis().ordinal()) assertEquals(pa[i], pb[i], 1e-9, d + " axis " + i);
+            }
         }
-        // the others stand at the nearest point of their face, which is as near as that face gets
-        assertTrue(base(move(h, Direction.NORTH)).distanceTo(cam) < 110);
     }
 
     @Test
-    void theUpArrowOfATallBuildStandsBesideTheWallAtEyeLevel() {
-        Vec3 cam = new Vec3(-6, 90, 100);
-        Handles h = new Handles(0, 0, 0, 200, 200, 200, cam, new Vec3(1, 0, 0));
-        Handles.Handle up = move(h, Direction.UP), down = move(h, Direction.DOWN);
-        assertEquals(90.0, up.from.y, 3.0);
-        assertEquals(90.0, down.from.y, 3.0);
-        // up points up, down points down, and they do not overlap
-        assertTrue(up.to.y > up.from.y);
-        assertTrue(down.to.y < down.from.y);
-        assertTrue(up.from.distanceTo(down.from) > 2.0);
-        // outside the west wall, the one the camera is at
-        assertTrue(up.from.x < 0 && down.from.x < 0);
+    void everyPairMirrorsItselfAcrossTheBuild() {
+        Handles h = new Handles(2, 1, 3, 12, 8, 14, new Vec3(-20, 3, 7), new Vec3(1, 0, 0));
+        // up and down share their x and z (the middle of the footprint), east and west their y and z, north and south their x and y
+        assertEquals(base(move(h, Direction.UP)).x, base(move(h, Direction.DOWN)).x, 1e-9);
+        assertEquals(base(move(h, Direction.UP)).z, base(move(h, Direction.DOWN)).z, 1e-9);
+        assertEquals(8.0, base(move(h, Direction.UP)).x, 1e-9);
+        assertEquals(10.0, base(move(h, Direction.UP)).z, 1e-9);
+        assertEquals(base(move(h, Direction.EAST)).y, base(move(h, Direction.WEST)).y, 1e-9);
+        assertEquals(base(move(h, Direction.EAST)).z, base(move(h, Direction.WEST)).z, 1e-9);
+        assertEquals(base(move(h, Direction.NORTH)).x, base(move(h, Direction.SOUTH)).x, 1e-9);
+        assertEquals(base(move(h, Direction.NORTH)).y, base(move(h, Direction.SOUTH)).y, 1e-9);
+        assertTrue(base(move(h, Direction.UP)).y > 9 && base(move(h, Direction.DOWN)).y < 1);
+    }
+
+    @Test
+    void onATallBuildTheSidewaysArrowsStayWithinStandingReach() {
+        Handles h = new Handles(0, 0, 0, 200, 200, 200, new Vec3(-6, 90, 100), new Vec3(1, 0, 0));
+        for (Direction d : new Direction[]{Direction.EAST, Direction.WEST, Direction.NORTH, Direction.SOUTH}) {
+            assertEquals(Handles.REACH_HEIGHT, base(move(h, d)).y, 1.0, d + " height");
+        }
+        Handles shed = new Handles(0, 0, 0, 8, 6, 8, new Vec3(-6, 2, 4), new Vec3(1, 0, 0));
+        assertEquals(3.0, base(move(shed, Direction.EAST)).y, 1.0, "a short build: the middle");
     }
 
     @Test
@@ -64,29 +62,29 @@ class HandlesGeometryTest {
         Vec3 far = new Vec3(-600, 50, 50);
         Handles h = new Handles(0, 0, 0, 100, 100, 100, far, new Vec3(1, 0, 0));
         for (Direction d : Direction.values()) assertTrue(move(h, d).scale <= Handles.MAX_ARROW_SCALE + 1e-9 && move(h, d).scale >= 1.0);
-        // close to a face of a big build, its arrow is small even though the middle of the build is far
-        Handles near = new Handles(0, 0, 0, 400, 100, 400, new Vec3(-3, 50, 200), new Vec3(1, 0, 0));
-        assertTrue(move(near, Direction.WEST).scale < 1.5, "scale " + move(near, Direction.WEST).scale);
+        // an arrow near the camera is smaller than one far away on the same build
+        Handles near = new Handles(0, 0, 0, 400, 100, 400, new Vec3(-3, 3, 200), new Vec3(1, 0, 0));
+        assertTrue(move(near, Direction.WEST).scale < move(near, Direction.EAST).scale, "west " + move(near, Direction.WEST).scale + ", east " + move(near, Direction.EAST).scale);
     }
 
     @Test
-    void theArrowNearestTheCameraCanBePickedWithTheRayThatLooksAtIt() {
+    void anArrowCanBePickedWithTheRayThatLooksAtIt() {
         Vec3 cam = new Vec3(-6, 90, 100);
         Vec3 look = new Vec3(1, 0, 0);
         Handles h = new Handles(0, 0, 0, 200, 200, 200, cam, look);
-        Handles.Handle up = move(h, Direction.UP);
-        Vec3 mid = up.from.add(up.to).scale(0.5);
-        Vec3 dir = mid.subtract(cam).normalize();
-        Handles.Handle hit = h.pick(cam, dir);
-        assertNotNull(hit, "from " + up.from + " to " + up.to + " cam " + cam + " dir " + dir);
-        assertEquals(Direction.UP, hit.dir);
+        for (Direction d : Direction.values()) {
+            Handles.Handle m = move(h, d);
+            Vec3 mid = m.from.add(m.to).scale(0.5);
+            Handles.Handle hit = h.pick(cam, mid.subtract(cam).normalize());
+            assertNotNull(hit, d + " from " + m.from + " to " + m.to);
+            assertEquals(d, hit.dir, "ray at the " + d + " arrow");
+        }
     }
 
     @Test
-    void aTallBuildIsOnlyTallWhenItIsTallAndTheTopIsFar() {
-        assertFalse(Handles.tall(new Vec3(0, 5, 0), new Vec3(0, 10, 0), 10));
-        assertFalse(Handles.tall(new Vec3(0, 5, 0), new Vec3(0, 18, 0), 18), "tall but the top is near");
-        assertTrue(Handles.tall(new Vec3(0, 5, 0), new Vec3(0, 60, 0), 60));
+    void anArrowSeenEndOnIsKnownAsSuch() {
+        assertTrue(Interaction.endOn(new Vec3(0, 0, 1), new Vec3(0.05, 0.05, 0.99).normalize()));
+        assertFalse(Interaction.endOn(new Vec3(0, 0, 1), new Vec3(0.6, 0, 0.8)));
     }
 
     @Test

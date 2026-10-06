@@ -581,11 +581,10 @@ public final class Interaction {
         double y = GhostRenderer.visualY(p);
         handles = new Handles(p.vx, y, p.vz, p.sizeX(), p.sizeY(), p.sizeZ(), camera, look);
         if (grab != null) {
-            // carrying it: the arrows stay (they are where the build is), nothing is hovered, and the guide shows where it came from
+            // carrying it: the mouse is busy, so no arrows and no ring; only where it came from and how far it has come
+            handles = null;
             updateGrab(mc, camera, look);
             chips(mc, new Chips.Chip("Release", "Drop it here"), new Chips.Chip("Shift", "Lift it up / down"));
-            handles.animate(null, null, dt(), null);
-            handles.emit();
             return;
         }
         if (drag != null) {
@@ -598,7 +597,8 @@ public final class Interaction {
             // one set of rows for the whole of Edit mode, so the chips do not rebuild as the crosshair moves: only the words of the
             // first two follow what is aimed at
             String first = hover == null ? (onBody(p) ? "Carry the build" : "Carry (aim at the build)")
-                : hover.kind == Handles.Kind.MOVE ? "Move " + axisWords(hover.axis) : "Turn in quarter turns";
+                : hover.kind == Handles.Kind.MOVE ? (endOn(hover.to.subtract(hover.from).normalize(), look) ? "Step to the side to drag it" : "Move " + axisWords(hover.axis))
+                : "Turn in quarter turns";
             chips(mc, new Chips.Chip("Drag", first), new Chips.Chip("Scroll", "Push " + word(nudgeDir)), new Chips.Chip("Ctrl+Scroll", "Turn"),
                 new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"), new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo"),
                 new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
@@ -767,6 +767,9 @@ public final class Interaction {
                 // is, and a line a hundred blocks away would turn every pixel of mouse movement into blocks
                 d.linePoint = d.handle.from;
             }
+            // an arrow seen end-on cannot be dragged (the view runs along its line, so where it points is anyone's guess): the
+            // grab waits, and the arrow says to step to the side
+            if (endOn(d.axis, look)) return;
             double t = HandleMath.closestOnLine(camera.x, camera.y, camera.z, look.x, look.y, look.z,
                 d.linePoint.x, d.linePoint.y, d.linePoint.z, d.axis.x, d.axis.y, d.axis.z);
             if (Double.isNaN(t)) return;
@@ -814,6 +817,11 @@ public final class Interaction {
             }
             if (!Settings.get().chips) say(mc, d.turns == 0 ? "Drag around the ring" : "Turn " + Math.abs(d.turns * 90) + " degrees " + (d.turns > 0 ? "clockwise" : "anticlockwise"));
         }
+    }
+
+    /** Whether the view runs nearly along an axis (the angle between them under about 10 degrees). */
+    static boolean endOn(Vec3 axis, Vec3 look) {
+        return Math.abs(axis.x * look.x + axis.y * look.y + axis.z * look.z) > 0.985;
     }
 
     private static void endDrag() {
