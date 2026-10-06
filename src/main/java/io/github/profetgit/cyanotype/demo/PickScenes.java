@@ -442,29 +442,61 @@ final class PickScenes {
         });
         waitTicks(4);
 
-        // ---- the Save area box says where it cuts a build in two, but only while a side is being dragged
+        // ---- the Save area box: blocks inside light up by their own shape while a side moves; scroll grows and shrinks the side you face
         camera(27, G + 8, 35, 180, 25);
         waitTicks(10);
         act(() -> {
             Director.hideHud(mc(), false);
             Placements.clear();
-            io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(AX, G + 1, Z0, AX + 6, G + 3, Z1));
+            io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(AX, G + 1, Z0, AX + 6, G + 4, Z1));
         });
         waitTicks(16);
-        act(() -> check("pick/with no side being dragged nothing is checked or shown", io.github.profetgit.cyanotype.interaction.Selecting.cuts() == null, String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.cuts())));
+        act(() -> check("pick/with no side being moved no block is lit", io.github.profetgit.cyanotype.interaction.Selecting.highlighted().isEmpty(), String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size())));
         shot("pick_9_idle_box");
         grabSide("top");
         act(() -> {
-            var c = io.github.profetgit.cyanotype.interaction.Selecting.cuts();
-            int up = net.minecraft.core.Direction.UP.ordinal();
-            check("pick/dragging a side of a box that stops under the roof shows it is cut on top", c != null && c.cut(net.minecraft.core.Direction.UP) && c.count[up] == 34, c == null ? "no result" : "top " + c.count[up]);
-            check("pick/and on no other side (a lone fence post is not a building)", c != null && c.total() == c.count[up], c == null ? "no result" : "total " + c.total());
+            var lit = io.github.profetgit.cyanotype.interaction.Selecting.highlighted();
+            boolean half = false;
+            for (var a : lit) if (a.maxY - a.minY < 0.6) half = true;
+            check("pick/dragging a side lights the blocks inside, the roof slabs by their half-block shape", lit.size() > 20 && half, lit.size() + " shapes, half-height " + half);
         });
-        shot("pick_9_cut_top");
+        shot("pick_9_lit");
         letGo();
-        act(() -> check("pick/letting go clears it again", io.github.profetgit.cyanotype.interaction.Selecting.cuts() == null, String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.cuts())));
+        act(() -> check("pick/letting go puts the light out", io.github.profetgit.cyanotype.interaction.Selecting.highlighted().isEmpty(), String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size())));
 
-        // a roof of stairs and slabs climbs a step sideways at a time: the box through it is cut too
+        // scroll: the side you look at grows (up) or shrinks (down); looking north here
+        act(() -> scroll(mc(), 1));
+        waitTicks(4);
+        act(() -> {
+            var b = io.github.profetgit.cyanotype.interaction.Selecting.box();
+            check("pick/scroll up grows the side the player faces (north) by one", b != null && b.z0() == Z0 - 1 && b.z1() == Z1 && b.x0() == AX && b.y1() == G + 4, String.valueOf(b));
+            check("pick/and the blocks light up while it moves", !io.github.profetgit.cyanotype.interaction.Selecting.highlighted().isEmpty(), "none lit");
+        });
+        shot("pick_9_scrolled");
+        act(() -> scroll(mc(), -1));
+        waitTicks(3);
+        act(() -> {
+            var b = io.github.profetgit.cyanotype.interaction.Selecting.box();
+            check("pick/scroll down shrinks it back", b != null && b.z0() == Z0, String.valueOf(b));
+            Interaction.testModifiers = 1;
+            scroll(mc(), 1);
+        });
+        waitTicks(3);
+        act(() -> {
+            var b = io.github.profetgit.cyanotype.interaction.Selecting.box();
+            check("pick/Shift+scroll moves it five blocks", b != null && b.z0() == Z0 - 5, String.valueOf(b));
+            Interaction.testModifiers = -1;
+            scroll(mc(), -5);
+        });
+        waitTicks(3);
+        act(() -> {
+            var b = io.github.profetgit.cyanotype.interaction.Selecting.box();
+            check("pick/five notches down shrink it five blocks", b != null && b.z0() == Z0, String.valueOf(b));
+        });
+        waitTicks(40);
+        act(() -> check("pick/the light goes out a moment after the last notch", io.github.profetgit.cyanotype.interaction.Selecting.highlighted().isEmpty(), String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size())));
+
+        // a roof of stairs and slabs lights by its shapes too
         act(() -> {
             java.util.List<String> roof = new java.util.ArrayList<>();
             for (int i = 0; i < 8; i++) {
@@ -478,15 +510,16 @@ final class PickScenes {
         waitTicks(16);
         grabSide("east");
         act(() -> {
-            var c = io.github.profetgit.cyanotype.interaction.Selecting.cuts();
-            int east = net.minecraft.core.Direction.EAST.ordinal();
-            check("pick/a box through a roof of stairs and slabs is cut where the roof climbs out", c != null && c.count[east] >= 3, c == null ? "no result" : "east " + c.count[east] + ", total " + c.total());
+            var lit = io.github.profetgit.cyanotype.interaction.Selecting.highlighted();
+            int slabs = 0;
+            for (var a : lit) if (a.maxY - a.minY < 0.6 && a.maxY - a.minY > 0.4) slabs++;
+            check("pick/stairs and slabs in the box are lit by their shapes", lit.size() >= 12 && slabs >= 3, lit.size() + " shapes, " + slabs + " half-height");
         });
         shot("pick_9_stairs");
         letGo();
         act(() -> io.github.profetgit.cyanotype.interaction.Selecting.cancel(mc()));
 
-        // far from the world's origin, where only some chunks are loaded: the check must still see the build
+        // far from the world's origin the blocks are still read
         camera(3003, G + 10, 3014, 180, 20);
         until("pick/the far chunks are loaded", 600, () -> mc().level != null && mc().level.getChunkSource().hasChunk(3000 >> 4, 3000 >> 4) && mc().level.getChunkSource().hasChunk(3005 >> 4, 3005 >> 4));
         waitTicks(10);
@@ -495,12 +528,7 @@ final class PickScenes {
         act(() -> io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(3000, G + 1, 3000, 3005, G + 3, 3005)));
         waitTicks(16);
         grabSide("top");
-        act(() -> {
-            var c = io.github.profetgit.cyanotype.interaction.Selecting.cuts();
-            int up = net.minecraft.core.Direction.UP.ordinal();
-            check("pick/a box through a build far from the origin is cut on top too", c != null && c.count[up] == 36, c == null ? "no result" : "top " + c.count[up] + ", total " + c.total());
-        });
-        shot("pick_9_far");
+        act(() -> check("pick/far from the origin the blocks inside are lit", io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size() > 20, String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size())));
         letGo();
         act(() -> {
             io.github.profetgit.cyanotype.interaction.Selecting.cancel(mc());

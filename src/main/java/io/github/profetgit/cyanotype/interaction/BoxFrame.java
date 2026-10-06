@@ -1,6 +1,5 @@
 package io.github.profetgit.cyanotype.interaction;
 
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gizmos.GizmoStyle;
 import net.minecraft.gizmos.Gizmos;
@@ -11,13 +10,10 @@ import org.jspecify.annotations.Nullable;
 /**
  * How the Save area box is drawn so that it can be read at a glance, on a tall build too: edges on the near side solid and the
  * far ones thin and dashed (so the box has depth), the top edges brighter than the bottom ones, the floor lightly filled, the
- * side being pointed at or dragged filled and amber squares on the box's faces
- * where it cuts a build in two ({@link BoxCheck}).
+ * side being pointed at or dragged filled.
  */
 final class BoxFrame {
     static final int CYAN = 0xFF7FE3FF, AMBER = 0xFFFFC857, WHITE = 0xFFFFFFFF;
-    /** The most amber squares drawn in all. */
-    private static final int MAX_SQUARES = 1200;
 
     private BoxFrame() {
     }
@@ -88,51 +84,5 @@ final class BoxFrame {
         fill(face(a, Direction.DOWN, 0), CYAN, 0.10);
         if (pointed != null) fill(face(a, pointed, 0.01), CYAN, dragging ? 0.30 : 0.20);
         Handles.brackets(a, CYAN, true);
-    }
-
-    /** Amber squares on the faces where the build goes on past the box, and a word beside each side that does. */
-    static void cuts(BoxCheck.Result r, AABB a, Vec3 camera, double seconds) {
-        if (r.skipped || !r.any()) return;
-        double pulse = 0.5 + 0.5 * Math.sin(seconds * 4.0);
-        int total = 0;
-        for (long[] cells : r.cells) total += cells.length;
-        int stride = Math.max(1, (total + MAX_SQUARES - 1) / MAX_SQUARES);
-        for (Direction d : Direction.values()) {
-            long[] cells = r.cells[d.ordinal()];
-            if (cells.length == 0) continue;
-            double cx = 0, cy = 0, cz = 0;
-            for (int i = 0; i < cells.length; i++) {
-                BlockPos p = BlockPos.of(cells[i]);
-                cx += p.getX() + 0.5;
-                cy += p.getY() + 0.5;
-                cz += p.getZ() + 0.5;
-                if (i % stride != 0) continue;
-                Vec3[] q = cellFace(p, d, 0.012);
-                Gizmos.rect(q[0], q[1], q[2], q[3], GizmoStyle.strokeAndFill(alpha(AMBER, 0.95), 1.8f, alpha(AMBER, 0.30 + 0.25 * pulse))).setAlwaysOnTop();
-            }
-            Vec3 mid = new Vec3(cx / cells.length, cy / cells.length, cz / cells.length);
-            double dist = camera.distanceTo(mid);
-            float scale = Handles.labelScale(dist, 0.9, 0.05);
-            // clear of the squares and of the side's arrow, a little way out from the face
-            double out = 1.8 + 0.9 * scale;
-            Vec3 at = mid.add(d.getStepX() * out, d.getStepY() * out + (d.getAxis() == Direction.Axis.Y ? 1.6 : 0.8), d.getStepZ() * out);
-            Handles.label(at, "The build goes on " + wording(d), scale, WHITE, AMBER);
-        }
-    }
-
-    static String wording(Direction d) {
-        return switch (d) {
-            case UP -> "above the box";
-            case DOWN -> "below the box";
-            case EAST -> "to the east";
-            case WEST -> "to the west";
-            case NORTH -> "to the north";
-            case SOUTH -> "to the south";
-        };
-    }
-
-    /** The face of a single block on one side. */
-    private static Vec3[] cellFace(BlockPos p, Direction d, double out) {
-        return face(new AABB(p), d, out);
     }
 }

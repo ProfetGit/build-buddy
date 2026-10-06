@@ -48,10 +48,9 @@ public final class Selecting {
     private static SaveScreen.@Nullable Pick fromPick;
     private static Handles handles;
     private static Handles.Handle hover;
-    /** Where the box cuts a build, worked out when the box changes and again every half second (the world changes as people build). */
-    private static BoxCheck.@Nullable Result cuts;
-    private static @Nullable SelectionBox cutsFor;
-    private static long cutsNs;
+    /** The side the scroll wheel is moving, and when it last moved: the same side for a whole run of notches, then the one you face again. */
+    private static Direction scrollFace = Direction.NORTH;
+    private static long scrollNs;
     /** Where the last frame was seen from: a click picks what the frame showed. */
     private static Vec3 camPos = Vec3.ZERO, camLook = new Vec3(0, 0, 1);
 
@@ -129,14 +128,21 @@ public final class Selecting {
         hover = null;
         dragHandle = null;
         dragStart = null;
-        cuts = null;
-        cutsFor = null;
+        BoxHighlight.clear();
+        scrollNs = 0;
     }
 
     // ---- input
 
     /** Scroll belongs to the tool: it raises or lowers the second corner while it follows the crosshair. */
     public static boolean onScroll(double amount) {
+        if (stage == Stage.ADJUST && box != null && dragHandle == null) {
+            // the side you are looking at grows with scroll up and shrinks with scroll down; Shift = 5 blocks at a time
+            scrollAcc += amount;
+            int n = (int) scrollAcc;
+            scrollAcc -= n;
+            if (n != 0) growFacing(Minecraft.getInstance(), n * (Interaction.shiftDown(Minecraft.getInstance()) ? 5 : 1));
+        }
         if (stage == Stage.SECOND) {
             scrollAcc += amount;
             int n = (int) scrollAcc;
@@ -147,6 +153,26 @@ public final class Selecting {
             }
         }
         return true;
+    }
+
+    /** Moves the side the player is facing: out for a positive count, in for a negative one. The same side for a run of notches. */
+    private static void growFacing(Minecraft mc, int steps) {
+        long now = System.nanoTime();
+        if (now - scrollNs > 1_200_000_000L) scrollFace = Direction.getApproximateNearest(camLook.x, camLook.y, camLook.z);
+        SelectionBox moved = box.moved(scrollFace, steps);
+        scrollNs = now;
+        if (moved.equals(box)) {
+            Sfx.play(Sfx.ERROR, 0.6f);
+            return;
+        }
+        if (moved.volume() > Capture.MAX_VOLUME) {
+            Sfx.play(Sfx.ERROR);
+            Interaction.say(mc, "That box is too big (at most " + String.format(Locale.ROOT, "%,d", Capture.MAX_VOLUME) + " blocks)");
+            return;
+        }
+        box = moved;
+        dragSteps = steps;
+        Sfx.play(Sfx.SNAP, 1.0f + 0.04f * Math.min(12, Math.abs(steps)) * Math.signum(steps));
     }
 
     /** A left click. */
@@ -244,43 +270,31 @@ public final class Selecting {
     private static void adjust(Minecraft mc, Vec3 camera, Vec3 look, String cancel) {
         if (dragHandle != null) updateDrag(camera, look);
         handles = new Handles(box.x0(), box.y0(), box.z0(), box.sizeX(), box.sizeY(), box.sizeZ(), camera, look, true);
-        // the cut-off check only runs, and only shows, while a side is being dragged
-        if (dragHandle != null) {
-            refreshCuts(mc);
-        } else {
-            cuts = null;
-            cutsFor = null;
-        }
+        long now = System.nanoTime();
+        boolean moving = dragHandle != null || now - scrollNs < 1_200_000_000L;
+        if (moving && mc.level != null) BoxHighlight.refresh(mc.level, box, camera);
+        if (dragHandle != null) updateDrag(camera, look);
+        handles = new Handles(box.x0(), box.y0(), box.z0(), box.sizeX(), box.sizeY(), box.sizeZ(), camera, look, true);
         if (dragHandle != null) {
             for (Handles.Handle h : handles.handles) if (h.id.equals(dragHandle.id)) hover = h;
             Interaction.chips(mc, new Chips.Chip("Release", "Set this side"));
         } else {
             hover = handles.pick(camera, look);
             Interaction.chips(mc, new Chips.Chip("Drag", hover == null ? "An arrow resizes the box" : "Move the " + face(hover.dir) + " side"),
+                new Chips.Chip("Scroll", "Grow / shrink the box"),
                 new Chips.Chip("Right click", "Save it..."), new Chips.Chip(cancel, "Cancel"));
         }
         handles.animate(hover, dragHandle == null ? null : hover, Interaction.dt());
-        drawBox(box, camera, false, hover == null ? null : hover.dir, dragHandle != null);
-        if (cuts != null) BoxFrame.cuts(cuts, box.aabb(), camera, System.nanoTime() / 1e9);
+        Direction pointed = hover != null ? hover.dir : (now - scrollNs < 1_200_000_000L ? scrollFace : null);
+        drawBox(box, camera, false, pointed, dragHandle != null);
+        if (moving) BoxHighlight.draw();
+        else BoxHighlight.clear();
         handles.emit();
     }
 
-    private static void refreshCuts(Minecraft mc) {
-        long now = System.nanoTime();
-        if (cuts != null && box.equals(cutsFor) && now - cutsNs < 500_000_000L) return;
-        cuts = BoxCheck.check(new LevelSource(mc.level), box, ignoredBuildings());
-        cutsFor = box;
-        cutsNs = now;
-    }
-
-    /** The other buildings Smart Pick left out are not "cut": the box was fitted to leave them out. */
-    private static java.util.function.@Nullable LongPredicate ignoredBuildings() {
-        return fromPick == null ? null : fromPick.others()::contains;
-    }
-
-    /** Dev demo: where the box cuts a build now (null until the first frame). */
-    public static BoxCheck.@Nullable Result cuts() {
-        return cuts;
+    /** Dev demo: the shapes lit now. */
+    public static java.util.List<AABB> highlighted() {
+        return BoxHighlight.shapes();
     }
 
     private static void updateDrag(Vec3 camera, Vec3 look) {
@@ -342,8 +356,6 @@ public final class Selecting {
         double halfW = Math.abs(right.x) * (a.maxX - a.minX) / 2 + Math.abs(right.z) * (a.maxZ - a.minZ) / 2;
         double lx = following ? c.x : c.x - right.x * (halfW + 1.2 * scale), lz = following ? c.z : c.z - right.z * (halfW + 1.2 * scale);
         String text = b.sizeText() + (b.volume() > 1 ? "   " + String.format(Locale.ROOT, "%,d", b.volume()) + " cells" : "");
-        // while a side is dragged the size label also says whether the box cuts anything off
-        if (!following && cuts != null && !cuts.skipped && !cuts.any()) text += "   nothing cut off";
         Handles.label(new Vec3(lx, a.maxY + 0.7 + 0.05 * dist + 0.5 * scale, lz), text, scale, 0xFFFFFFFF, CYAN);
     }
 
