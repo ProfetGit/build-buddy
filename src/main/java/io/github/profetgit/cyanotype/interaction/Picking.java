@@ -437,8 +437,9 @@ public final class Picking {
     }
 
     private static void aimHint(Minecraft mc, @Nullable BlockPos cell, String cancel) {
+        // the same two rows whatever is aimed at: only the words of the first follow it
         if (cell == null) {
-            Interaction.chips(mc, new Chips.Chip("Aim at a build", "then click"), new Chips.Chip(cancel, "Cancel"));
+            Interaction.chips(mc, new Chips.Chip("Click", "Aim at a build first"), new Chips.Chip(cancel, "Cancel"));
             return;
         }
         boolean buildable = hoverKind == Kind.BUILT || hoverHop != Long.MIN_VALUE;
@@ -448,10 +449,10 @@ public final class Picking {
             Interaction.chips(mc, new Chips.Chip("Click", "Pick this build"), new Chips.Chip(cancel, "Cancel"));
         } else if (hoverKind == Kind.FLUID) {
             Gizmos.cuboid(new AABB(cell).inflate(0.004), GizmoStyle.stroke(0xCCFF6B6B, 2.4f)).setAlwaysOnTop();
-            Interaction.chips(mc, new Chips.Chip("Water", "is not a build"), new Chips.Chip(cancel, "Cancel"));
+            Interaction.chips(mc, new Chips.Chip("Click", "Water is not a build"), new Chips.Chip(cancel, "Cancel"));
         } else {
             Gizmos.cuboid(new AABB(cell).inflate(0.004), GizmoStyle.stroke(0xCCFFC857, 2.4f)).setAlwaysOnTop();
-            Interaction.chips(mc, new Chips.Chip("Click twice", "Pick " + describe(hoverKind) + " anyway"), new Chips.Chip(cancel, "Cancel"));
+            Interaction.chips(mc, new Chips.Chip("Click", "Twice to pick " + describe(hoverKind)), new Chips.Chip(cancel, "Cancel"));
         }
     }
 
@@ -473,16 +474,10 @@ public final class Picking {
             if (set.picked().contains(key)) first = "Save this build";
             else if (set.isContext(key)) first = "Pick that part instead";
         }
-        boolean ctrl = Interaction.ctrl(mc), shift = Interaction.shift(mc);
+        // always the same seven rows: holding Ctrl or Shift must not rebuild the list, the cut size is in the words
         String cut = DETAIL_NAMES[detail];
-        if (ctrl || shift) {
-            // a modifier is held: say what the click and the scroll do now
-            Interaction.chips(mc, new Chips.Chip(ctrl ? "Ctrl+Click" : "Shift+Click", (ctrl ? "Take out " : "Put in ") + cut),
-                new Chips.Chip(ctrl ? "Ctrl+Scroll" : "Shift+Scroll", "Cut size: " + cut), new Chips.Chip("Right click", "Start over"), new Chips.Chip(cancel, "Cancel"));
-            return;
-        }
-        Interaction.chips(mc, new Chips.Chip("Click", first), new Chips.Chip("Shift+Click", "Add " + (detail == 0 ? "a part" : cut)), new Chips.Chip("Ctrl+Click", "Take out " + (detail == 0 ? "a part" : cut)),
-            new Chips.Chip("Ctrl+Scroll", "Finer cuts"), new Chips.Chip("Scroll", "Reach " + set.reachWanted()), new Chips.Chip("Right click", "Start over"), new Chips.Chip(cancel, "Cancel"));
+        Interaction.chips(mc, new Chips.Chip("Click", first), new Chips.Chip("Shift+Click", "Add " + cut), new Chips.Chip("Ctrl+Click", "Take out " + cut),
+            new Chips.Chip("Ctrl+Scroll", "Cut size: " + cut), new Chips.Chip("Scroll", "Reach " + set.reachWanted()), new Chips.Chip("Right click", "Start over"), new Chips.Chip(cancel, "Cancel"));
     }
 
     // ---- drawing the pick

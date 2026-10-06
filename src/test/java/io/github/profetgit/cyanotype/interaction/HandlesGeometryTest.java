@@ -106,24 +106,29 @@ class HandlesGeometryTest {
     }
 
     @Test
-    void aSmallBuildKeepsItsRingAndABigOneGetsADialYouCanReach() {
+    void theRingLiesUnderTheBuildRoundItsMiddleAndIsCutDownOnAHugeOne() {
         Handles small = new Handles(0, 0, 0, 9, 6, 9, new Vec3(-6, 2, 4), new Vec3(1, 0, 0));
-        assertFalse(small.ring.dial(), "a ring round a house");
         assertEquals(4.5, small.ring.cx(), 1e-9);
-        Vec3 cam = new Vec3(-8, 3, 100);
-        Handles mega = new Handles(0, 0, 0, 240, 120, 240, cam, new Vec3(1, 0, 0));
-        assertTrue(mega.ring.dial(), "a dial instead");
-        assertTrue(mega.ring.radius() < 8, "small: " + mega.ring.radius());
-        assertTrue(Math.hypot(mega.ring.cx() - cam.x, mega.ring.cz() - cam.z) < 30, "near the player, not at the middle of the build");
-        assertTrue(mega.ring.cx() < 0, "outside the wall it stands beside");
+        assertEquals(4.5, small.ring.cz(), 1e-9);
+        assertEquals(0.05, small.ring.y(), 1e-9, "at the base");
+        assertTrue(small.ring.radius() > Math.hypot(9, 9) / 2, "round the footprint");
+        Handles mega = new Handles(0, 0, 0, 240, 120, 240, new Vec3(-8, 3, 100), new Vec3(1, 0, 0));
+        assertEquals(120, mega.ring.cx(), 1e-9, "still round the middle");
+        assertEquals(Handles.RING_MAX, mega.ring.radius(), 1e-9, "cut down");
+        assertTrue(mega.ring.tolerance() > 0.3);
     }
 
     @Test
-    void insideAHugeBuildTheDialStandsInFrontOfThePlayer() {
-        Vec3 cam = new Vec3(100, 3, 100);
-        Handles h = new Handles(0, 0, 0, 240, 120, 240, cam, new Vec3(0, 0, -1));
-        assertTrue(h.ring.dial());
-        assertEquals(100, h.ring.cx(), 1e-6);
-        assertTrue(h.ring.cz() < 100 && h.ring.cz() > 85, "ahead, to the north: " + h.ring.cz());
+    void thereAreNoFlipArrowsAndEveryArrowStaysWhateverWayTheViewPoints() {
+        for (Vec3 look : new Vec3[]{new Vec3(1, 0, 0), new Vec3(0, 0, 1), new Vec3(0, -1, 0), new Vec3(0.7, 0.3, 0.64).normalize()}) {
+            Handles h = new Handles(0, 0, 0, 12, 8, 12, new Vec3(-10, 4, 6), look);
+            int moves = 0, others = 0;
+            for (Handles.Handle x : h.handles) {
+                if (x.kind == Handles.Kind.MOVE) moves++;
+                else if (x.kind != Handles.Kind.RING) others++;
+            }
+            assertEquals(6, moves);
+            assertEquals(0, others);
+        }
     }
 }

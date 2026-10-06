@@ -12,14 +12,14 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * The grabbable parts of the placement being edited: six arrows that move it along an axis, a ring at its base that turns
- * it, and two flip arrows above it. Built from where the placement is drawn, sized with the distance to the camera so
+ * it. Built from where the placement is drawn, sized with the distance to the camera so
  * they stay easy to hit on a big build and not huge on a small one. Drawn as solid translucent 3D shapes with crisp
  * outlines (the blueprint look): a hovered handle swells and brightens, a grabbed one presses in. Only geometry and
  * drawing here: Interaction decides what a grab does.
  */
 final class Handles {
     enum Kind {
-        MOVE, RING, FLIP
+        MOVE, RING
     }
 
     static final int X_COLOR = 0xFFFF6B6B, Y_COLOR = 0xFF6BE58F, Z_COLOR = 0xFF6BB8FF, RING_COLOR = 0xFFE8F6FF, WHITE = 0xFFFFFFFF;
@@ -45,12 +45,12 @@ final class Handles {
             this.to = to;
             this.boxes = boxes;
             this.scale = scale;
-            this.id = kind == Kind.FLIP ? "FLIP" : kind + ":" + (axis == null ? "" : axis.getName()) + ":" + (dir == null ? "" : dir.getName());
+            this.id = kind + ":" + (axis == null ? "" : axis.getName()) + ":" + (dir == null ? "" : dir.getName());
         }
     }
 
     /** Ring geometry, kept beside the list because a ray meets it on a plane rather than in boxes. */
-    record Ring(double cx, double cz, double y, double radius, double tolerance, double unit, boolean dial) {
+    record Ring(double cx, double cz, double y, double radius, double tolerance, double unit) {
     }
 
     /** How strongly each handle is hovered, 0 to 1, eased between frames so hover grows in and out instead of switching. */
@@ -66,13 +66,12 @@ final class Handles {
     final Vec3 look;
     /** Distance to the camera, for text that has to stay readable. */
     final double distance;
-    private static Direction.Axis flipAxis = Direction.Axis.X;
     /** The most a face arrow is scaled up for distance: further away it stays this size and the build is just far. */
     static final double MAX_ARROW_SCALE = 8.0;
     /** The smallest a handle's grab box gets, per block of distance: about 30 pixels on a 1080p screen whatever the build's size. */
     static final double PICK_PER_BLOCK = 0.025;
-    /** A turn ring wider than this (half the build's diagonal plus a margin) is too big to reach round: a small dial beside the build takes its place. */
-    static final double DIAL_FROM = 14.0;
+    /** The widest the turn ring is drawn, in blocks of radius. */
+    static final double RING_MAX = 24.0;
 
     /**
      * How big the arrows of a build are drawn, in the unit the arrow shapes are built from (a face arrow is 2.8 units long).
@@ -90,7 +89,7 @@ final class Handles {
         this(x0, y0, z0, sx, sy, sz, camera, look, false);
     }
 
-    /** @param facesOnly only the six arrows, no turn ring and no flip arrow (the Save area box is resized, not turned) */
+    /** @param facesOnly only the six arrows, no turn ring (the Save area box is resized, not turned) */
     Handles(double x0, double y0, double z0, double sx, double sy, double sz, Vec3 camera, Vec3 look, boolean facesOnly) {
         this.look = look;
         this.x0 = x0;
@@ -104,7 +103,6 @@ final class Handles {
         this.distance = dist;
         double ref = Math.max(sx, Math.max(sy, sz));
         this.scale = arrowScale(dist, ref, 12.0);
-        double pick = Math.max(0.45 * scale, PICK_PER_BLOCK * dist);
 
         // a face arrow stands on the point of its face nearest the camera, not at the face's middle: on a build a hundred
         // blocks tall the middle of the top is out of sight and out of reach, the nearest point never is
@@ -132,61 +130,12 @@ final class Handles {
             handles.add(new Handle(Kind.MOVE, d, d.getAxis(), axisColor(d.getAxis()), from, to, new double[][]{box(from, to, spick)}, s));
         }
 
-        double radius = Math.hypot(sx, sz) / 2 + 0.9 * scale;
-        ring = radius > DIAL_FROM ? dial(camera, look, lo, size) : new Ring(cx, cz, y0 + 0.05, radius, Math.max(0.45 * scale, PICK_PER_BLOCK * dist), scale, false);
+        // the ring lies under the build at its base, round its middle; on a huge build it is cut down to a size that can be
+        // looked at and reached round, rather than a circle the size of the footprint
+        double radius = Math.min(Math.hypot(sx, sz) / 2 + 0.9 * scale, RING_MAX);
+        ring = new Ring(cx, cz, y0 + 0.05, radius, Math.max(0.45 * scale, PICK_PER_BLOCK * dist), scale);
         if (facesOnly) return;
         handles.add(new Handle(Kind.RING, null, Direction.Axis.Y, RING_COLOR, Vec3.ZERO, Vec3.ZERO, new double[0][], scale));
-
-        // one flip arrow, across the view: its axis follows where the player looks (like ctrl+scroll), with some
-        // hysteresis so it does not jump back and forth at 45 degrees
-        double ax = Math.abs(look.x), az = Math.abs(look.z);
-        if (ax > az * 1.15) flipAxis = Direction.Axis.Z;
-        else if (az > ax * 1.15) flipAxis = Direction.Axis.X;
-        double fscale = scale, fpick = pick;
-        double fy = y0 + sy + 1.4 * scale, span = 1.5 * scale, off = 3.4 * scale;
-        // beside the build's middle toward the right of the screen: the name label takes the left
-        org.joml.Vector3f right = new org.joml.Vector3f(1, 0, 0).rotate(Handles.camera);
-        double rh = Math.hypot(right.x, right.z), rx = rh < 0.1 ? 1 : right.x / rh, rz = rh < 0.1 ? 0 : right.z / rh;
-        Vec3 fcx = new Vec3(cx + rx * off, fy, cz + rz * off);
-        Vec3 topPoint = new Vec3(Math.max(x0, Math.min(x0 + sx, camera.x)), y0 + sy, Math.max(z0, Math.min(z0 + sz, camera.z)));
-        if (tall(camera, topPoint, sy)) {
-            // out of reach on top: beside the up and down arrows, at eye level
-            Vec3 m = sideMount(camera, Direction.UP, lo, size);
-            fcx = new Vec3(m.x, m.y, m.z);
-            fscale = arrowScale(camera.distanceTo(m), ref, MAX_ARROW_SCALE);
-            fpick = Math.max(0.45 * fscale, PICK_PER_BLOCK * camera.distanceTo(m));
-            span = 1.5 * fscale;
-            fcx = fcx.add(tangentOf(camera, lo, size).scale(2.8 * fscale));
-        }
-        Vec3 fa = flipAxis == Direction.Axis.X ? new Vec3(fcx.x - span, fcx.y, fcx.z) : new Vec3(fcx.x, fcx.y, fcx.z - span);
-        Vec3 fb = flipAxis == Direction.Axis.X ? new Vec3(fcx.x + span, fcx.y, fcx.z) : new Vec3(fcx.x, fcx.y, fcx.z + span);
-        handles.add(new Handle(Kind.FLIP, null, flipAxis, axisColor(flipAxis), fa, fb, new double[][]{box(fa, fb, fpick)}, fscale));
-    }
-
-    /**
-     * The turn dial of a build too big to ring: a small flat ring on the ground beside the nearest wall (in front of the
-     * player when they stand inside the footprint). Dragging round it turns the build about its own middle, in quarter
-     * turns, the angle taken about the dial's centre so a hand's width of mouse is a quarter turn at any build size.
-     */
-    private static Ring dial(Vec3 camera, Vec3 look, double[] lo, double[] size) {
-        double qx = Math.max(lo[0], Math.min(lo[0] + size[0], camera.x)), qz = Math.max(lo[2], Math.min(lo[2] + size[2], camera.z));
-        boolean inside = qx == camera.x && qz == camera.z;
-        double d0 = Math.hypot(qx - camera.x, qz - camera.z);
-        double u = arrowScale(Math.max(d0, 6), 16, 4.0);
-        double r = 1.7 * u;
-        double dx, dz;
-        if (inside) {
-            double h = Math.hypot(look.x, look.z);
-            double lx = h < 0.05 ? 0 : look.x / h, lz = h < 0.05 ? -1 : look.z / h;
-            dx = camera.x + lx * (r + 2.5);
-            dz = camera.z + lz * (r + 2.5);
-        } else {
-            double[] w = nearestWall(camera, lo, size);
-            dx = w[4] + w[0] * (r + 1.2);
-            dz = w[5] + w[1] * (r + 1.2);
-        }
-        double y = camera.y - lo[1] < 3 ? lo[1] + 0.05 : Math.max(lo[1] + 0.05, camera.y - 1.62);
-        return new Ring(dx, dz, y, r, Math.max(0.45 * u, PICK_PER_BLOCK * Math.max(d0, 4)), u, true);
     }
 
     /** Whether a face point is too far above or below the camera to be a good place for an arrow: a build over 16 blocks tall, with the point more than 20 away. */
@@ -234,7 +183,6 @@ final class Handles {
         Handle best = null;
         double bestT = Double.POSITIVE_INFINITY;
         for (Handle h : handles) {
-            if (endOn(h)) continue;
             double t = Double.NaN;
             if (h.kind == Kind.RING) {
                 double plane = HandleMath.rayPlaneY(o.y, d.y, ring.y);
@@ -292,34 +240,12 @@ final class Handles {
             double k = 1 + 0.22 * e - 0.1 * p;
             switch (h.kind) {
                 case MOVE -> {
-                    if (endOn(h)) continue;
-                    Vec3 dir = h.to.subtract(h.from).normalize();
-                    arrow(h.from, dir, h.from.distanceTo(h.to), k, h.color, e, along(dir, e), h.scale);
-                }
-                case FLIP -> {
-                    Vec3 mid = h.from.add(h.to).scale(0.5);
-                    Vec3 dir = h.to.subtract(h.from).normalize();
-                    double half = h.from.distanceTo(h.to) / 2;
-                    arrow(mid, dir, half, k, h.color, e, 1f, h.scale);
-                    arrow(mid, dir.scale(-1), half, k, h.color, e, 1f, h.scale);
+                            Vec3 dir = h.to.subtract(h.from).normalize();
+                    arrow(h.from, dir, h.from.distanceTo(h.to), k, h.color, e, 1f, h.scale);
                 }
                 case RING -> ring(e, p);
             }
         }
-    }
-
-    /** How visible an arrow is: one pointing along the view is seen end-on and only clutters, so it fades unless it is hovered. */
-    private float along(Vec3 dir, float hover) {
-        double c = Math.abs(dir.x * look.x + dir.y * look.y + dir.z * look.z);
-        double fade = c < 0.6 ? 1 : 1 - Math.min(1, (c - 0.6) / 0.26);
-        return (float) (fade + (1 - fade) * hover);
-    }
-
-    /** An arrow seen nearly end-on is not drawn, so it cannot be grabbed either: turn the view to reach that axis. */
-    private boolean endOn(Handle h) {
-        if (h.kind != Kind.MOVE) return false;
-        Vec3 dir = h.to.subtract(h.from).normalize();
-        return Math.abs(dir.x * look.x + dir.y * look.y + dir.z * look.z) > 0.88;
     }
 
     /** Set each frame by Interaction: the camera's turn, so labels can face it. */

@@ -227,11 +227,8 @@ public final class Selecting {
             Interaction.chips(mc, new Chips.Chip("Release", "Set this side"));
         } else {
             hover = handles.pick(camera, look);
-            if (hover == null) {
-                Interaction.chips(mc, new Chips.Chip("Drag arrow", "Resize the box"), new Chips.Chip("Right click", "Save it..."), new Chips.Chip(cancel, "Cancel"));
-            } else {
-                Interaction.chips(mc, new Chips.Chip("Drag", "Move the " + face(hover.dir) + " side"));
-            }
+            Interaction.chips(mc, new Chips.Chip("Drag", hover == null ? "An arrow resizes the box" : "Move the " + face(hover.dir) + " side"),
+                new Chips.Chip("Right click", "Save it..."), new Chips.Chip(cancel, "Cancel"));
         }
         handles.animate(hover, dragHandle == null ? null : hover, Interaction.dt());
         drawBox(box, camera, false);

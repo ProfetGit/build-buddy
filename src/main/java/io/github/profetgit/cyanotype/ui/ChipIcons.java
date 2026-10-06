@@ -19,7 +19,7 @@ public final class ChipIcons {
     }
 
     /** The pixel mouse is 16 x 16 with 2 empty columns each side: 12 are drawn. A key cap shows 14 of 16 rows' width: 1 empty column each side. */
-    static final int MOUSE_W = 12, WHEEL_W = 12, DRAG_W = 10, DRAG_H = 8, GAP = 4, CAP_PAD = 3, CAP_TEXT_COLOR = 0xFF1C222E;
+    static final int MOUSE_W = 12, WHEEL_W = 12, DRAG_W = 10, DRAG_H = 8, SCROLL_W = 5, SCROLL_H = 11, GAP = 4, CAP_PAD = 3, CAP_TEXT_COLOR = 0xFF1C222E;
 
     private ChipIcons() {
     }
@@ -82,7 +82,7 @@ public final class ChipIcons {
     private static int widthOf(Part p) {
         return switch (p.kind) {
             case MOUSE_LEFT, MOUSE_RIGHT -> MOUSE_W + markWidth(p);
-            case MOUSE_WHEEL -> WHEEL_W;
+            case MOUSE_WHEEL -> WHEEL_W + SCROLL_W + 2;
             case KEYCAP -> capWidth(p);
             case TEXT -> Ui.font().width(p.text);
             case PLUS, SLASH -> Ui.font().width(p.text);
@@ -115,7 +115,9 @@ public final class ChipIcons {
                 }
                 case MOUSE_WHEEL -> {
                     Skin.pixel(g, "mouse_wheel", cx - 2, y, 16, 16, a);
-                    cx += WHEEL_W;
+                    // the arrows say it is the wheel and not the left button, which looks the same at this size
+                    Skin.pixel(g, "mark_scroll", cx + WHEEL_W + 1, y + 2, SCROLL_W, SCROLL_H, a);
+                    cx += WHEEL_W + SCROLL_W + 2;
                 }
                 case KEYCAP -> {
                     int w = capWidth(p);

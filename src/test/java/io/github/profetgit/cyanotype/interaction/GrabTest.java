@@ -91,6 +91,36 @@ class GrabTest {
     }
 
     @Test
+    void lookingTowardTheHorizonCannotThrowTheBuildFarAway() {
+        // grabbed low, 12 blocks off, from standing height; then the view lifts toward the horizon and the sky at once
+        Vec3 eye = new Vec3(0, 1.6, 0);
+        Vec3 p0 = new Vec3(12, 0, 0);
+        Grab g = Grab.start(eye, toward(eye, p0), p0, 0);
+        double worst = 0;
+        for (double pitch = -0.13; pitch < -0.0001; pitch *= 0.8) {
+            g.update(eye, new Vec3(Math.cos(pitch), Math.sin(pitch), 0), false);
+            worst = Math.max(worst, Math.abs(g.dx));
+        }
+        assertTrue(worst <= 12 * 1.5 + 30 - 12 + 1, "never farther than the reach limit: " + worst);
+        g.update(eye, new Vec3(0.9, 0.3, 0).normalize(), false);
+        assertTrue(Math.abs(g.dx) <= 48, "the sky: stays put or comes back, never flies: " + g.dx);
+        // moving 10 blocks is still 10: the squeeze starts only past the grab distance and is gentle near it
+        Grab h = Grab.start(eye, toward(eye, p0), p0, 0);
+        h.update(eye, toward(eye, new Vec3(22, 0, 0)), false);
+        assertTrue(h.dx >= 9 && h.dx <= 10, "ten away is about ten: " + h.dx);
+    }
+
+    @Test
+    void liftingIsBoundedToo() {
+        Vec3 eye = new Vec3(0, 20, 0);
+        Vec3 p0 = new Vec3(30, 15, 0);
+        Grab g = Grab.start(eye, toward(eye, p0), p0, 0);
+        g.update(eye, toward(eye, p0), true);
+        g.update(eye, new Vec3(1, 4, 0).normalize(), true);
+        assertTrue(Math.abs(g.dy) < 80, "bounded: " + g.dy);
+    }
+
+    @Test
     void aViewThatNeverMeetsThePlaneLeavesTheBuildWhereItWas() {
         Vec3 eye = new Vec3(0, 70, 0);
         Vec3 p0 = new Vec3(40, 10, 0);

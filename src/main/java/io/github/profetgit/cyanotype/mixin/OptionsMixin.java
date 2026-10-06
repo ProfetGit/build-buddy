@@ -30,6 +30,7 @@ public abstract class OptionsMixin {
         all.add(Keys.TOGGLE);
         all.add(Keys.UNDO);
         all.add(Keys.REDO);
+        all.add(Keys.MIRROR);
         all.add(Keys.REMOVE);
         keyMappings = all.toArray(KeyMapping[]::new);
     }

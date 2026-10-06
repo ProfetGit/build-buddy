@@ -200,15 +200,8 @@ public final class Interaction {
         }
         if (Placements.mode() == Mode.EDIT && p != null && hover != null && drag == null) {
             suppressAttack = true;
-            if (hover.kind == Handles.Kind.FLIP) {
-                Placements.remember(p);
-                p.set(p.origin, p.orientation.flipped(hover.axis));
-                PlacementStore.markDirty();
-                Sfx.play(Sfx.PRESS, 1.2f);
-            } else {
-                Placements.remember(p);
-                drag = new Drag(p, hover);
-            }
+            Placements.remember(p);
+            drag = new Drag(p, hover);
             return true;
         }
         if (Placements.mode() == Mode.EDIT && p != null && p.locked && hover == null && drag == null && grab == null && startGrab(Minecraft.getInstance(), p)) {
@@ -278,6 +271,24 @@ public final class Interaction {
         Handles.label(g.start.add(g.dx, g.dy, g.dz).add(0, 0.12 * dist + 0.9, 0), g.words(), Handles.labelScale(dist, 1.1, 0.1), 0xFFFFFFFF, 0xFFFFFFFF);
     }
 
+    /**
+     * Mirrors the build across the way the player looks (left and right as they see it): the M key, while a build is
+     * being placed or edited and nothing is being dragged. The same flip as Ctrl+Shift+scroll, which is for those who prefer it.
+     */
+    private static void mirror(Minecraft mc) {
+        Placement p = Placements.active();
+        if (p == null || drag != null || grab != null) return;
+        Mode mode = Placements.mode();
+        boolean placing = mode == Mode.PLACING && !p.locked;
+        if (!placing && !(mode == Mode.EDIT && p.locked && p.ready())) return;
+        Vec3 look = mc.player.getLookAngle();
+        if (!placing) Placements.remember(p);
+        p.set(p.origin, p.orientation.flipped(Math.abs(look.x) > Math.abs(look.z) ? Direction.Axis.Z : Direction.Axis.X));
+        if (!placing) PlacementStore.markDirty();
+        Sfx.play(Sfx.PRESS, 1.2f);
+        say(mc, "Mirrored");
+    }
+
     /** The use button went down. */
     public static boolean onUse() {
         if (GhostRenderer.hidden) return false;
@@ -318,6 +329,9 @@ public final class Interaction {
         tickMainKey(mc, screen, clicked && testMainDown == null);
         while (Keys.TOGGLE.consumeClick()) {
             if (!screen) toggleGhosts(mc);
+        }
+        while (Keys.MIRROR.consumeClick()) {
+            if (!screen && !GhostRenderer.hidden) mirror(mc);
         }
         while (Keys.REMOVE.consumeClick()) {
             if (!screen && !GhostRenderer.hidden) askRemove(mc);
@@ -532,7 +546,7 @@ public final class Interaction {
             if (p == null || p.locked) Placements.setMode(Mode.IDLE);
         } else if (mode == Mode.PLACING) {
             follow(mc, p, pos, look);
-            chips(mc, new Chips.Chip("Scroll", "Turn"), new Chips.Chip("Shift+Scroll", "Up / down"), new Chips.Chip("Ctrl+Scroll", "Flip"),
+            chips(mc, new Chips.Chip("Scroll", "Turn"), new Chips.Chip("Shift+Scroll", "Up / down"), new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"),
                 new Chips.Chip("Click", "Lock in place"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Cancel"));
         } else if (mode == Mode.LAYERS) {
             if (p == null || !p.locked || !p.ready()) {
@@ -567,10 +581,11 @@ public final class Interaction {
         double y = GhostRenderer.visualY(p);
         handles = new Handles(p.vx, y, p.vz, p.sizeX(), p.sizeY(), p.sizeZ(), camera, look);
         if (grab != null) {
-            // carrying it: no arrows in the way, just where it was and where it is going
-            handles = null;
+            // carrying it: the arrows stay (they are where the build is), nothing is hovered, and the guide shows where it came from
             updateGrab(mc, camera, look);
             chips(mc, new Chips.Chip("Release", "Drop it here"), new Chips.Chip("Shift", "Lift it up / down"));
+            handles.animate(null, null, dt(), null);
+            handles.emit();
             return;
         }
         if (drag != null) {
@@ -580,18 +595,13 @@ public final class Interaction {
         } else {
             hover = handles.pick(camera, look);
             nudgeDir = scrollDirection(look);
-            if (hover == null) {
-                chips(mc, onBody(p) ? new Chips.Chip("Drag", "Carry it where you look") : new Chips.Chip("Aim at it", "then drag to carry"),
-                    new Chips.Chip("Scroll", "Push " + word(nudgeDir)), new Chips.Chip("Ctrl+Scroll", "Turn"), new Chips.Chip("Drag arrow", "Move one way"),
-                    new Chips.Chip("Click flip", "Mirror"), new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo"),
-                    new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
-            } else {
-                chips(mc, switch (hover.kind) {
-                    case MOVE -> new Chips.Chip("Drag", "Move " + axisWords(hover.axis));
-                    case RING -> new Chips.Chip("Drag", "Turn in quarter turns");
-                    case FLIP -> new Chips.Chip("Click", "Flip " + (hover.axis == Direction.Axis.X ? "east-west" : "north-south"));
-                }, new Chips.Chip("Scroll", "Push " + word(nudgeDir)));
-            }
+            // one set of rows for the whole of Edit mode, so the chips do not rebuild as the crosshair moves: only the words of the
+            // first two follow what is aimed at
+            String first = hover == null ? (onBody(p) ? "Carry the build" : "Carry (aim at the build)")
+                : hover.kind == Handles.Kind.MOVE ? "Move " + axisWords(hover.axis) : "Turn in quarter turns";
+            chips(mc, new Chips.Chip("Drag", first), new Chips.Chip("Scroll", "Push " + word(nudgeDir)), new Chips.Chip("Ctrl+Scroll", "Turn"),
+                new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"), new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo"),
+                new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
         }
         handles.animate(hover, drag == null ? null : drag.handle, dt(), drag == null ? nudgeDir.getAxis() : null);
         handles.emit();
@@ -1014,7 +1024,6 @@ public final class Interaction {
             String name = switch (handle.kind) {
                 case MOVE -> "move" + (handle.dir.getAxisDirection() == Direction.AxisDirection.POSITIVE ? "+" : "-") + handle.axis.getName();
                 case RING -> "ring";
-                case FLIP -> "flip";
             };
             if (!name.equals(id)) continue;
             if (handle.kind == Handles.Kind.RING) {

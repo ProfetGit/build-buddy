@@ -5,8 +5,17 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 /**
  * The cursor chips: small labels beside the crosshair that say what the mouse and keys do right now ("Scroll: turn",
- * "Click: lock"). Whoever owns the current tool sets them every frame; they slide and fade in when the set changes and
- * fade out when it is cleared. They are the first layer of the in-game help (PRD 7.12) and can be turned off.
+ * "Click: lock"). Whoever owns the current tool sets them every frame. The rules, so they never flicker:
+ * <ul>
+ * <li><b>When they show:</b> only while a Cyanotype tool is active (placing, edit, layers, save area, smart pick) and no screen is open;
+ * never over the tool wheel or a menu, and not while the ghosts are hidden (H).</li>
+ * <li><b>A set is its keys:</b> the left halves ("Drag", "Scroll", "Ctrl+Z / Y"). A new set of keys is a new situation and slides
+ * in once, a row after a row. The same keys with other words (the direction "Push south" follows the view, the first row follows
+ * what is aimed at) just change the words in place: nothing slides, nothing rebuilds.</li>
+ * <li><b>They stay put through gaps:</b> a quarter of a second without a request (a tool changing over, a lost frame) keeps
+ * them; after that they fade out, and come in fresh next time.</li>
+ * </ul>
+ * They are the first layer of the in-game help (PRD 7.12) and can be turned off.
  */
 public final class Chips {
     public record Chip(String key, String action) {
@@ -14,8 +23,9 @@ public final class Chips {
 
     private static List<Chip> current = List.of();
     private static String id = "";
-    private static long changedNs;
-    private static boolean wanted;
+    private static long changedNs, wantedNs;
+    private static boolean gone = true;
+    private static final long GRACE_NS = 250_000_000L;
 
     private Chips() {
     }
@@ -23,13 +33,16 @@ public final class Chips {
     /** Asks for these chips this frame. */
     public static void show(Chip... chips) {
         List<Chip> now = List.of(chips);
-        String nid = now.toString();
-        if (!nid.equals(id)) {
-            current = now;
+        StringBuilder keys = new StringBuilder();
+        for (Chip c : now) keys.append(c.key()).append('\u0001');
+        String nid = keys.toString();
+        if (gone || !nid.equals(id)) {
             id = nid;
             changedNs = System.nanoTime();
+            gone = false;
         }
-        wanted = true;
+        current = now;
+        wantedNs = System.nanoTime();
     }
 
     /** The legacy text form, for when chips are switched off: one line on the action bar. */
@@ -47,8 +60,9 @@ public final class Chips {
      * built, and are drawn at about three quarters of the GUI scale (rounded so the text stays on whole pixels).
      */
     static void draw(GuiGraphicsExtractor g) {
+        boolean wanted = System.nanoTime() - wantedNs < GRACE_NS && net.minecraft.client.Minecraft.getInstance().gui.screen() == null;
         float visible = Motion.follow("chips#visible", wanted ? 1f : 0f, 0.1);
-        wanted = false;
+        if (visible < 0.02f && !wanted) gone = true;
         if (visible < 0.02f || current.isEmpty() || !Settings.get().chips) return;
         int w = g.guiWidth(), h = g.guiHeight();
         double gui = Math.max(1, net.minecraft.client.Minecraft.getInstance().getWindow().getGuiScale());

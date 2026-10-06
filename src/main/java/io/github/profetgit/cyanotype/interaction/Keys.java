@@ -17,6 +17,7 @@ public final class Keys {
     public static final KeyMapping TOGGLE = new KeyMapping("key.cyanotype.toggle", InputConstants.KEY_H, CATEGORY);
     public static final KeyMapping UNDO = new KeyMapping("key.cyanotype.undo", InputConstants.KEY_Z, CATEGORY);
     public static final KeyMapping REDO = new KeyMapping("key.cyanotype.redo", InputConstants.KEY_Y, CATEGORY);
+    public static final KeyMapping MIRROR = new KeyMapping("key.cyanotype.mirror", InputConstants.KEY_M, CATEGORY);
     public static final KeyMapping REMOVE = new KeyMapping("key.cyanotype.remove", InputConstants.KEY_DELETE, CATEGORY);
 
     private Keys() {

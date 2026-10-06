@@ -196,7 +196,7 @@ final class PlaceScenes {
         shot("handles_idle");
 
         // hover each handle by aiming at it
-        for (String id : List.of("move+x", "move-x", "move+y", "ring", "flip")) {
+        for (String id : List.of("move+x", "move-x", "move+y", "ring")) {
             act(() -> {
                 Minecraft mc = Minecraft.getInstance();
                 Vec3 a = Interaction.handleAnchor(id);
@@ -208,18 +208,18 @@ final class PlaceScenes {
             });
             waitTicks(4);
             act(() -> {
-                String want = id.startsWith("move") ? "move" + id.substring(id.length() - 1) : id.startsWith("flip") ? "flip" : "ringy";
+                String want = id.startsWith("move") ? "move" + id.substring(id.length() - 1) : "ringy";
                 check("handles/hover " + id, Interaction.hoverName().startsWith(want), "hover '" + Interaction.hoverName() + "'");
             });
         }
 
-        // an arrow pointing straight along the view is hidden and cannot be grabbed; from the side it can
+        // an arrow pointing straight along the view is still drawn and still grabbable: arrows never come and go with the view
         act(() -> {
             Vec3 a = Interaction.handleAnchor("move+z");
             if (a != null) aim(Minecraft.getInstance(), a.x, a.y, a.z);
         });
         waitTicks(4);
-        act(() -> check("handles/an end-on arrow is not grabbable", Interaction.hoverName().isEmpty(), "hover '" + Interaction.hoverName() + "'"));
+        act(() -> check("handles/an end-on arrow can still be grabbed", Interaction.hoverName().startsWith("movez"), "hover '" + Interaction.hoverName() + "'"));
         camera(-16, G + 6, 12.5, -90, 6);
         waitTicks(10);
         act(() -> {
@@ -308,17 +308,10 @@ final class PlaceScenes {
         until("handles/rebaked after the turn", 400, GhostRenderer::settled);
         shot("handles_turned");
 
-        // a flip arrow flips on click
-        act(() -> {
-            Vec3 a = Interaction.handleAnchor("flip");
-            aim(Minecraft.getInstance(), a.x, a.y, a.z);
-        });
+        // M mirrors it (there are no flip arrows any more)
+        act(() -> tap(Keys.MIRROR));
         waitTicks(4);
-        act(() -> hold(Minecraft.getInstance().options.keyAttack));
-        waitTicks(3);
-        act(() -> release(Minecraft.getInstance().options.keyAttack));
-        waitTicks(3);
-        act(() -> check("handles/flip arrow mirrors it", first.orientation.isMirrored(), "orientation " + first.orientation));
+        act(() -> check("handles/M mirrors it", first.orientation.isMirrored(), "orientation " + first.orientation));
 
         // undo, three times: the flip, the turn, the lift
         for (int i = 0; i < 3; i++) ctrlTap(Keys.UNDO, false);
@@ -413,8 +406,6 @@ final class PlaceScenes {
         shot("look_hover_arrow");
         aimAtHandle("ring");
         shot("look_hover_ring");
-        aimAtHandle("flip");
-        shot("look_hover_flip");
         // mid-drag: the +x arrow two blocks out
         aimAtHandle("move+x");
         act(() -> hold(Minecraft.getInstance().options.keyAttack));

@@ -35,7 +35,7 @@ class AtlasTest {
     void theIconsAndHintPartsTheScreensDrawArePixelSprites() throws IOException {
         JsonObject s = pixels();
         for (String name : List.of("check", "cross", "list", "folder", "move", "layers", "hammer", "save", "gear", "eye", "eye_off", "trash", "undo", "redo", "wand", "cube", "sweep", "select",
-            "mouse_left", "mouse_right", "mouse_wheel", "mouse_none", "keycap", "mark_drag")) {
+            "mouse_left", "mouse_right", "mouse_wheel", "mouse_none", "keycap", "mark_drag", "mark_scroll")) {
             assertTrue(s.has(name), "missing pixel sprite " + name);
         }
     }

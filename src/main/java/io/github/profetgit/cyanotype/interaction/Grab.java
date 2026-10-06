@@ -22,17 +22,21 @@ final class Grab {
     final double planeY;
     private double hx, hz;
     private final double nx, nz;
+    /** How far from the eye (sideways) the grabbed point was, and how far the build may be taken: see {@link #soft}. */
+    private final double r0, reachMax;
     int dx, dy, dz;
     private double vOff;
     private boolean wasVertical, switched;
 
-    private Grab(Vec3 start, double planeY, double hx, double hz, double nx, double nz) {
+    private Grab(Vec3 start, double planeY, double hx, double hz, double nx, double nz, double r0) {
         this.start = start;
         this.planeY = planeY;
         this.hx = hx;
         this.hz = hz;
         this.nx = nx;
         this.nz = nz;
+        this.r0 = r0;
+        this.reachMax = r0 * 1.5 + 30;
     }
 
     /**
@@ -47,7 +51,18 @@ final class Grab {
         double sx = t > 0 ? eye.x + look.x * t : Double.NaN, sz = t > 0 ? eye.z + look.z * t : Double.NaN;
         double h = Math.hypot(look.x, look.z);
         double nx = h < 1e-3 ? 0 : look.x / h, nz = h < 1e-3 ? -1 : look.z / h;
-        return new Grab(p0, plane, sx, sz, nx, nz);
+        return new Grab(p0, plane, sx, sz, nx, nz, Math.hypot(p0.x - eye.x, p0.z - eye.z));
+    }
+
+    /**
+     * Keeps a far reach from running away: a view that skims the plane (looking toward the horizon, or at the sky when the
+     * grab was low) meets it a very long way off, so beyond the distance the point was grabbed at the reach is squeezed
+     * toward {@link #reachMax} (tanh: the same speed up to there, then slower and slower, never past it).
+     */
+    private double soft(double r) {
+        if (r <= r0) return r;
+        double room = reachMax - r0;
+        return r0 + room * Math.tanh((r - r0) / room);
     }
 
     /** Follows the view for this frame. @param vertical Shift is held: only up and down change, else only sideways */
@@ -67,12 +82,21 @@ final class Grab {
                 vOff = dy - raw;
                 switched = false;
             }
-            dy = (int) Math.round(raw + vOff);
+            double v = raw + vOff;
+            // the same squeeze for height, symmetric: lifting 30 blocks is 30, never a hundred and ten thousand
+            double bound = reachMax;
+            dy = (int) Math.round(bound * Math.tanh(v / bound));
         } else {
             if (Math.abs(look.y) < 1e-9) return;
             double t = (planeY - eye.y) / look.y;
             if (t <= 0 || t > MAX_T) return;
             double x = eye.x + look.x * t, z = eye.z + look.z * t;
+            double r = Math.hypot(x - eye.x, z - eye.z);
+            if (r > 1e-6) {
+                double k = soft(r) / r;
+                x = eye.x + (x - eye.x) * k;
+                z = eye.z + (z - eye.z) * k;
+            }
             if (Double.isNaN(hx)) {
                 hx = x;
                 hz = z;
