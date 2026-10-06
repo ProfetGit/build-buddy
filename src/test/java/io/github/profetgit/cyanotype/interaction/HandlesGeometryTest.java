@@ -88,4 +88,42 @@ class HandlesGeometryTest {
         assertFalse(Handles.tall(new Vec3(0, 5, 0), new Vec3(0, 18, 0), 18), "tall but the top is near");
         assertTrue(Handles.tall(new Vec3(0, 5, 0), new Vec3(0, 60, 0), 60));
     }
+
+    @Test
+    void arrowsShrinkWithASmallBuildButNeverVanishOrGrowPastTheCap() {
+        // a 4 block shed seen from 9 blocks: much smaller than the old minimum of 1 unit (2.8 blocks long)
+        double shed = Handles.arrowScale(9, 4, Handles.MAX_ARROW_SCALE);
+        assertTrue(shed < 0.5 && shed >= 0.35, "scale " + shed);
+        // a 16 block house keeps the old size at the old distances
+        assertEquals(1.0, Handles.arrowScale(9, 16, Handles.MAX_ARROW_SCALE), 1e-9);
+        assertTrue(Handles.arrowScale(9, 10, 8) > shed && Handles.arrowScale(9, 10, 8) < 1.0, "a middling build in between");
+        assertEquals(Handles.MAX_ARROW_SCALE, Handles.arrowScale(5000, 300, Handles.MAX_ARROW_SCALE), 1e-9);
+        // never smaller on screen than the grab box floor lets you hit
+        Handles h = new Handles(0, 0, 0, 4, 4, 4, new Vec3(-30, 2, 2), new Vec3(1, 0, 0));
+        Handles.Handle east = move(h, Direction.WEST);
+        double half = (east.boxes[0][3] - east.boxes[0][0]) / 2;
+        assertTrue(half >= Handles.PICK_PER_BLOCK * 20, "half width " + half);
+    }
+
+    @Test
+    void aSmallBuildKeepsItsRingAndABigOneGetsADialYouCanReach() {
+        Handles small = new Handles(0, 0, 0, 9, 6, 9, new Vec3(-6, 2, 4), new Vec3(1, 0, 0));
+        assertFalse(small.ring.dial(), "a ring round a house");
+        assertEquals(4.5, small.ring.cx(), 1e-9);
+        Vec3 cam = new Vec3(-8, 3, 100);
+        Handles mega = new Handles(0, 0, 0, 240, 120, 240, cam, new Vec3(1, 0, 0));
+        assertTrue(mega.ring.dial(), "a dial instead");
+        assertTrue(mega.ring.radius() < 8, "small: " + mega.ring.radius());
+        assertTrue(Math.hypot(mega.ring.cx() - cam.x, mega.ring.cz() - cam.z) < 30, "near the player, not at the middle of the build");
+        assertTrue(mega.ring.cx() < 0, "outside the wall it stands beside");
+    }
+
+    @Test
+    void insideAHugeBuildTheDialStandsInFrontOfThePlayer() {
+        Vec3 cam = new Vec3(100, 3, 100);
+        Handles h = new Handles(0, 0, 0, 240, 120, 240, cam, new Vec3(0, 0, -1));
+        assertTrue(h.ring.dial());
+        assertEquals(100, h.ring.cx(), 1e-6);
+        assertTrue(h.ring.cz() < 100 && h.ring.cz() > 85, "ahead, to the north: " + h.ring.cz());
+    }
 }

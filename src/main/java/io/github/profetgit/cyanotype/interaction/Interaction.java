@@ -530,13 +530,12 @@ public final class Interaction {
     private static AABB gestureStart;
 
     /**
-     * Which way one scroll step pushes: along the arrow the mouse is on, else along the axis the player looks along the
-     * most, away from them (so looking north, scrolling up pushes the build north). The axis only changes when another one
+     * Which way one scroll step pushes: along the axis the player looks along the most (never the arrow the mouse is on:
+     * the arrows are for dragging), away from them (so looking north, scrolling up pushes the build north). The axis only changes when another one
      * clearly takes over, so it does not flicker at 45 degrees.
      */
     private static Direction scrollDirection(Vec3 look) {
         editLook = look;
-        if (hover != null && hover.kind == Handles.Kind.MOVE) return hover.dir;
         double[] c = {look.x, look.y, look.z};
         int cur = HandleMath.dominantAxis(look.x, look.y, look.z, viewAxis.ordinal());
         viewAxis = Direction.Axis.values()[cur];
@@ -690,9 +689,12 @@ public final class Interaction {
             if (!Settings.get().chips) say(mc, what + "   now at " + p.origin.getX() + " " + p.origin.getY() + " " + p.origin.getZ());
         } else {
             if (!d.armed) {
-                d.ringY = d.startOrigin.getY() + 0.05;
-                d.cx = d.startOrigin.getX() + d.startSx / 2.0;
-                d.cz = d.startOrigin.getZ() + d.startSz / 2.0;
+                // the angle is taken about the ring's own centre, fixed for the whole drag: the build's middle for a ring round
+                // the build, the dial's centre for the dial of a build too big to ring
+                Handles.Ring r = handles.ring;
+                d.ringY = r.y();
+                d.cx = r.cx();
+                d.cz = r.cz();
             }
             double t = HandleMath.rayPlaneY(camera.y, look.y, d.ringY);
             if (Double.isNaN(t)) return;

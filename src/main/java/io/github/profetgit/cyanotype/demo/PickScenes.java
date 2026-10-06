@@ -163,6 +163,37 @@ final class PickScenes {
         settled();
         act(() -> check("pick/ctrl+click takes it out again", !has(BX + 2, G + 3, Z1) && has(AX + 2, G + 3, Z1) && Picking.picked().size() == houseA[0], Picking.picked().size() + " picked"));
 
+        // ---- precise edits: Ctrl+scroll sets a cube size, Ctrl+click takes the cube out, Shift+click puts it back
+        act(() -> {
+            Interaction.testModifiers = 2;
+            scroll(mc(), 2);
+        });
+        waitTicks(4);
+        act(() -> check("pick/ctrl+scroll picks the 3x3x3 cut", Picking.detail() == 2, "detail " + Picking.detail()));
+        act(() -> aimAt(AX + 2, G + 3, Z1));
+        waitTicks(6);
+        shot("pick_3b_cube_preview");
+        click();
+        waitTicks(6);
+        act(() -> {
+            long n = houseA[0] - Picking.picked().size();
+            check("pick/ctrl+click with a cut size takes only that cube out", n > 0 && n <= 27 && !has(AX + 2, G + 3, Z1) && has(AX + 2, G + 3, Z0), n + " blocks went");
+        });
+        shot("pick_3c_cube_out");
+        act(() -> Interaction.testModifiers = 1);
+        click();
+        waitTicks(6);
+        act(() -> check("pick/shift+click puts the cube back", Picking.picked().size() == houseA[0] && has(AX + 2, G + 3, Z1), Picking.picked().size() + " picked"));
+        act(() -> {
+            Interaction.testModifiers = 2;
+            scroll(mc(), -5);
+        });
+        waitTicks(2);
+        act(() -> {
+            Interaction.testModifiers = -1;
+            check("pick/ctrl+scroll back down returns to whole parts", Picking.detail() == 0, "detail " + Picking.detail());
+        });
+
         // ---- the reach: scroll up and down, the pick stays the house
         act(() -> scroll(mc(), 1));
         waitTicks(4);

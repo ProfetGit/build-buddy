@@ -50,6 +50,14 @@ public final class Picking {
     private static Vec3 camPos = Vec3.ZERO, camLook = new Vec3(0, 0, 1);
     private static double scrollAcc;
 
+    /**
+     * How much Ctrl+click takes out and Shift+click puts in: a whole part (what the picker found), or a cube of 5, 3 or
+     * 1 block around the block aimed at, for the precise edits a part is too coarse for. Ctrl+scroll or Shift+scroll changes it.
+     */
+    static final String[] DETAIL_NAMES = {"a part", "5x5x5 blocks", "3x3x3 blocks", "one block"};
+    static final int[] DETAIL_HALF = {-1, 2, 1, 0};
+    private static int detail;
+
     // a click on terrain asks for a second click on the same block before it picks it
     private static long forceCell = Long.MIN_VALUE;
 
@@ -90,6 +98,11 @@ public final class Picking {
         return set != null && set.working();
     }
 
+    /** Which cut size Ctrl+click and Shift+click use (0 = a whole part), for the demo. */
+    public static int detail() {
+        return detail;
+    }
+
     public static int reach() {
         return set == null ? Picker.DEFAULT_REACH : set.reachWanted();
     }
@@ -128,6 +141,7 @@ public final class Picking {
         set = null;
         stage = Stage.AIM;
         scrollAcc = 0;
+        detail = 0;
         forceCell = Long.MIN_VALUE;
         hoverCell = Long.MIN_VALUE;
         mesh = null;
@@ -166,11 +180,13 @@ public final class Picking {
         long key = cell.asLong();
         if (stage == Stage.RESULT) {
             if (ctrl) {
-                takeOut(mc, cell);
+                if (detail == 0) takeOut(mc, cell);
+                else cube(mc, cell, false);
                 return;
             }
             if (shift) {
-                addPart(mc, cell);
+                if (detail == 0) addPart(mc, cell);
+                else cube(mc, cell, true);
                 return;
             }
             if (set.picked().contains(key)) {
@@ -243,6 +259,28 @@ public final class Picking {
         if (!set.working()) Interaction.say(mc, "Added a part: " + String.format(Locale.ROOT, "%,d", set.picked().size() - before) + " blocks.");
     }
 
+    /** The precise edit: takes the picked blocks of a cube around the block aimed at out, or puts the reached ones back. */
+    private static void cube(Minecraft mc, BlockPos cell, boolean put) {
+        int n = put ? set.addCube(cell.asLong(), DETAIL_HALF[detail]) : set.removeCube(cell.asLong(), DETAIL_HALF[detail]);
+        if (n == 0) {
+            problem(mc, put ? "Nothing to put back there. Only blocks the pick has seen can come in; Shift+click a part for a new one."
+                : "No picked blocks there. Aim at the pick.");
+            return;
+        }
+        if (put) {
+            Sfx.play(Sfx.PRESS, 1.25f);
+        } else if (set.picked().isEmpty()) {
+            set.clear();
+            stage = Stage.AIM;
+            Sfx.play(Sfx.CLOSE);
+            Interaction.say(mc, "Nothing is left. Aim at a build and click.");
+            return;
+        } else {
+            Sfx.play(Sfx.RELEASE, 0.9f);
+        }
+        Interaction.say(mc, (put ? "Put back " : "Took out ") + String.format(Locale.ROOT, "%,d", n) + (n == 1 ? " block." : " blocks.") + (put ? " Ctrl+click takes blocks out." : " Shift+click puts them back."));
+    }
+
     private static void takeOut(Minecraft mc, BlockPos cell) {
         long key = cell.asLong();
         if (!set.picked().contains(key)) {
@@ -281,13 +319,24 @@ public final class Picking {
         cancel(mc);
     }
 
-    /** Scroll: how wide a gap the picker jumps. Always the tool's, so the hotbar does not move. */
+    /** Scroll: how wide a gap the picker jumps, or with Ctrl or Shift held how much a click cuts. Always the tool's, so the hotbar does not move. */
     public static boolean onScroll(double amount) {
         if (set == null || stage != Stage.RESULT) return true;
         scrollAcc += amount;
         int n = (int) scrollAcc;
         scrollAcc -= n;
         if (n == 0) return true;
+        Minecraft mc = Minecraft.getInstance();
+        if (Interaction.ctrl(mc) || Interaction.shift(mc)) {
+            // up = finer
+            int target = Math.max(0, Math.min(DETAIL_NAMES.length - 1, detail + n));
+            if (target != detail) {
+                detail = target;
+                Sfx.play(Sfx.SNAP, 0.9f + 0.1f * target);
+                Interaction.say(mc, "Cuts " + DETAIL_NAMES[detail]);
+            }
+            return true;
+        }
         int target = Math.max(0, Math.min(Picker.MAX_REACH, set.reachWanted() + n));
         if (target != set.reachWanted()) {
             set.setReach(target);
@@ -368,6 +417,7 @@ public final class Picking {
             return;
         }
         drawPick(camera);
+        brushPreview(mc, cell);
         resultHint(mc, cell, cancel);
     }
 
@@ -405,6 +455,17 @@ public final class Picking {
         }
     }
 
+    /** With Ctrl (out) or Shift (in) held and a cube size chosen: the cube a click would cut, red for out and green for in. */
+    private static void brushPreview(Minecraft mc, @Nullable BlockPos cell) {
+        if (cell == null || detail == 0) return;
+        boolean ctrl = Interaction.ctrl(mc), shift = Interaction.shift(mc);
+        if (!ctrl && !shift) return;
+        int h = DETAIL_HALF[detail];
+        AABB box = new AABB(cell.getX() - h, cell.getY() - h, cell.getZ() - h, cell.getX() + h + 1, cell.getY() + h + 1, cell.getZ() + h + 1).inflate(0.01);
+        int c = ctrl ? 0xFFFF6B6B : 0xFF7BE495;
+        Gizmos.cuboid(box, GizmoStyle.strokeAndFill(0xCC000000 | (c & 0xFFFFFF), 2.6f, 0x24000000 | (c & 0xFFFFFF))).setAlwaysOnTop();
+    }
+
     private static void resultHint(Minecraft mc, @Nullable BlockPos cell, String cancel) {
         String first = "Pick another build here";
         if (cell != null) {
@@ -412,8 +473,16 @@ public final class Picking {
             if (set.picked().contains(key)) first = "Save this build";
             else if (set.isContext(key)) first = "Pick that part instead";
         }
-        Interaction.chips(mc, new Chips.Chip("Click", first), new Chips.Chip("Shift+Click", "Add a part"), new Chips.Chip("Ctrl+Click", "Take a part out"),
-            new Chips.Chip("Scroll", "Reach " + set.reachWanted()), new Chips.Chip("Right click", "Start over"), new Chips.Chip(cancel, "Cancel"));
+        boolean ctrl = Interaction.ctrl(mc), shift = Interaction.shift(mc);
+        String cut = DETAIL_NAMES[detail];
+        if (ctrl || shift) {
+            // a modifier is held: say what the click and the scroll do now
+            Interaction.chips(mc, new Chips.Chip(ctrl ? "Ctrl+Click" : "Shift+Click", (ctrl ? "Take out " : "Put in ") + cut),
+                new Chips.Chip(ctrl ? "Ctrl+Scroll" : "Shift+Scroll", "Cut size: " + cut), new Chips.Chip("Right click", "Start over"), new Chips.Chip(cancel, "Cancel"));
+            return;
+        }
+        Interaction.chips(mc, new Chips.Chip("Click", first), new Chips.Chip("Shift+Click", "Add " + (detail == 0 ? "a part" : cut)), new Chips.Chip("Ctrl+Click", "Take out " + (detail == 0 ? "a part" : cut)),
+            new Chips.Chip("Ctrl+Scroll", "Finer cuts"), new Chips.Chip("Scroll", "Reach " + set.reachWanted()), new Chips.Chip("Right click", "Start over"), new Chips.Chip(cancel, "Cancel"));
     }
 
     // ---- drawing the pick

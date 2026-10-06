@@ -128,10 +128,11 @@ public final class WheelScreen extends Screen {
         int mx = Ui.mx(rawX), my = Ui.my(rawY);
         int cx = width / 2, cy = height / 2;
         int scale = height >= 270 ? 2 : 1;
-        int size = 64 * scale;
+        // the ring is wider than the icon in it by a margin on each side: 16 units of icon in a 24 wide ring, 32 in a 44 wide one
+        int size = scale == 2 ? 160 : 88;
         int n = tools.length;
         WheelArt.ensure(n, size);
-        double inner = WheelArt.hub(size), outer = 34 * scale + 90, rim = WheelArt.outer(size);
+        double inner = WheelArt.hub(size), outer = size / 2.0 + 90, rim = WheelArt.outer(size);
         if (chosen < 0) {
             int now = WheelGeometry.segmentAt(mx - cx, my - cy, inner, outer, n);
             if (now != hovered) {
@@ -169,9 +170,10 @@ public final class WheelScreen extends Screen {
             WheelArt.drawWedge(g, -size / 2, -size / 2, size, wedgeA);
             g.pose().popMatrix();
         }
-        // icons sit in the middle of their segments; they shrink when many tools share the ring
+        // icons sit in the middle of their segments, at a whole 16 or 32 so the pixels stay square; the big one only when
+        // the ring is wide enough to leave a margin and a neighbour is not closer than the icon
         double ringR = (inner + rim) / 2, arc = 2 * Math.PI * ringR / n;
-        double iconHalf = Math.min(7 * scale, Math.min(arc * 0.34, (rim - inner) * 0.4));
+        int box = (rim - inner) >= 40 && arc >= 38 ? 32 : 16;
         java.util.List<int[]> placed = new java.util.ArrayList<>();
         for (int i = 0; i < n; i++) {
             Tool t = tools[i];
@@ -182,10 +184,10 @@ public final class WheelScreen extends Screen {
             double[] at = WheelGeometry.pointAt(i, n, ringR);
             int ix = (int) Math.round(cx + at[0]), iy = (int) Math.round(cy + at[1]);
             float lift = Motion.follow("wheel#icon" + i, hot ? 1f : 0f, 0.07);
-            int isz = (int) Math.round(iconHalf * (1 + 0.12 * lift) * pulseK);
-            // dark icons on the lit wedge, light ones on the base
+            // no scaling (it would smear the pixels): the hovered icon lifts a pixel, the chosen one hops
+            int hop = (int) Math.round(lift * (box / 16) + (pulseK - 1) * 10);
             boolean dark = hot && on;
-            Ui.icon(g, t.icon, ix - isz, iy - isz, dark, isz * 2, on ? alpha : alpha * 0.4f);
+            Ui.icon(g, t.icon, ix - box / 2, iy - box / 2 - hop, dark, box, on ? alpha : alpha * 0.4f);
             // the name outside the wheel, pushed further out when it would sit on a neighbour's
             double ang = WheelGeometry.center(i, n) - Math.PI / 2;
             int col = !on ? 0xFF5E7C99 : hot ? Ui.WHITE : Ui.DIM;

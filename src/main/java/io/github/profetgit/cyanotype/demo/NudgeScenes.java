@@ -21,7 +21,7 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Edit mode's scroll wheel: it pushes the build along the axis the player looks along, Shift goes five at a time, Ctrl turns,
- * Ctrl+Shift flips, the arrow under the mouse sets the axis, one run of scrolls is one undo. On a build over a hundred
+ * Ctrl+Shift flips, scroll never follows the arrow under the mouse, one run of scrolls is one undo. On a build over a hundred
  * blocks every arrow must be one the player can reach.
  */
 final class NudgeScenes {
@@ -137,8 +137,9 @@ final class NudgeScenes {
         waitTicks(4);
         act(() -> check("nudge/both are undone", house.orientation.equals(Orientation.NONE), String.valueOf(house.orientation)));
 
-        // the arrow under the mouse sets the axis
-        look(5.5, G + 6, 40, 180, 8);
+        // the arrow under the mouse does not set the axis: the way the player looks does. From far south the east arrow
+        // is nearly straight ahead along north, so a push along the arrow would go east and one along the view north
+        look(5.5, G + 6, 75, 180, 4);
         act(() -> {
             Vec3 a = Interaction.handleAnchor("move+x");
             PlaceScenes.aim(mc(), a.x, a.y, a.z);
@@ -147,7 +148,8 @@ final class NudgeScenes {
         act(() -> o[0] = house.origin);
         act(() -> scroll(mc(), 1));
         waitTicks(4);
-        act(() -> check("nudge/on the east arrow, scroll pushes it east whatever way the player faces", house.origin.equals(o[0].east()), "origin " + house.origin + " from " + o[0]));
+        act(() -> check("nudge/the east arrow is under the mouse", Interaction.hoverName().equals("movex"), "hover '" + Interaction.hoverName() + "'"));
+        act(() -> check("nudge/on the east arrow, scroll still pushes the way the player looks (north), not along the arrow", house.origin.equals(o[0].north()), "origin " + house.origin + " from " + o[0]));
         shot("nudge_2_on_arrow");
 
         // hidden: the wheel is the game's again

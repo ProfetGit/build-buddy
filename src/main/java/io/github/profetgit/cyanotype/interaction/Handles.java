@@ -50,7 +50,7 @@ final class Handles {
     }
 
     /** Ring geometry, kept beside the list because a ray meets it on a plane rather than in boxes. */
-    record Ring(double cx, double cz, double y, double radius, double tolerance) {
+    record Ring(double cx, double cz, double y, double radius, double tolerance, double unit, boolean dial) {
     }
 
     /** How strongly each handle is hovered, 0 to 1, eased between frames so hover grows in and out instead of switching. */
@@ -69,6 +69,22 @@ final class Handles {
     private static Direction.Axis flipAxis = Direction.Axis.X;
     /** The most a face arrow is scaled up for distance: further away it stays this size and the build is just far. */
     static final double MAX_ARROW_SCALE = 8.0;
+    /** The smallest a handle's grab box gets, per block of distance: about 30 pixels on a 1080p screen whatever the build's size. */
+    static final double PICK_PER_BLOCK = 0.025;
+    /** A turn ring wider than this (half the build's diagonal plus a margin) is too big to reach round: a small dial beside the build takes its place. */
+    static final double DIAL_FROM = 14.0;
+
+    /**
+     * How big the arrows of a build are drawn, in the unit the arrow shapes are built from (a face arrow is 2.8 units long).
+     * An arrow is about the same size on screen at any distance (distance / 14) so it stays easy to hit on a huge build,
+     * but never so big that it swamps a small one: under 16 blocks across the arrows shrink with the build (to half at 8
+     * blocks and under) and are never smaller than a third of a unit.
+     */
+    static double arrowScale(double distance, double ref, double max) {
+        double k = Math.max(0.5, Math.min(1.0, ref / 16.0));
+        double lo = Math.max(0.35, Math.min(1.0, ref / 14.0));
+        return Math.max(lo, Math.min(max, distance / 14.0 * k));
+    }
 
     Handles(double x0, double y0, double z0, double sx, double sy, double sz, Vec3 camera, Vec3 look) {
         this(x0, y0, z0, sx, sy, sz, camera, look, false);
@@ -86,8 +102,9 @@ final class Handles {
         double cx = x0 + sx / 2, cy = y0 + sy / 2, cz = z0 + sz / 2;
         double dist = camera.distanceTo(new Vec3(cx, cy, cz));
         this.distance = dist;
-        this.scale = Math.max(1.0, Math.min(12.0, dist / 14.0));
-        double pick = 0.45 * scale;
+        double ref = Math.max(sx, Math.max(sy, sz));
+        this.scale = arrowScale(dist, ref, 12.0);
+        double pick = Math.max(0.45 * scale, PICK_PER_BLOCK * dist);
 
         // a face arrow stands on the point of its face nearest the camera, not at the face's middle: on a build a hundred
         // blocks tall the middle of the top is out of sight and out of reach, the nearest point never is
@@ -107,15 +124,16 @@ final class Handles {
             // on a tall build the top and bottom are out of reach whatever the camera does: the up and down arrows then stand
             // beside the nearest wall at eye level instead
             if (d.getAxis() == Direction.Axis.Y && tall(camera, face, sy)) face = sideMount(camera, d, lo, size);
-            double s = Math.max(1.0, Math.min(MAX_ARROW_SCALE, camera.distanceTo(face) / 14.0));
-            double gap = 0.45 * s, len = 2.8 * s, spick = 0.45 * s;
+            double fd = camera.distanceTo(face);
+            double s = arrowScale(fd, ref, MAX_ARROW_SCALE);
+            double gap = 0.45 * s, len = 2.8 * s, spick = Math.max(0.45 * s, PICK_PER_BLOCK * fd);
             Vec3 from = face.add(d.getStepX() * gap, d.getStepY() * gap, d.getStepZ() * gap);
             Vec3 to = from.add(d.getStepX() * len, d.getStepY() * len, d.getStepZ() * len);
             handles.add(new Handle(Kind.MOVE, d, d.getAxis(), axisColor(d.getAxis()), from, to, new double[][]{box(from, to, spick)}, s));
         }
 
         double radius = Math.hypot(sx, sz) / 2 + 0.9 * scale;
-        ring = new Ring(cx, cz, y0 + 0.05, radius, 0.45 * scale);
+        ring = radius > DIAL_FROM ? dial(camera, look, lo, size) : new Ring(cx, cz, y0 + 0.05, radius, Math.max(0.45 * scale, PICK_PER_BLOCK * dist), scale, false);
         if (facesOnly) return;
         handles.add(new Handle(Kind.RING, null, Direction.Axis.Y, RING_COLOR, Vec3.ZERO, Vec3.ZERO, new double[0][], scale));
 
@@ -126,20 +144,49 @@ final class Handles {
         else if (az > ax * 1.15) flipAxis = Direction.Axis.X;
         double fscale = scale, fpick = pick;
         double fy = y0 + sy + 1.4 * scale, span = 1.5 * scale, off = 3.4 * scale;
-        Vec3 fcx = new Vec3(cx + off, fy, cz);
+        // beside the build's middle toward the right of the screen: the name label takes the left
+        org.joml.Vector3f right = new org.joml.Vector3f(1, 0, 0).rotate(Handles.camera);
+        double rh = Math.hypot(right.x, right.z), rx = rh < 0.1 ? 1 : right.x / rh, rz = rh < 0.1 ? 0 : right.z / rh;
+        Vec3 fcx = new Vec3(cx + rx * off, fy, cz + rz * off);
         Vec3 topPoint = new Vec3(Math.max(x0, Math.min(x0 + sx, camera.x)), y0 + sy, Math.max(z0, Math.min(z0 + sz, camera.z)));
         if (tall(camera, topPoint, sy)) {
             // out of reach on top: beside the up and down arrows, at eye level
             Vec3 m = sideMount(camera, Direction.UP, lo, size);
             fcx = new Vec3(m.x, m.y, m.z);
-            fscale = Math.max(1.0, Math.min(MAX_ARROW_SCALE, camera.distanceTo(m) / 14.0));
-            fpick = 0.45 * fscale;
+            fscale = arrowScale(camera.distanceTo(m), ref, MAX_ARROW_SCALE);
+            fpick = Math.max(0.45 * fscale, PICK_PER_BLOCK * camera.distanceTo(m));
             span = 1.5 * fscale;
             fcx = fcx.add(tangentOf(camera, lo, size).scale(2.8 * fscale));
         }
         Vec3 fa = flipAxis == Direction.Axis.X ? new Vec3(fcx.x - span, fcx.y, fcx.z) : new Vec3(fcx.x, fcx.y, fcx.z - span);
         Vec3 fb = flipAxis == Direction.Axis.X ? new Vec3(fcx.x + span, fcx.y, fcx.z) : new Vec3(fcx.x, fcx.y, fcx.z + span);
         handles.add(new Handle(Kind.FLIP, null, flipAxis, axisColor(flipAxis), fa, fb, new double[][]{box(fa, fb, fpick)}, fscale));
+    }
+
+    /**
+     * The turn dial of a build too big to ring: a small flat ring on the ground beside the nearest wall (in front of the
+     * player when they stand inside the footprint). Dragging round it turns the build about its own middle, in quarter
+     * turns, the angle taken about the dial's centre so a hand's width of mouse is a quarter turn at any build size.
+     */
+    private static Ring dial(Vec3 camera, Vec3 look, double[] lo, double[] size) {
+        double qx = Math.max(lo[0], Math.min(lo[0] + size[0], camera.x)), qz = Math.max(lo[2], Math.min(lo[2] + size[2], camera.z));
+        boolean inside = qx == camera.x && qz == camera.z;
+        double d0 = Math.hypot(qx - camera.x, qz - camera.z);
+        double u = arrowScale(Math.max(d0, 6), 16, 4.0);
+        double r = 1.7 * u;
+        double dx, dz;
+        if (inside) {
+            double h = Math.hypot(look.x, look.z);
+            double lx = h < 0.05 ? 0 : look.x / h, lz = h < 0.05 ? -1 : look.z / h;
+            dx = camera.x + lx * (r + 2.5);
+            dz = camera.z + lz * (r + 2.5);
+        } else {
+            double[] w = nearestWall(camera, lo, size);
+            dx = w[4] + w[0] * (r + 1.2);
+            dz = w[5] + w[1] * (r + 1.2);
+        }
+        double y = camera.y - lo[1] < 3 ? lo[1] + 0.05 : Math.max(lo[1] + 0.05, camera.y - 1.62);
+        return new Ring(dx, dz, y, r, Math.max(0.45 * u, PICK_PER_BLOCK * Math.max(d0, 4)), u, true);
     }
 
     /** Whether a face point is too far above or below the camera to be a good place for an arrow: a build over 16 blocks tall, with the point more than 20 away. */
@@ -167,7 +214,7 @@ final class Handles {
     private static Vec3 sideMount(Vec3 camera, Direction d, double[] lo, double[] size) {
         double[] w = nearestWall(camera, lo, size);
         double y = Math.max(lo[1] + 1, Math.min(lo[1] + size[1] - 1, camera.y));
-        double s = Math.max(1.0, Math.min(MAX_ARROW_SCALE, camera.distanceTo(new Vec3(w[4], y, w[5])) / 14.0));
+        double s = arrowScale(camera.distanceTo(new Vec3(w[4], y, w[5])), Math.max(size[0], Math.max(size[1], size[2])), MAX_ARROW_SCALE);
         double side = (d == Direction.UP ? 1 : -1) * 1.6 * s, out = 1.2 * s;
         return new Vec3(w[4] + w[0] * out + w[2] * side, y, w[5] + w[1] * out + w[3] * side);
     }
@@ -361,7 +408,7 @@ final class Handles {
 
     /** The turn ring: a flat translucent band at the base with a crisp edge on both sides and four chevrons showing clockwise. */
     private void ring(float hover, float press) {
-        double band = 0.5 * scale * (1 + 0.25 * hover - 0.1 * press);
+        double band = 0.5 * ring.unit * (1 + 0.25 * hover - 0.1 * press);
         double r0 = ring.radius - band / 2, r1 = ring.radius + band / 2;
         int stroke = mix(RING_COLOR, WHITE, 0.2f + 0.8f * hover);
         float sw = 2.2f + 2.0f * hover;
@@ -381,7 +428,7 @@ final class Handles {
             Gizmos.line(out[i], out[i + 1], stroke, sw).setAlwaysOnTop();
         }
         // chevrons pointing clockwise (toward +z from +x, as seen from above)
-        double w = 0.55 * scale * (1 + 0.2 * hover), tipAngle = 0.8 * scale / ring.radius;
+        double w = 0.55 * ring.unit * (1 + 0.2 * hover), tipAngle = 0.8 * ring.unit / ring.radius;
         for (int k = 0; k < 4; k++) {
             double a = k * Math.PI / 2 + Math.PI / 4;
             Vec3 tip = new Vec3(ring.cx + Math.cos(a + tipAngle) * ring.radius, ring.y, ring.cz + Math.sin(a + tipAngle) * ring.radius);

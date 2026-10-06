@@ -24,6 +24,8 @@ public final class PickSet {
     private final List<Picker.Result> floods = new ArrayList<>();
     private final List<Long> chosen = new ArrayList<>();
     private final LongOpenHashSet removed = new LongOpenHashSet();
+    /** Single cells added by hand from parts that are not chosen (a brush Shift+click), picked unless taken out again. */
+    private final LongOpenHashSet extra = new LongOpenHashSet();
     private int reach = Picker.DEFAULT_REACH;
 
     // derived from it
@@ -184,6 +186,52 @@ public final class PickSet {
         return false;
     }
 
+    /**
+     * Takes every picked cell of the cube of side {@code 2 * half + 1} around a cell out: the precise edit, when a whole
+     * part is too much (a lamp post on a wall, a doorstep).
+     * @return how many cells went
+     */
+    public int removeCube(long center, int half) {
+        if (job != null) return 0;
+        int n = 0, cx = BlockPos.getX(center), cy = BlockPos.getY(center), cz = BlockPos.getZ(center);
+        for (int y = cy - half; y <= cy + half; y++) {
+            for (int z = cz - half; z <= cz + half; z++) {
+                for (int x = cx - half; x <= cx + half; x++) {
+                    long c = BlockPos.asLong(x, y, z);
+                    if (!picked.contains(c)) continue;
+                    removed.add(c);
+                    n++;
+                }
+            }
+        }
+        if (n > 0) derive();
+        return n;
+    }
+
+    /**
+     * Puts back the cells of the cube around a cell that the picker reached but that are not picked (parts left out, cells
+     * taken out): the other half of the precise edit.
+     * @return how many cells came in
+     */
+    public int addCube(long center, int half) {
+        if (job != null) return 0;
+        int cx = BlockPos.getX(center), cy = BlockPos.getY(center), cz = BlockPos.getZ(center);
+        LongOpenHashSet add = new LongOpenHashSet();
+        for (int y = cy - half; y <= cy + half; y++) {
+            for (int z = cz - half; z <= cz + half; z++) {
+                for (int x = cx - half; x <= cx + half; x++) {
+                    long c = BlockPos.asLong(x, y, z);
+                    if (!picked.contains(c) && isContext(c)) add.add(c);
+                }
+            }
+        }
+        if (add.isEmpty()) return 0;
+        removed.removeAll(add);
+        extra.addAll(add);
+        derive();
+        return add.size();
+    }
+
     /** Changes how wide a gap the picker jumps; the old pick stays until the new one is ready. */
     public void setReach(int newReach) {
         int r = Math.max(0, Math.min(Picker.MAX_REACH, newReach));
@@ -200,6 +248,7 @@ public final class PickSet {
         floods.clear();
         chosen.clear();
         removed.clear();
+        extra.clear();
         picked = new LongOpenHashSet();
         version++;
         doubtful = new LongOpenHashSet();
@@ -251,7 +300,10 @@ public final class PickSet {
         chosen.clear();
         chosen.addAll(nextChosen);
         reach = nextReach;
-        if (restart) removed.clear();
+        if (restart) {
+            removed.clear();
+            extra.clear();
+        }
         restart = false;
         nextFloods = null;
         derive();
@@ -283,6 +335,7 @@ public final class PickSet {
                 }
             }
         }
+        for (long c : extra) if (!removed.contains(c)) out.add(c);
         picked = out;
         version++;
         doubtful = doubt;

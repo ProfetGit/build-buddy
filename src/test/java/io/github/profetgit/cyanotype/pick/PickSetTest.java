@@ -130,6 +130,48 @@ class PickSetTest {
     }
 
     @Test
+    void aCubeOfCellsCanBeTakenOutAndPutBack() {
+        TestWorld w = new TestWorld();
+        house(w, 10, 10);
+        PickSet s = new PickSet(w, Picker.DEFAULT_LIMIT);
+        s.start(key(12, 3, 10), null);
+        run(s);
+        int all = s.picked().size();
+        int gone = s.removeCube(key(12, 3, 14), 1);
+        assertTrue(gone > 0 && gone <= 27);
+        assertEquals(all - gone, s.picked().size());
+        assertFalse(s.picked().contains(key(12, 3, 14)));
+        assertTrue(s.picked().contains(key(12, 3, 10)), "the rest stays");
+        assertEquals(0, s.removeCube(key(12, 3, 14), 1), "nothing left there to take");
+        assertTrue(s.isContext(key(12, 3, 14)), "offered to put back");
+        assertEquals(gone, s.addCube(key(12, 3, 14), 1));
+        assertEquals(all, s.picked().size());
+        assertEquals(0, s.addCube(key(12, 3, 14), 1), "already all in");
+    }
+
+    @Test
+    void aSingleCellOfAPartThatWasLeftOutCanBeAdded() {
+        TestWorld w = new TestWorld();
+        house(w, 10, 10);
+        house(w, 24, 10);
+        for (int x = 17; x <= 23; x++) w.set(x, 1, 12, Blocks.OAK_FENCE);
+        PickSet s = new PickSet(w, Picker.DEFAULT_LIMIT);
+        s.start(key(12, 3, 10), null);
+        run(s);
+        assertFalse(s.picked().contains(key(26, 3, 10)));
+        assertEquals(1, s.addCube(key(26, 3, 10), 0));
+        assertTrue(s.picked().contains(key(26, 3, 10)));
+        assertTrue(s.removeCube(key(26, 3, 10), 0) == 1);
+        assertFalse(s.picked().contains(key(26, 3, 10)));
+        s.start(key(12, 3, 10), null);
+        run(s);
+        assertEquals(1, s.addCube(key(26, 3, 10), 0));
+        s.start(key(12, 3, 10), null);
+        run(s);
+        assertFalse(s.picked().contains(key(26, 3, 10)), "a fresh pick forgets the hand edits");
+    }
+
+    @Test
     void aFailedPickKeepsTheOldOneAndSaysWhy() {
         TestWorld w = new TestWorld();
         house(w, 10, 10);
