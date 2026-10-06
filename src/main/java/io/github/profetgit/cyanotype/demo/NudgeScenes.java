@@ -210,6 +210,47 @@ final class NudgeScenes {
         act(() -> PlaceScenes.release(mc().options.keyAttack));
         waitTicks(4);
         act(() -> check("mega/dragging it three blocks up lifts the whole build three", house.origin.equals(o[0].above(3)), "origin " + house.origin + " from " + o[0]));
+        // carry it: grab the wall from far away, look 20 blocks along it and the whole build comes with the crosshair
+        look(-150, G + 60, 110, -90, 0);
+        waitTicks(6);
+        act(() -> {
+            Vec3 e = mc().player.getEyePosition();
+            PlaceScenes.aim(mc(), 0.0, e.y + 40, 110.0);
+            o[0] = house.origin;
+        });
+        waitTicks(6);
+        act(() -> check("mega/the body is under the crosshair, no arrow", Interaction.hoverName().isEmpty(), "hover '" + Interaction.hoverName() + "'"));
+        act(() -> PlaceScenes.hold(mc().options.keyAttack));
+        waitTicks(4);
+        act(() -> check("mega/pressing on the body picks it up", Interaction.grabbing(), "grabbing " + Interaction.grabbing()));
+        act(() -> {
+            Vec3 e = mc().player.getEyePosition();
+            PlaceScenes.aim(mc(), 0.0, e.y + 40, 90.0);
+        });
+        waitTicks(6);
+        shot("mega_2_carry");
+        act(() -> Interaction.testModifiers = 1);
+        waitTicks(3);
+        act(() -> {
+            Vec3 e = mc().player.getEyePosition();
+            PlaceScenes.aim(mc(), 0.0, e.y + 50, 90.0);
+        });
+        waitTicks(6);
+        act(() -> Interaction.testModifiers = -1);
+        waitTicks(3);
+        act(() -> PlaceScenes.release(mc().options.keyAttack));
+        waitTicks(4);
+        act(() -> {
+            BlockPos d = house.origin.subtract(o[0]);
+            check("mega/carried 20 blocks north and lifted 10 by looking (within a block)", Math.abs(d.getX()) <= 1 && Math.abs(d.getZ() + 20) <= 1 && Math.abs(d.getY() - 10) <= 1, "moved " + d);
+            check("mega/it is put down on release", !Interaction.grabbing(), "grabbing");
+        });
+        act(() -> {
+            Placements.undo();
+        });
+        waitTicks(4);
+        act(() -> check("mega/one undo brings it all the way back", house.origin.equals(o[0]), "origin " + house.origin + " from " + o[0]));
+
         // and the scroll does it from anywhere
         look(-12, G + 40, 110, -90, 5);
         act(() -> o[0] = house.origin);

@@ -1,0 +1,108 @@
+package io.github.profetgit.cyanotype.interaction;
+
+import net.minecraft.world.phys.Vec3;
+
+/**
+ * Carrying a build by grabbing it: the point of the build under the crosshair stays under the crosshair while the player
+ * looks around, whatever the build's size or distance. That is why it feels the same on a shed and on a hundred-block
+ * tower (an arrow's drag is a line far away, where a pixel of mouse is many blocks).
+ *
+ * <p>Sideways movement follows the point where the view meets a flat plane at the grabbed point's height (the floor of the
+ * build, when that height is about the player's eye level and the plane could never be met); with Shift held the build
+ * goes up and down instead, following the view's crossing of an upright plane through the grabbed point. Each part
+ * moves in whole blocks from where it was grabbed. Pure maths, tested.
+ */
+final class Grab {
+    /** The farthest a view line is followed to its plane: beyond it the build stays where it was last. */
+    static final double MAX_T = 600;
+    /** A plane closer than this to the eye in height is no use for sideways movement (the view runs along it). */
+    static final double MIN_PLANE_GAP = 3.0;
+
+    final Vec3 start;
+    final double planeY;
+    private double hx, hz;
+    private final double nx, nz;
+    int dx, dy, dz;
+    private double vOff;
+    private boolean wasVertical, switched;
+
+    private Grab(Vec3 start, double planeY, double hx, double hz, double nx, double nz) {
+        this.start = start;
+        this.planeY = planeY;
+        this.hx = hx;
+        this.hz = hz;
+        this.nx = nx;
+        this.nz = nz;
+    }
+
+    /**
+     * Starts a grab of the point {@code p0} seen from {@code eye} along {@code look}; {@code floorY} is the height of the
+     * build's base, the fallback plane when the grabbed point is level with the eye.
+     */
+    static Grab start(Vec3 eye, Vec3 look, Vec3 p0, double floorY) {
+        double plane = p0.y;
+        if (Math.abs(p0.y - eye.y) < MIN_PLANE_GAP && Math.abs(floorY - eye.y) >= 0.5) plane = floorY;
+        // where the view meets the plane now; when it does not (looking level), the first frame it does is the start
+        double t = Math.abs(look.y) < 1e-9 ? -1 : (plane - eye.y) / look.y;
+        double sx = t > 0 ? eye.x + look.x * t : Double.NaN, sz = t > 0 ? eye.z + look.z * t : Double.NaN;
+        double h = Math.hypot(look.x, look.z);
+        double nx = h < 1e-3 ? 0 : look.x / h, nz = h < 1e-3 ? -1 : look.z / h;
+        return new Grab(p0, plane, sx, sz, nx, nz);
+    }
+
+    /** Follows the view for this frame. @param vertical Shift is held: only up and down change, else only sideways */
+    void update(Vec3 eye, Vec3 look, boolean vertical) {
+        // changing between sideways and up/down must not jump: the new mode takes up from where the build is now
+        if (vertical != wasVertical) {
+            wasVertical = vertical;
+            switched = true;
+        }
+        if (vertical) {
+            double den = look.x * nx + look.z * nz;
+            if (den < 1e-3) return;
+            double t = ((start.x - eye.x) * nx + (start.z - eye.z) * nz) / den;
+            if (t <= 0 || t > MAX_T) return;
+            double raw = eye.y + look.y * t - start.y;
+            if (switched) {
+                vOff = dy - raw;
+                switched = false;
+            }
+            dy = (int) Math.round(raw + vOff);
+        } else {
+            if (Math.abs(look.y) < 1e-9) return;
+            double t = (planeY - eye.y) / look.y;
+            if (t <= 0 || t > MAX_T) return;
+            double x = eye.x + look.x * t, z = eye.z + look.z * t;
+            if (Double.isNaN(hx)) {
+                hx = x;
+                hz = z;
+            }
+            if (switched) {
+                hx = x - dx;
+                hz = z - dz;
+                switched = false;
+            }
+            dx = (int) Math.round(x - hx);
+            dz = (int) Math.round(z - hz);
+        }
+    }
+
+    boolean moved() {
+        return dx != 0 || dy != 0 || dz != 0;
+    }
+
+    /** "12 east, 3 north, 2 up" for what has moved so far. */
+    String words() {
+        StringBuilder sb = new StringBuilder();
+        add(sb, dx, dx > 0 ? "east" : "west");
+        add(sb, dz, dz > 0 ? "south" : "north");
+        add(sb, dy, dy > 0 ? "up" : "down");
+        return sb.length() == 0 ? "not moved" : sb.toString();
+    }
+
+    private static void add(StringBuilder sb, int n, String word) {
+        if (n == 0) return;
+        if (sb.length() > 0) sb.append(", ");
+        sb.append(Math.abs(n)).append(' ').append(word);
+    }
+}

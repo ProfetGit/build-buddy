@@ -104,6 +104,13 @@ public final class Interaction {
     private static Handles.Handle hover;
     private static Drag drag;
 
+    /** Carrying the build by grabbing its body (see {@link Grab}): the placement, where it started, and the grab maths. */
+    private static Grab grab;
+    private static Placement grabbed;
+    private static BlockPos grabOrigin;
+    private static AABB grabBox;
+    private static Vec3 eyePos = Vec3.ZERO, eyeLook = new Vec3(0, 0, -1);
+
     private Interaction() {
     }
 
@@ -145,7 +152,7 @@ public final class Interaction {
         }
         if (Placements.mode() == Mode.EDIT && p != null && p.locked) {
             // the wheel moves the build along the axis the player looks along; mid-drag it is not wanted, but must not change the hotbar either
-            if (drag == null) editScroll(mc, p, amount);
+            if (drag == null && grab == null) editScroll(mc, p, amount);
             return true;
         }
         if (Placements.mode() != Mode.PLACING || p == null || p.locked) return false;
@@ -204,7 +211,71 @@ public final class Interaction {
             }
             return true;
         }
+        if (Placements.mode() == Mode.EDIT && p != null && p.locked && hover == null && drag == null && grab == null && startGrab(Minecraft.getInstance(), p)) {
+            suppressAttack = true;
+            return true;
+        }
         return false;
+    }
+
+    /** The visual box of a placement, where its body is drawn. */
+    private static AABB bodyBox(Placement p) {
+        double y = GhostRenderer.visualY(p);
+        return new AABB(p.vx, y, p.vz, p.vx + p.sizeX(), y + p.sizeY(), p.vz + p.sizeZ());
+    }
+
+    /** Whether the crosshair is on the body of the build (its box), seen from the camera of this frame. */
+    private static boolean onBody(Placement p) {
+        AABB b = bodyBox(p);
+        return !Double.isNaN(HandleMath.rayBox(eyePos.x, eyePos.y, eyePos.z, eyeLook.x, eyeLook.y, eyeLook.z, b.minX, b.minY, b.minZ, b.maxX, b.maxY, b.maxZ));
+    }
+
+    /** Picks the build up by the point under the crosshair: where the view enters its box, or, from inside it, the block looked at. */
+    private static boolean startGrab(Minecraft mc, Placement p) {
+        AABB b = bodyBox(p);
+        double t = HandleMath.rayBox(eyePos.x, eyePos.y, eyePos.z, eyeLook.x, eyeLook.y, eyeLook.z, b.minX, b.minY, b.minZ, b.maxX, b.maxY, b.maxZ);
+        if (Double.isNaN(t)) return false;
+        Vec3 p0;
+        if (t > 0) {
+            p0 = eyePos.add(eyeLook.scale(t));
+        } else {
+            BlockHitResult hit = mc.level.clip(new ClipContext(eyePos, eyePos.add(eyeLook.scale(PLACE_RANGE)), ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, mc.player));
+            p0 = hit.getType() == HitResult.Type.BLOCK ? hit.getLocation() : eyePos.add(eyeLook.scale(6));
+        }
+        Placements.remember(p);
+        grabbed = p;
+        grabOrigin = p.origin;
+        grabBox = b;
+        grab = Grab.start(eyePos, eyeLook, p0, p.origin.getY());
+        Sfx.play(Sfx.PRESS, 1.1f);
+        return true;
+    }
+
+    private static void endGrab() {
+        Grab g = grab;
+        Placement p = grabbed;
+        grab = null;
+        grabbed = null;
+        if (g == null) return;
+        if (g.moved()) PlacementStore.markDirty();
+        else Placements.forgetLast();
+        if (p != null && g.moved()) Sfx.play(Sfx.LOCK, 1.0f);
+    }
+
+    /** One frame of carrying: the build follows the view, in whole blocks. */
+    private static void updateGrab(Minecraft mc, Vec3 camera, Vec3 look) {
+        Grab g = grab;
+        Placement p = grabbed;
+        g.update(camera, look, shift(mc));
+        BlockPos target = grabOrigin.offset(g.dx, g.dy, g.dz);
+        if (!target.equals(p.origin)) {
+            p.set(target, p.orientation);
+            Sfx.play(Sfx.SNAP, 1.0f + 0.03f * Math.min(12, Math.abs(g.dx) + Math.abs(g.dz) + Math.abs(g.dy)));
+        }
+        // where it was, and how far it has come
+        Gizmos.cuboid(grabBox, GizmoStyle.stroke(0x66FFFFFF, 1.6f)).setAlwaysOnTop();
+        double dist = camera.distanceTo(g.start);
+        Handles.label(g.start.add(g.dx, g.dy, g.dz).add(0, 0.12 * dist + 0.9, 0), g.words(), Handles.labelScale(dist, 1.1, 0.1), 0xFFFFFFFF, 0xFFFFFFFF);
     }
 
     /** The use button went down. */
@@ -234,7 +305,7 @@ public final class Interaction {
 
     /** Whether holding the attack button should do nothing (it was used for a click or a drag, until it is let go). */
     public static boolean suppressHold() {
-        return suppressAttack || drag != null || !GhostRenderer.hidden && (Placements.mode() == Mode.PLACING || Placements.mode() == Mode.LAYERS || Placements.mode() == Mode.SELECT || Placements.mode() == Mode.PICK);
+        return suppressAttack || drag != null || grab != null || !GhostRenderer.hidden && (Placements.mode() == Mode.PLACING || Placements.mode() == Mode.LAYERS || Placements.mode() == Mode.SELECT || Placements.mode() == Mode.PICK);
     }
 
     public static void tick(Minecraft mc) {
@@ -263,6 +334,7 @@ public final class Interaction {
         }
         boolean down = mc.options.keyAttack.isDown();
         if (drag != null && (!down || screen)) endDrag();
+        if (grab != null && (!down || screen)) endGrab();
         if (Selecting.dragging() && (!down || screen)) Selecting.endDrag();
         if (suppressAttack && !down) suppressAttack = false;
         Picking.tick(mc);
@@ -351,6 +423,7 @@ public final class Interaction {
 
     static void endDragSafely() {
         endDrag();
+        endGrab();
     }
 
     private static void endLayers(Minecraft mc, boolean showAll) {
@@ -426,6 +499,8 @@ public final class Interaction {
     public static void reset() {
         Handles.forget();
         drag = null;
+        grab = null;
+        grabbed = null;
         hover = null;
         handles = null;
         suppressAttack = false;
@@ -444,6 +519,8 @@ public final class Interaction {
         Handles.camera.set(cam.orientation);
         Vector3f f = new Vector3f(0, 0, -1).rotate(cam.orientation);
         Vec3 look = new Vec3(f.x, f.y, f.z);
+        eyePos = pos;
+        eyeLook = look;
         Placement p = Placements.active();
         Mode mode = Placements.mode();
         hover = null;
@@ -489,6 +566,13 @@ public final class Interaction {
     private static void edit(Minecraft mc, Placement p, Vec3 camera, Vec3 look) {
         double y = GhostRenderer.visualY(p);
         handles = new Handles(p.vx, y, p.vz, p.sizeX(), p.sizeY(), p.sizeZ(), camera, look);
+        if (grab != null) {
+            // carrying it: no arrows in the way, just where it was and where it is going
+            handles = null;
+            updateGrab(mc, camera, look);
+            chips(mc, new Chips.Chip("Release", "Drop it here"), new Chips.Chip("Shift", "Lift it up / down"));
+            return;
+        }
         if (drag != null) {
             updateDrag(mc, camera, look);
             hover = drag.handle;
@@ -497,7 +581,8 @@ public final class Interaction {
             hover = handles.pick(camera, look);
             nudgeDir = scrollDirection(look);
             if (hover == null) {
-                chips(mc, new Chips.Chip("Scroll", "Push " + word(nudgeDir)), new Chips.Chip("Ctrl+Scroll", "Turn"), new Chips.Chip("Drag arrow", "Move"),
+                chips(mc, onBody(p) ? new Chips.Chip("Drag", "Carry it where you look") : new Chips.Chip("Aim at it", "then drag to carry"),
+                    new Chips.Chip("Scroll", "Push " + word(nudgeDir)), new Chips.Chip("Ctrl+Scroll", "Turn"), new Chips.Chip("Drag arrow", "Move one way"),
                     new Chips.Chip("Click flip", "Mirror"), new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo"),
                     new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
             } else {
@@ -948,6 +1033,11 @@ public final class Interaction {
 
     public static boolean dragging() {
         return drag != null;
+    }
+
+    /** Whether the build is being carried (grabbed by its body), for the demo. */
+    public static boolean grabbing() {
+        return grab != null;
     }
 
     public static String hoverName() {
