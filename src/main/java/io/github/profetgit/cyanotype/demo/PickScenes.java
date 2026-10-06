@@ -117,6 +117,11 @@ final class PickScenes {
             boolean holes = false;
             for (int px : leaves.face()[2].px()) if ((px >>> 24) < 128) holes = true;
             check("pick/leaves are solid cubes with the right green: no see-through texels", leaves.cube() && !holes && ((leaves.face()[2].avg() >> 8) & 255) > ((leaves.face()[2].avg() >> 16) & 255), "cube " + leaves.cube() + ", holes " + holes);
+            var cherry = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.CHERRY_LEAVES.defaultBlockState());
+            int cavg = cherry.face()[2].avg();
+            check("pick/cherry leaves are pink, not green", ((cavg >> 16) & 255) > ((cavg >> 8) & 255), Integer.toHexString(cavg));
+            var azalea = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.FLOWERING_AZALEA_LEAVES.defaultBlockState());
+            check("pick/oak leaves are green", ((leaves.face()[2].avg() >> 8) & 255) > ((leaves.face()[2].avg() >> 16) & 255) && azalea.face()[2].avg() != leaves.face()[2].avg(), Integer.toHexString(leaves.face()[2].avg()) + " vs azalea " + Integer.toHexString(azalea.face()[2].avg()));
             var torch = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.TORCH.defaultBlockState());
             var grassPlant = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.SHORT_GRASS.defaultBlockState());
             var stair = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.OAK_STAIRS.defaultBlockState());

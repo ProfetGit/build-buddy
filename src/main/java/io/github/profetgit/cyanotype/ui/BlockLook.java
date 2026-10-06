@@ -238,6 +238,8 @@ public final class BlockLook {
         Block b = s.getBlock();
         String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(b).getPath();
         if (b instanceof LiquidBlock) return 0xFF3F76E4;
+        // these leaves have a tinted model but no colour provider in the game: they are drawn as the texture is
+        if (id.equals("cherry_leaves") || id.equals("azalea_leaves") || id.equals("flowering_azalea_leaves") || id.equals("pale_oak_leaves")) return 0xFFFFFFFF;
         if (b instanceof LeavesBlock) {
             if (id.startsWith("birch")) return 0xFF80A755;
             if (id.startsWith("spruce")) return 0xFF619961;
