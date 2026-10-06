@@ -171,6 +171,43 @@ class BoxCheckTest {
     }
 
     @Test
+    void oneFencePostTouchingAWholeWallOfTheBoxIsStillNotABuildGoingOn() {
+        W w = new W();
+        w.fill(10, 1, 10, 10, 4, 14, Blocks.OAK_PLANKS);
+        w.fill(11, 1, 12, 11, 1, 12, Blocks.OAK_FENCE);
+        // the post touches several wall blocks (straight and slanting), but it is one block
+        assertFalse(BoxCheck.check(w, SelectionBox.of(8, 1, 9, 10, 4, 15), null).any());
+        assertEquals(0, BoxCheck.fit(w, SelectionBox.of(8, 1, 9, 10, 4, 15), null, 96, 8_000_000L).layers());
+    }
+
+    /** A roof of {@code block} climbing one block up for every block east, 5 wide (z 10..14), from x 10 to x 25. */
+    private static W slope(Block block) {
+        W w = new W();
+        for (int i = 0; i < 16; i++) w.fill(10 + i, 1 + i, 10, 10 + i, 1 + i, 14, block);
+        return w;
+    }
+
+    @Test
+    void aStairRoofCutByTheBoxIsFoundEvenThoughTheNextStepIsDiagonal() {
+        W w = slope(Blocks.OAK_STAIRS);
+        BoxCheck.Result r = BoxCheck.check(w, SelectionBox.of(9, 1, 9, 13, 20, 15), null);
+        assertTrue(r.cut(Direction.EAST), "the stairs go on to the east");
+        assertEquals(5, r.count[Direction.EAST.ordinal()]);
+        BoxCheck.Fit f = BoxCheck.fit(w, SelectionBox.of(9, 1, 9, 13, 20, 15), null, 96, 8_000_000L);
+        assertEquals(25, f.box().x1());
+        assertFalse(BoxCheck.check(w, f.box(), null).any());
+    }
+
+    @Test
+    void aSlabRoofIsTheSame() {
+        W w = slope(Blocks.OAK_SLAB);
+        BoxCheck.Result r = BoxCheck.check(w, SelectionBox.of(9, 1, 9, 13, 20, 15), null);
+        assertTrue(r.cut(Direction.EAST));
+        // and cut from the top, where the slope climbs out of the box
+        assertTrue(BoxCheck.check(w, SelectionBox.of(9, 1, 9, 25, 8, 15), null).cut(Direction.UP));
+    }
+
+    @Test
     void anOverBigBoxIsNotChecked() {
         BoxCheck.Result r = BoxCheck.check(tower(), SelectionBox.of(0, 0, 0, 900, 200, 900), null);
         assertTrue(r.skipped);

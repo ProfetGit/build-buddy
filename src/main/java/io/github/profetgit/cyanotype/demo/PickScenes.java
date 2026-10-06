@@ -469,6 +469,26 @@ final class PickScenes {
         act(() -> io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(AX + 5, G, 18, AX + 12, G + 9, 26)));
         waitTicks(16);
         shot("pick_9_tall");
+        // a roof of stairs and slabs climbs a step sideways at a time: the box through it is cut too
+        act(() -> {
+            java.util.List<String> roof = new java.util.ArrayList<>();
+            for (int i = 0; i < 8; i++) {
+                roof.add("fill " + (42 + i) + " " + (G + 1 + i) + " 26 " + (42 + i) + " " + (G + 1 + i) + " 28 " + (i % 2 == 0 ? "minecraft:oak_stairs[facing=east]" : "minecraft:oak_slab"));
+            }
+            Director.run(mc(), roof.toArray(new String[0]));
+        });
+        camera(46, G + 8, 38, 180, 22);
+        waitTicks(20);
+        act(() -> io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(42, G + 1, 26, 45, G + 8, 28)));
+        waitTicks(16);
+        act(() -> {
+            var c = io.github.profetgit.cyanotype.interaction.Selecting.cuts();
+            int east = net.minecraft.core.Direction.EAST.ordinal();
+            check("pick/a box through a roof of stairs and slabs is cut where the roof climbs out", c != null && c.count[east] >= 3, c == null ? "no result" : "east " + c.count[east] + ", total " + c.total());
+        });
+        shot("pick_9_stairs");
+        act(() -> io.github.profetgit.cyanotype.interaction.Selecting.cancel(mc()));
+
         // far from the world's origin, where only some chunks are loaded: the check must still see the build
         act(() -> io.github.profetgit.cyanotype.interaction.Selecting.cancel(mc()));
         camera(3003, G + 10, 3014, 180, 20);
