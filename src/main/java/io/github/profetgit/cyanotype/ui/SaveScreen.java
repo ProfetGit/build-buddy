@@ -1,5 +1,6 @@
 package io.github.profetgit.cyanotype.ui;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import io.github.profetgit.cyanotype.Cyanotype;
 import io.github.profetgit.cyanotype.blueprint.Blueprint;
 import io.github.profetgit.cyanotype.blueprint.Capture;
@@ -62,13 +63,8 @@ public final class SaveScreen extends Screen {
     /** On a screen too narrow for the preview beside the form, the preview takes the form's place when this is on. */
     private boolean previewOnly;
     private boolean draggingPreview, panningPreview;
-    /** Where a press on the picture began and which block was under it: a click that stays near is a removal of that block. */
-    private double pressX, pressY;
-    private int pressCell = -1;
     /** Why the last attempt to remove a block did nothing, shown under the picture until the next one. */
     private String removeNote = "";
-    /** Remove mode: pointing at a block of the preview lights it up and a click takes it out of the save. Ctrl+Z brings it back. */
-    private boolean removeMode;
     /** What was read from the world (before any block was taken out), where its min corner is, and the blocks taken out as world positions, with the ones undone for redo. */
     private Blueprint base;
     private int[] origin = {0, 0, 0};
@@ -203,12 +199,6 @@ public final class SaveScreen extends Screen {
     /** The preview's panel: beside the form, or on top of it when the screen is narrow and the preview is asked for. */
     private int[] previewPanel() {
         return wide() ? new int[]{px() + pw() + GAP, py(), pvW(), ph()} : new int[]{px(), py(), pw(), ph()};
-    }
-
-    /** Where the picture itself is, inside its panel. */
-    private int[] previewRect() {
-        int[] p = previewPanel();
-        return new int[]{p[0] + 8, p[1] + 22, p[2] - 16, p[3] - 22 - 24};
     }
 
     private boolean previewShown() {
@@ -492,40 +482,65 @@ public final class SaveScreen extends Screen {
         Ui.text(g, "Preview", pp[0] + 10, pp[1] + 8, Ui.withAlpha(Ui.LINE, inner));
         boolean idle = state == State.EDITING;
         boolean ctrl = idle && Interaction.ctrlDown(minecraft);
-        // pointing at a block lights it up in remove mode, and while Ctrl is held (Ctrl+click removes)
-        preview.setRemoveMode(removeMode || ctrl);
-        Ui.button(g, "sv#reset", resetX(pp), pp[1] + 5, RESET_W, 14, "Reset", null, mx, my, false, idle);
-        Ui.button(g, "sv#remove", removeX(pp), pp[1] + 5, REMOVE_W, 14, removeMode ? "Stop removing" : "Remove blocks", null, mx, my, removeMode, idle && captured != null);
-        int[] r = wide() ? previewRect() : new int[]{pp[0] + 8, pp[1] + 22, pp[2] - 16, pp[3] - 22 - 24};
+        // pointing at a block lights it up while Ctrl is held (Ctrl+click takes it out)
+        preview.setRemoveMode(ctrl);
+        Ui.button(g, "sv#reset", resetX(pp), pp[1] + 5, RESET_W, 14, "Reset view", null, mx, my, false, idle);
+        int[] r = pictureRect();
         double progress = job != null && !job.done() ? job.progress() : -1;
         preview.draw(g, r[0], r[1], r[2], r[3], progress, mx, my);
-        if (removeMode || ctrl) {
-            // remove mode is unmistakable: a red frame round the picture, a red banner on it, and the hovered block in red
+        if (ctrl) {
+            // with Ctrl held it is unmistakable what a click does: a red frame, a red banner, the pointed block in red
             int red = Ui.withAlpha(0xFFFF6B6B, inner * 0.95f);
             g.fill(r[0], r[1], r[0] + r[2], r[1] + 2, red);
             g.fill(r[0], r[1] + r[3] - 2, r[0] + r[2], r[1] + r[3], red);
             g.fill(r[0], r[1], r[0] + 2, r[1] + r[3], red);
             g.fill(r[0] + r[2] - 2, r[1], r[0] + r[2], r[1] + r[3], red);
-            String banner = removeMode ? "REMOVING: click a block to take it out" : "CTRL: click a block to take it out";
+            String banner = "CTRL: click a block to take it out";
             int bw = Ui.font().width(banner) + 10;
             g.fill(r[0] + 2, r[1] + 2, r[0] + 2 + bw, r[1] + 15, Ui.withAlpha(0xFFB02A2A, inner * 0.92f));
             Ui.text(g, banner, r[0] + 7, r[1] + 5, Ui.withAlpha(Ui.WHITE, inner));
         }
-        String hint = !removeNote.isEmpty() ? removeNote
-            : removedStack.isEmpty()
-            ? (removeMode ? "Remove mode is on. Ctrl+Z puts a block back" : "Drag turns, right-drag moves, scroll zooms, Ctrl+click removes a block")
+        // what was done, or why a click did nothing, in the corner under the picture; then the shortcuts
+        String note = !removeNote.isEmpty() ? removeNote
+            : removedStack.isEmpty() ? ""
             : "Took out " + removedStack.size() + (removedStack.size() == 1 ? " block" : " blocks") + ". Ctrl+Z puts it back";
-        Ui.text(g, Ui.fit(hint, pp[2] - 16), pp[0] + 8, pp[1] + pp[3] - 17, Ui.withAlpha(removeMode || !removeNote.isEmpty() ? 0xFFFF8A8A : Ui.DIM, inner * 0.95f));
+        int ly = r[1] + r[3] + 4;
+        if (!note.isEmpty()) Ui.text(g, Ui.fit(note, pp[2] - 16), pp[0] + 8, ly, Ui.withAlpha(removeNote.isEmpty() ? Ui.CYAN : 0xFFFF8A8A, inner));
+        drawShortcuts(g, pp[0] + 8, ly + (note.isEmpty() ? 0 : 11), pp[2] - 16, inner, ctrl);
     }
 
-    private static final int RESET_W = 44, REMOVE_W = 90;
+    /** What the mouse and keys do in the preview, as the same key and mouse pictures the cursor hints use. */
+    private static final String[][] SHORTCUTS = {
+        {"Drag", "Turn"}, {"Right drag", "Move"}, {"Scroll", "Zoom"},
+        {"Ctrl+Click", "Remove a block"}, {"Ctrl+Z / Y", "Undo / Redo"}};
+
+    private void drawShortcuts(GuiGraphicsExtractor g, int x, int y, int w, float inner, boolean ctrl) {
+        int cx = x, cy = y;
+        for (String[] sc : SHORTCUTS) {
+            int need = ChipIcons.width(sc[0]) + 4 + Ui.font().width(sc[1]);
+            if (cx > x && cx + need > x + w) {
+                cx = x;
+                cy += 15;
+            }
+            boolean hot = ctrl && sc[0].startsWith("Ctrl+Click");
+            ChipIcons.draw(g, sc[0], cx, cy - 2, inner * (hot ? 1f : 0.9f));
+            Ui.text(g, sc[1], cx + ChipIcons.width(sc[0]) + 4, cy + 2, Ui.withAlpha(hot ? 0xFFFF8A8A : Ui.DIM, inner));
+            cx += need + 12;
+        }
+    }
+
+    /** The picture inside the preview panel: below the title, above the note and the shortcuts. */
+    private int[] pictureRect() {
+        int[] pp = previewPanel();
+        return new int[]{pp[0] + 8, pp[1] + 22, pp[2] - 16, pp[3] - 22 - SHORTCUT_H};
+    }
+
+    private static final int SHORTCUT_H = 64;
+
+    private static final int RESET_W = 70;
 
     private int resetX(int[] pp) {
         return pp[0] + pp[2] - 10 - RESET_W;
-    }
-
-    private int removeX(int[] pp) {
-        return resetX(pp) - 4 - REMOVE_W;
     }
 
     private void fieldRow(GuiGraphicsExtractor g, String label, EditBox f, int x, int y, float inner, float partial, int mx, int my, String hint) {
@@ -564,26 +579,19 @@ public final class SaveScreen extends Screen {
                 Sfx.play(Sfx.PRESS, 1.1f);
                 return true;
             }
-            if (captured != null && Ui.inside(mx, my, removeX(pp), pp[1] + 5, REMOVE_W, 14)) {
-                removeMode = !removeMode;
-                preview.setRemoveMode(removeMode);
-                Sfx.play(Sfx.PRESS, removeMode ? 1.2f : 0.9f);
-                return true;
-            }
-            int[] r = wide() ? previewRect() : new int[]{px() + 8, py() + 22, pw() - 16, ph() - 22 - 24};
+            int[] r = pictureRect();
             if (Ui.inside(mx, my, r[0], r[1], r[2], r[3])) {
-                int under = preview.cellAt(event.x() - r[0], event.y() - r[1]);
-                // Ctrl+click takes the block under the pointer out at once, whatever else is switched on: no mode, no drag to tell it from
-                if (event.button() == 0 && (event.hasControlDown() || Interaction.ctrlDown(minecraft))) {
+                // the game numbers the mouse buttons left 1, middle 2, right 3
+                boolean left = event.button() == InputConstants.MOUSE_BUTTON_LEFT;
+                // Ctrl+click takes the block under the pointer out, on the press: no mode, and nothing to tell from a drag
+                if (left && (event.hasControlDown() || Interaction.ctrlDown(minecraft))) {
+                    int under = preview.cellAt(event.x() - r[0], event.y() - r[1]);
                     if (under >= 0) removeCell(under);
                     else removeNote = "No block there. Ctrl+click on a block of the picture";
                     return true;
                 }
                 draggingPreview = true;
-                pressX = event.x();
-                pressY = event.y();
-                pressCell = removeMode ? under : -1;
-                panningPreview = event.button() == 1 || event.button() == 2 || event.hasShiftDown();
+                panningPreview = event.button() == InputConstants.MOUSE_BUTTON_RIGHT || event.button() == InputConstants.MOUSE_BUTTON_MIDDLE || event.hasShiftDown();
                 return true;
             }
         }
@@ -620,12 +628,6 @@ public final class SaveScreen extends Screen {
         int mx = (int) event.x(), my = (int) event.y();
         if (draggingPreview) {
             draggingPreview = false;
-            // a click that stayed where it began is a removal, in remove mode (of the block it began on); a drag is only the view turning
-            if (removeMode && event.button() == 0) {
-                if (Math.hypot(event.x() - pressX, event.y() - pressY) >= 8) removeNote = "That was a drag, not a click: it turned the picture";
-                else if (pressCell < 0 && preview.hovered() < 0) removeNote = "No block under the pointer";
-                else removeCell(pressCell >= 0 ? pressCell : preview.hovered());
-            }
             return true;
         }
         String was = down;
@@ -649,9 +651,7 @@ public final class SaveScreen extends Screen {
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
         if (draggingPreview) {
-            // in remove mode a press that has not left its spot yet does not turn the picture: it may still be a click
-            boolean still = removeMode && !panningPreview && Math.hypot(event.x() - pressX, event.y() - pressY) < 8;
-            if (!still) preview.drag(dx, dy, panningPreview);
+            preview.drag(dx, dy, panningPreview);
             return true;
         }
         return super.mouseDragged(event, dx, dy);
@@ -660,7 +660,7 @@ public final class SaveScreen extends Screen {
     @Override
     public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {
         if (previewShown()) {
-            int[] r = wide() ? previewRect() : new int[]{px() + 8, py() + 22, pw() - 16, ph() - 22 - 24};
+            int[] r = pictureRect();
             if (Ui.inside((int) x, (int) y, r[0], r[1], r[2], r[3])) {
                 preview.zoom(scrollY, x - (r[0] + r[2] / 2.0), y - (r[1] + r[3] / 2.0));
                 return true;
@@ -774,10 +774,6 @@ public final class SaveScreen extends Screen {
         return removedStack.size();
     }
 
-    public boolean removing() {
-        return removeMode;
-    }
-
     /** Dev demo: undo and redo of the removals, as the keys do them. */
     public void undoRemovalForDemo() {
         undoRemoval();
@@ -793,9 +789,8 @@ public final class SaveScreen extends Screen {
             case "back" -> new int[]{backX() + 35, buttonY() + 8};
             case "trim", "ground" -> new int[]{px() + 20, py() + 44 + 86 + 5};
             case "reset" -> new int[]{resetX(previewPanel()) + RESET_W / 2, previewPanel()[1] + 12};
-            case "remove" -> new int[]{removeX(previewPanel()) + REMOVE_W / 2, previewPanel()[1] + 12};
             case "preview" -> {
-                int[] r = wide() ? previewRect() : new int[]{px() + 8, py() + 22, pw() - 16, ph() - 22 - 24};
+                int[] r = pictureRect();
                 yield new int[]{r[0] + r[2] / 2, r[1] + r[3] / 2};
             }
             default -> new int[]{0, 0};

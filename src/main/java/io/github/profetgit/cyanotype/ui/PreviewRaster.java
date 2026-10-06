@@ -179,8 +179,13 @@ public final class PreviewRaster {
     }
 
     static @Nullable Scene scene(int[] cells, BlockLook.Look[] looks, int ex, int ey, int ez) {
-        boolean[] cube = new boolean[looks.length + 1];
-        for (int i = 0; i < looks.length; i++) cube[i + 1] = looks[i].cube();
+        // what hides the faces behind it: a plain cube that is not see-through; water shows what is behind it and is no wall
+        boolean[] cube = new boolean[looks.length + 1], water = new boolean[looks.length + 1], isCube = new boolean[looks.length + 1];
+        for (int i = 0; i < looks.length; i++) {
+            water[i + 1] = looks[i].translucent();
+            isCube[i + 1] = looks[i].cube();
+            cube[i + 1] = looks[i].cube() && !looks[i].translucent();
+        }
         // the cells drawn from their model: not plain cubes, and not shut in by cubes on every side
         java.util.ArrayList<Integer> customList = new java.util.ArrayList<>();
         long total = 0;
@@ -198,13 +203,16 @@ public final class PreviewRaster {
                         int i = row + x;
                         int c = cells[i];
                         if (c == 0) continue;
-                        if (!cube[c]) {
+                        if (!isCube[c]) {
                             if (pass == 0 && !enclosed(cells, cube, x, y, z, ex, ey, ez)) customList.add(i);
                             continue;
                         }
                         for (int d = 0; d < 6; d++) {
                             int nx = x + N[d][0], ny = y + N[d][1], nz = z + N[d][2];
-                            boolean open = nx < 0 || ny < 0 || nz < 0 || nx >= ex || ny >= ey || nz >= ez || !cube[cells[(ny * ez + nz) * ex + nx]];
+                            boolean outside = nx < 0 || ny < 0 || nz < 0 || nx >= ex || ny >= ey || nz >= ez;
+                            int nc = outside ? 0 : cells[(ny * ez + nz) * ex + nx];
+                            // an opaque face is open next to air, a model or water; a water face only next to air or a model (not next to water or a solid)
+                            boolean open = water[c] ? nc == 0 || (!cube[nc] && !water[nc]) : !cube[nc];
                             if (!open) continue;
                             if (pass == 0) {
                                 total++;
@@ -266,14 +274,20 @@ public final class PreviewRaster {
             front[d] = N[d][1] * sp + nz * cp > 1e-9;
         }
         double[] fx = new double[4], fy = new double[4], fz = new double[4], fu = new double[4], fv = new double[4];
+        // two sweeps: everything solid first, then the water over it (blended, not written to the depth buffer)
+        for (int sweep = 0; sweep < 2; sweep++) {
         for (int k = 0; k < s.count; k += stride) {
             int code = s.faces[k];
             int d = code & 7, i = code >>> 3;
             if (!front[d]) continue;
+            boolean wet = s.looks[s.cells[i] - 1].translucent();
+            if (wet != (sweep == 1)) continue;
+            // the surface of water is a little below the top of its block
+            boolean lower = wet && !(i + s.ex * s.ez < s.cells.length && s.looks[Math.max(0, s.cells[i + s.ex * s.ez] - 1)].translucent() && s.cells[i + s.ex * s.ez] != 0);
             int x = i % s.ex, z = (i / s.ex) % s.ez, y = i / (s.ex * s.ez);
             for (int c = 0; c < 4; c++) {
                 int[] cc = CORNERS[d][c];
-                double qx = x + cc[0] - mx, qy = y + cc[1] - my, qz = z + cc[2] - mz;
+                double qx = x + cc[0] - mx, qy = y + (lower && cc[1] == 1 ? 0.89 : cc[1]) - my, qz = z + cc[2] - mz;
                 double rx = qx * cy - qz * sy, rz = qx * sy + qz * cy;
                 fx[c] = ox + rx * scale;
                 fy[c] = oy - (qy * cp - rz * sp) * scale;
@@ -285,8 +299,9 @@ public final class PreviewRaster {
             boolean useTexture = textured && tex.px() != null;
             double light = LIGHT[d] * (useTexture ? 1.0 : 0.94 + 0.12 * jitter(i));
             boolean hot = i == hover;
-            tri(px, ids, depth, w, h, fx[0], fy[0], fz[0], fu[0], fv[0], fx[1], fy[1], fz[1], fu[1], fv[1], fx[2], fy[2], fz[2], fu[2], fv[2], tex, useTexture, light, hot, k + 1);
-            tri(px, ids, depth, w, h, fx[0], fy[0], fz[0], fu[0], fv[0], fx[2], fy[2], fz[2], fu[2], fv[2], fx[3], fy[3], fz[3], fu[3], fv[3], tex, useTexture, light, hot, k + 1);
+            tri(px, ids, depth, w, h, fx[0], fy[0], fz[0], fu[0], fv[0], fx[1], fy[1], fz[1], fu[1], fv[1], fx[2], fy[2], fz[2], fu[2], fv[2], tex, useTexture, light, hot, k + 1, wet);
+            tri(px, ids, depth, w, h, fx[0], fy[0], fz[0], fu[0], fv[0], fx[2], fy[2], fz[2], fu[2], fv[2], fx[3], fy[3], fz[3], fu[3], fv[3], tex, useTexture, light, hot, k + 1, wet);
+        }
         }
         // the cells that are not cubes: every quad of their model, seen from either side
         double[] qx = new double[4], qy = new double[4], qz = new double[4];
@@ -307,8 +322,8 @@ public final class PreviewRaster {
                 boolean hot = i == hover;
                 boolean useTexture = q.tex().px() != null;
                 float[] uv = q.uv();
-                tri(px, ids, depth, w, h, qx[0], qy[0], qz[0], uv[0], uv[1], qx[1], qy[1], qz[1], uv[2], uv[3], qx[2], qy[2], qz[2], uv[4], uv[5], q.tex(), useTexture, light, hot, -(i + 1));
-                tri(px, ids, depth, w, h, qx[0], qy[0], qz[0], uv[0], uv[1], qx[2], qy[2], qz[2], uv[4], uv[5], qx[3], qy[3], qz[3], uv[6], uv[7], q.tex(), useTexture, light, hot, -(i + 1));
+                tri(px, ids, depth, w, h, qx[0], qy[0], qz[0], uv[0], uv[1], qx[1], qy[1], qz[1], uv[2], uv[3], qx[2], qy[2], qz[2], uv[4], uv[5], q.tex(), useTexture, light, hot, -(i + 1), false);
+                tri(px, ids, depth, w, h, qx[0], qy[0], qz[0], uv[0], uv[1], qx[2], qy[2], qz[2], uv[4], uv[5], qx[3], qy[3], qz[3], uv[6], uv[7], q.tex(), useTexture, light, hot, -(i + 1), false);
             }
         }
         return new Frame(w, h, px, ids);
@@ -321,6 +336,11 @@ public final class PreviewRaster {
         h *= 0x85EBCA6B;
         h ^= h >>> 13;
         return (h & 0xFFFF) / 65535.0;
+    }
+
+    private static int blend(int dst, int src, double a) {
+        int r = (int) (((src >> 16) & 255) * a + ((dst >> 16) & 255) * (1 - a)), g = (int) (((src >> 8) & 255) * a + ((dst >> 8) & 255) * (1 - a)), b = (int) ((src & 255) * a + (dst & 255) * (1 - a));
+        return 0xFF000000 | r << 16 | g << 8 | b;
     }
 
     private static int shade(int argb, double k, boolean hot) {
@@ -337,7 +357,7 @@ public final class PreviewRaster {
                             double x0, double y0, double z0, double u0, double v0,
                             double x1, double y1, double z1, double u1, double v1,
                             double x2, double y2, double z2, double u2, double v2,
-                            BlockLook.Tex tex, boolean useTexture, double light, boolean hot, int id) {
+                            BlockLook.Tex tex, boolean useTexture, double light, boolean hot, int id, boolean wet) {
         double minX = Math.min(x0, Math.min(x1, x2)), maxX = Math.max(x0, Math.max(x1, x2));
         double minY = Math.min(y0, Math.min(y1, y2)), maxY = Math.max(y0, Math.max(y1, y2));
         int ix0 = Math.max(0, (int) Math.floor(minX)), ix1 = Math.min(w - 1, (int) Math.ceil(maxX));
@@ -361,6 +381,14 @@ public final class PreviewRaster {
                 double z = w0 * z0 + w1 * z1 + w2 * z2;
                 int at = y * w + x;
                 if (z <= depth[at]) continue;
+                if (wet) {
+                    // water: blended over what is there, with no depth written, so what is behind it still shows and can still be pointed at
+                    int dst = px[at];
+                    int src = flat;
+                    px[at] = dst == 0 ? (0xB0 << 24 | (src & 0xFFFFFF)) : blend(dst, src, 0.55);
+                    if (ids[at] == 0) ids[at] = id;
+                    continue;
+                }
                 int color = flat;
                 if (useTexture) {
                     double uu = Math.max(0, Math.min(0.9999, w0 * u0 + w1 * u1 + w2 * u2)), vv = Math.max(0, Math.min(0.9999, w0 * v0 + w1 * v1 + w2 * v2));

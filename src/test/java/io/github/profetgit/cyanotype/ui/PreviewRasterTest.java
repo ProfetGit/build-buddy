@@ -187,6 +187,33 @@ class PreviewRasterTest {
         assertEquals(0, s.custom.length);
     }
 
+    private static BlockLook.Look water() {
+        BlockLook.Tex t = BlockLook.Tex.flat(0xFF3F76E4);
+        return new BlockLook.Look(new BlockLook.Tex[]{t, t, t, t, t, t}, null, true);
+    }
+
+    @Test
+    void waterIsSeeThroughAndNoWall() {
+        // water beside a stone cube: the water has no face toward the stone, the stone shows the face toward the water
+        PreviewRaster.Scene s = PreviewRaster.scene(new int[]{1, 2}, new BlockLook.Look[]{water(), BlockLook.Look.solid(RED)}, 2, 1, 1);
+        assertEquals(11, s.count, "5 faces of water, 6 of the cube");
+        // two waters share no faces either
+        PreviewRaster.Scene pool = PreviewRaster.scene(new int[]{1, 1}, new BlockLook.Look[]{water()}, 2, 1, 1);
+        assertEquals(10, pool.count);
+    }
+
+    @Test
+    void aSolidBlockShowsThroughWaterAndWaterBlendsOverIt() {
+        // looking down on water over a stone floor: the picture is a blend, neither pure water nor pure stone, and the stone is what a click finds
+        PreviewRaster.Scene s = PreviewRaster.scene(new int[]{2, 1}, new BlockLook.Look[]{water(), BlockLook.Look.solid(RED)}, 1, 2, 1);
+        // cell 0 (y = 0) is red stone, cell 1 (y = 1) water above it
+        PreviewRaster.Scene fix = PreviewRaster.scene(new int[]{2, 1}, new BlockLook.Look[]{water(), BlockLook.Look.solid(RED)}, 1, 2, 1);
+        PreviewRaster.Frame f = PreviewRaster.render(fix, new PreviewRaster.View(0.3, 1.2, 1.0, 0, 0), 160, 160, 1, -1);
+        int mid = f.px()[80 * 160 + 80];
+        int r = (mid >> 16) & 255, b = mid & 255;
+        assertTrue(mid != 0 && r > 0x20 && b > 0x40, "a blend of red stone and blue water: " + Integer.toHexString(mid));
+    }
+
     @Test
     void aBoxTooBigToPreviewIsRefused() {
         assertEquals(null, PreviewRaster.scene(new io.github.profetgit.cyanotype.blueprint.Blueprint(io.github.profetgit.cyanotype.blueprint.Blueprint.Metadata.of("t"), java.util.List.of())));

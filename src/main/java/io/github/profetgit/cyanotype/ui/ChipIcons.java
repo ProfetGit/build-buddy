@@ -40,6 +40,7 @@ public final class ChipIcons {
                 case "Hold use" -> out.add(new Part(Kind.MOUSE_RIGHT, "", "hold"));
                 case "Scroll" -> out.add(new Part(Kind.MOUSE_WHEEL, "", ""));
                 case "Drag", "Drag arrow", "Drag ring" -> out.add(new Part(Kind.MOUSE_LEFT, "", "drag"));
+                case "Right drag" -> out.add(new Part(Kind.MOUSE_RIGHT, "", "drag"));
                 default -> {
                     // "Z / Y": two keys with a slash between
                     if (t.contains(" / ") && t.length() <= 20) {

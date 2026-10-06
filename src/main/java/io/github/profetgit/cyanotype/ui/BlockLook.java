@@ -55,11 +55,16 @@ public final class BlockLook {
      * The six faces in the order +x, -x, +y, -y, +z, -z, and for a block that is not a plain cube (a stair, a slab, a torch, grass,
      * bamboo, a fence...) its model: the quads to draw instead of the cube. {@code model} is null for a cube.
      */
-    public record Look(Tex[] face, Quad @Nullable [] model) {
+    public record Look(Tex[] face, Quad @Nullable [] model, boolean translucent) {
         public Look(Tex[] face) {
-            this(face, null);
+            this(face, null, false);
         }
 
+        public Look(Tex[] face, Quad @Nullable [] model) {
+            this(face, model, false);
+        }
+
+        /** A plain cube that hides what is behind it (not glass-like water: that one is see-through). */
         public boolean cube() {
             return model == null;
         }
@@ -148,6 +153,11 @@ public final class BlockLook {
     }
 
     private static @Nullable Look fromModel(BlockState s, BlockStateModelSet models) {
+        // water has none either: a see-through blue cube, drawn lower at its surface by the preview
+        if (s.getBlock() == net.minecraft.world.level.block.Blocks.WATER) {
+            Tex t = Tex.flat(0xFF3F76E4);
+            return new Look(new Tex[]{t, t, t, t, t, t}, null, true);
+        }
         // a banner has no baked model (the game draws it with its own renderer): a pole and a flag of its colour are built here
         if (s.getBlock() instanceof net.minecraft.world.level.block.AbstractBannerBlock banner) return banner(s, banner.getColor().getTextureDiffuseColor() | 0xFF000000);
         BlockStateModel model = models.get(s);

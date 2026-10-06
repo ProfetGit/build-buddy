@@ -174,50 +174,47 @@ final class PickScenes {
         act(() -> {
             SaveScreen sv = (SaveScreen) screen();
             check("pick/the preview is what will be saved", sv.captured() != null && sv.captured().totalBlocks() == houseA[0], sv.captured() == null ? "nothing" : sv.captured().totalBlocks() + " blocks, wanted " + houseA[0]);
-            var info = new net.minecraft.client.input.MouseButtonInfo(0, 0);
+            // the game numbers the mouse buttons left 1, middle 2, right 3 (not 0, 1, 2)
+            var left = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 0);
+            var right = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_RIGHT, 0);
             int[] at = sv.anchor("preview");
             var home = sv.preview().view();
-            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info), false);
-            sv.mouseDragged(new net.minecraft.client.input.MouseButtonEvent(at[0] + 30, at[1] + 6, info), 30, 6);
-            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0] + 30, at[1] + 6, info));
-            check("pick/dragging the preview turns it", sv.preview().view().yaw() != home.yaw() && sv.preview().view().pitch() != home.pitch(), sv.preview().view().toString());
+            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], left), false);
+            sv.mouseDragged(new net.minecraft.client.input.MouseButtonEvent(at[0] + 30, at[1] + 6, left), 30, 6);
+            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0] + 30, at[1] + 6, left));
+            check("pick/a left drag turns the preview", sv.preview().view().yaw() != home.yaw() && sv.preview().view().pitch() != home.pitch() && sv.preview().view().panX() == home.panX(), sv.preview().view().toString());
+            check("pick/and a plain click on a block removes nothing", sv.removedCount() == 0, sv.removedCount() + " removed");
             sv.mouseScrolled(at[0], at[1], 0, 3);
             check("pick/scrolling over the preview zooms it", sv.preview().view().zoom() > 1.5, sv.preview().view().toString());
-            var right = new net.minecraft.client.input.MouseButtonInfo(1, 0);
-            double panBefore = sv.preview().view().panX();
+            double panBefore = sv.preview().view().panX(), yawBefore = sv.preview().view().yaw();
             sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], right), false);
             sv.mouseDragged(new net.minecraft.client.input.MouseButtonEvent(at[0] + 20, at[1], right), 20, 0);
             sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0] + 20, at[1], right));
-            check("pick/a right drag moves it", sv.preview().view().panX() > panBefore + 10, sv.preview().view().toString());
+            check("pick/a right drag moves it and does not turn it", sv.preview().view().panX() > panBefore + 10 && sv.preview().view().yaw() == yawBefore, sv.preview().view().toString());
         });
         waitTicks(14);
         shot("pick_5b_preview_turned");
         act(() -> {
             SaveScreen sv = (SaveScreen) screen();
-            var info = new net.minecraft.client.input.MouseButtonInfo(0, 0);
+            var left = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 0);
             int[] at = sv.anchor("reset");
-            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info), false);
-            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info));
-            check("pick/the Reset button starts the view over", sv.preview().view().equals(io.github.profetgit.cyanotype.ui.PreviewRaster.View.HOME), sv.preview().view().toString());
-            // remove mode: the button, then pointing at a block of the picture lights it up
-            int[] rm = sv.anchor("remove");
-            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(rm[0], rm[1], info), false);
-            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(rm[0], rm[1], info));
-            check("pick/the Remove blocks button turns remove mode on", sv.removing(), "removing " + sv.removing());
+            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], left), false);
+            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], left));
+            check("pick/the Reset view button starts the view over", sv.preview().view().equals(io.github.profetgit.cyanotype.ui.PreviewRaster.View.HOME), sv.preview().view().toString());
+            // Ctrl held: the block under the pointer lights up
+            Interaction.testModifiers = 2;
             io.github.profetgit.cyanotype.ui.Ui.testMouse = sv.anchor("preview");
         });
         waitTicks(16);
-        act(() -> check("pick/pointing at the picture finds a block", ((SaveScreen) screen()).preview().hovered() >= 0, "hovered " + ((SaveScreen) screen()).preview().hovered()));
+        act(() -> check("pick/with Ctrl held, pointing at the picture finds a block", ((SaveScreen) screen()).preview().hovered() >= 0, "hovered " + ((SaveScreen) screen()).preview().hovered()));
         shot("pick_5c_remove_hover");
         act(() -> {
             SaveScreen sv = (SaveScreen) screen();
-            var info = new net.minecraft.client.input.MouseButtonInfo(0, 0);
             int[] at = sv.anchor("preview");
-            // a real hand wobbles: the pointer moves a few units between press and release and it is still a click on the block pressed
-            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info), false);
-            sv.mouseDragged(new net.minecraft.client.input.MouseButtonEvent(at[0] + 3, at[1] + 2, info), 3, 2);
-            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0] + 3, at[1] + 2, info));
-            check("pick/a click on a block takes it out of what is saved", sv.removedCount() == 1 && sv.captured().totalBlocks() == houseA[0] - 1, sv.removedCount() + " removed, " + sv.captured().totalBlocks() + " blocks");
+            var ctrlClick = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 192);
+            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], ctrlClick), false);
+            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], ctrlClick));
+            check("pick/Ctrl+click takes the block under the pointer out of what is saved", sv.removedCount() == 1 && sv.captured().totalBlocks() == houseA[0] - 1, sv.removedCount() + " removed, " + sv.captured().totalBlocks() + " blocks");
         });
         waitTicks(14);
         shot("pick_5d_block_removed");
@@ -229,29 +226,14 @@ final class PickScenes {
             sv.keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_Y, 0, ctrl));
             check("pick/Ctrl+Y takes it out again", sv.removedCount() == 1 && sv.captured().totalBlocks() == houseA[0] - 1, sv.removedCount() + " removed");
             sv.keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_Z, 0, ctrl));
+            Interaction.testModifiers = -1;
             io.github.profetgit.cyanotype.ui.Ui.testMouse = null;
-            int[] rm = sv.anchor("remove");
-            var info = new net.minecraft.client.input.MouseButtonInfo(0, 0);
-            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(rm[0], rm[1], info), false);
-            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(rm[0], rm[1], info));
-            check("pick/remove mode is off again", !sv.removing() && sv.captured().totalBlocks() == houseA[0], "removing " + sv.removing());
-        });
-        waitTicks(10);
-        act(() -> {
-            SaveScreen sv = (SaveScreen) screen();
-            int[] at = sv.anchor("preview");
-            var ctrlClick = new net.minecraft.client.input.MouseButtonInfo(0, 192);
-            sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], ctrlClick), false);
-            check("pick/Ctrl+click takes a block out with remove mode off, on the press", !sv.removing() && sv.removedCount() == 1 && sv.captured().totalBlocks() == houseA[0] - 1, sv.removedCount() + " removed, " + sv.captured().totalBlocks() + " blocks");
-            sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], ctrlClick));
-            sv.undoRemovalForDemo();
-            check("pick/and Ctrl+Z puts it back", sv.removedCount() == 0 && sv.captured().totalBlocks() == houseA[0], sv.removedCount() + " removed");
+            check("pick/undone: what is saved is the whole build again", sv.captured().totalBlocks() == houseA[0], sv.captured().totalBlocks() + " blocks");
             var banner = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.BANNER.pick(net.minecraft.world.item.DyeColor.RED).defaultBlockState());
             var wallBanner = io.github.profetgit.cyanotype.ui.BlockLook.of(net.minecraft.world.level.block.Blocks.WALL_BANNER.pick(net.minecraft.world.item.DyeColor.BLUE).defaultBlockState());
             check("pick/banners are drawn as a pole and a flag in their colour, not a block", !banner.cube() && banner.model() != null && !wallBanner.cube() && ((banner.face()[0].avg() >> 16) & 255) > ((banner.face()[0].avg()) & 255) && (wallBanner.face()[0].avg() & 255) > ((wallBanner.face()[0].avg() >> 16) & 255), "red " + Integer.toHexString(banner.face()[0].avg()) + ", blue wall " + Integer.toHexString(wallBanner.face()[0].avg()));
         });
-        waitTicks(6);
-        waitTicks(6);
+        waitTicks(12);
         shot("pick_5_save");
         act(() -> screen().keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN, 0, 0)));
         until("pick/saved", 300, () -> SaveScreen.lastSaved != null);
