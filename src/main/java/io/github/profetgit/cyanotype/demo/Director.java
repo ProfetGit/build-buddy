@@ -232,6 +232,7 @@ public final class Director {
                 case "auto" -> AutoScenes.auto();
                 case "nudge" -> NudgeScenes.nudge();
                 case "mega" -> NudgeScenes.mega();
+                case "carry" -> NudgeScenes.carry();
                 case "materials" -> MaterialsScenes.materials();
                 case "settings" -> SettingsScenes.settings();
                 case "look" -> PlaceScenes.look();

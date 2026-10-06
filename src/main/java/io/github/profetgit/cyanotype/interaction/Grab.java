@@ -7,8 +7,10 @@ import net.minecraft.world.phys.Vec3;
  * looks around, whatever the build's size or distance. That is why it feels the same on a shed and on a hundred-block
  * tower (an arrow's drag is a line far away, where a pixel of mouse is many blocks).
  *
- * <p>Sideways movement follows the point where the view meets a flat plane at the grabbed point's height (the floor of the
- * build, when that height is about the player's eye level and the plane could never be met); with Shift held the build
+ * <p>Sideways movement follows the point where the view meets a flat plane at the grabbed point's height; when the view
+ * cannot meet that plane (a roof grabbed from the ground, then the view lowered to the ground) it follows the point where the
+ * view meets the floor of the build instead, and the two take over from each other without a jump; a grabbed point level
+ * with the eye uses the floor alone, since its own plane could never be met. With Shift held the build
  * goes up and down instead, following the view's crossing of an upright plane through the grabbed point. Each part
  * moves in whole blocks from where it was grabbed. Pure maths, tested.
  */
@@ -18,8 +20,15 @@ final class Grab {
     /** A plane closer than this to the eye in height is no use for sideways movement (the view runs along it). */
     static final double MIN_PLANE_GAP = 3.0;
 
+    /** Beyond this fraction of a block past the rounding point the offset changes: a view resting on the line between two blocks does not flicker. */
+    static final double HOLD = 0.62;
+
     final Vec3 start;
     final double planeY;
+    /** The floor of the build, the second plane to follow when the first is not met; NaN when it is the same plane. */
+    private final double floorY;
+    /** Which plane the offsets are taken from now: 0 the grabbed height, 1 the floor. */
+    private int plane;
     private double hx, hz;
     private final double nx, nz;
     /** How far from the eye (sideways) the grabbed point was, and how far the build may be taken: see {@link #soft}. */
@@ -28,9 +37,10 @@ final class Grab {
     private double vOff;
     private boolean wasVertical, switched;
 
-    private Grab(Vec3 start, double planeY, double hx, double hz, double nx, double nz, double r0) {
+    private Grab(Vec3 start, double planeY, double floorY, double hx, double hz, double nx, double nz, double r0) {
         this.start = start;
         this.planeY = planeY;
+        this.floorY = Math.abs(floorY - planeY) < 0.5 ? Double.NaN : floorY;
         this.hx = hx;
         this.hz = hz;
         this.nx = nx;
@@ -51,7 +61,7 @@ final class Grab {
         double sx = t > 0 ? eye.x + look.x * t : Double.NaN, sz = t > 0 ? eye.z + look.z * t : Double.NaN;
         double h = Math.hypot(look.x, look.z);
         double nx = h < 1e-3 ? 0 : look.x / h, nz = h < 1e-3 ? -1 : look.z / h;
-        return new Grab(p0, plane, sx, sz, nx, nz, Math.hypot(p0.x - eye.x, p0.z - eye.z));
+        return new Grab(p0, plane, floorY, sx, sz, nx, nz, Math.hypot(p0.x - eye.x, p0.z - eye.z));
     }
 
     /**
@@ -87,10 +97,15 @@ final class Grab {
             double bound = reachMax;
             dy = (int) Math.round(bound * Math.tanh(v / bound));
         } else {
-            if (Math.abs(look.y) < 1e-9) return;
-            double t = (planeY - eye.y) / look.y;
-            if (t <= 0 || t > MAX_T) return;
-            double x = eye.x + look.x * t, z = eye.z + look.z * t;
+            // the grabbed height first; when the view cannot meet it, the floor of the build
+            int which = 0;
+            double[] at = meet(eye, look, planeY);
+            if (at == null && !Double.isNaN(floorY)) {
+                at = meet(eye, look, floorY);
+                which = 1;
+            }
+            if (at == null) return;
+            double x = at[0], z = at[1];
             double r = Math.hypot(x - eye.x, z - eye.z);
             if (r > 1e-6) {
                 double k = soft(r) / r;
@@ -101,14 +116,26 @@ final class Grab {
                 hx = x;
                 hz = z;
             }
-            if (switched) {
+            if (switched || which != plane) {
+                // a new mode or a new plane takes up from where the build is now
                 hx = x - dx;
                 hz = z - dz;
                 switched = false;
+                plane = which;
             }
-            dx = (int) Math.round(x - hx);
-            dz = (int) Math.round(z - hz);
+            double fx = x - hx, fz = z - hz;
+            // a view resting between two blocks keeps the block it had until it is clearly past
+            if (Math.abs(fx - dx) > HOLD) dx = (int) Math.round(fx);
+            if (Math.abs(fz - dz) > HOLD) dz = (int) Math.round(fz);
         }
+    }
+
+    /** Where the view line meets a flat plane at this height in front of the eye (within {@link #MAX_T}), or null. */
+    private static double[] meet(Vec3 eye, Vec3 look, double y) {
+        if (Math.abs(look.y) < 1e-9) return null;
+        double t = (y - eye.y) / look.y;
+        if (t <= 0 || t > MAX_T) return null;
+        return new double[]{eye.x + look.x * t, eye.z + look.z * t};
     }
 
     boolean moved() {

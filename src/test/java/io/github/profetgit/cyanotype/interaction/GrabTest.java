@@ -134,6 +134,46 @@ class GrabTest {
     }
 
     @Test
+    void aRoofGrabbedFromTheGroundStillFollowsWhenTheViewLowersToTheGround() {
+        // standing at the foot of a tall build, picking it up by its roof, then looking down to where it should go
+        Vec3 eye = new Vec3(0, 1.6, 0);
+        Vec3 roof = new Vec3(10, 9, 0);
+        Grab g = Grab.start(eye, toward(eye, roof), roof, 0);
+        assertEquals(9, g.planeY, 1e-9);
+        g.update(eye, toward(eye, roof.add(0, 0, 3)), false);
+        assertEquals(3, g.dz, "looking up at the roof level: the grabbed point follows");
+        // the view goes down to the ground: the roof's plane can no longer be met, the floor takes over without a jump
+        g.update(eye, toward(eye, new Vec3(10, 0, 4)), false);
+        assertEquals(3, g.dz, "no jump when the floor takes over");
+        g.update(eye, toward(eye, new Vec3(10, 0, 9)), false);
+        assertEquals(8, g.dz, "five blocks of floor is five blocks of build");
+        assertEquals(0, g.dx);
+        // and back up to the roof's height: the roof's plane takes over again, again without a jump
+        g.update(eye, toward(eye, roof.add(0, 0, 5)), false);
+        assertEquals(8, g.dz, "no jump going back");
+        g.update(eye, toward(eye, roof.add(0, 0, 7)), false);
+        assertEquals(10, g.dz);
+    }
+
+    @Test
+    void aViewRestingBetweenTwoBlocksDoesNotFlicker() {
+        Vec3 eye = new Vec3(0, 40, 0);
+        Vec3 p0 = new Vec3(20, 10, 0);
+        Grab g = Grab.start(eye, toward(eye, p0), p0, 10);
+        g.update(eye, toward(eye, p0.add(2.1, 0, 0)), false);
+        assertEquals(2, g.dx);
+        int flips = 0, last = g.dx;
+        for (double wobble : new double[]{2.45, 2.55, 2.48, 2.57, 2.5, 2.52, 2.46}) {
+            g.update(eye, toward(eye, p0.add(wobble, 0, 0)), false);
+            if (g.dx != last) flips++;
+            last = g.dx;
+        }
+        assertEquals(0, flips, "a wobble around the line between two blocks changes nothing");
+        g.update(eye, toward(eye, p0.add(3.0, 0, 0)), false);
+        assertEquals(3, g.dx, "clearly past it: the next block");
+    }
+
+    @Test
     void wordsSaysWhatMoved() {
         Vec3 eye = new Vec3(0, 70, 0);
         Vec3 p0 = new Vec3(30, 10, 0);

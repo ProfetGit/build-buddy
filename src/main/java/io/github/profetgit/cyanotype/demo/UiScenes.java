@@ -447,18 +447,7 @@ final class UiScenes {
         // the Delete key: on the ghost under the crosshair, or on the one being edited, and never while hidden
         act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.REMOVE));
         waitTicks(6);
-        act(() -> check("remove/Delete once only says what it would remove: nothing goes, no screen opens", screen() == null && Placements.all().contains(house), "screen " + screen()));
-        // a second press long after the first is a first press again (real time: the client may tick faster than 20 a second here)
-        long[] t0 = {0};
-        act(() -> t0[0] = System.nanoTime());
-        until("remove/three and a half seconds pass", 600, () -> System.nanoTime() - t0[0] > 3_500_000_000L);
-        act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.REMOVE));
-        waitTicks(6);
-        act(() -> check("remove/a second Delete that comes too late does not remove", Placements.all().contains(house), "gone"));
-        // Delete twice in a row removes it, and Ctrl+Z brings it back
-        act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.REMOVE));
-        waitTicks(6);
-        act(() -> check("remove/Delete twice in a row removes the aimed ghost", !Placements.all().contains(house) && screen() == null, "still there"));
+        act(() -> check("remove/one Delete removes the aimed ghost, with no question", !Placements.all().contains(house) && screen() == null, "still there, screen " + screen()));
         PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, false);
         waitTicks(6);
         act(() -> check("remove/Ctrl+Z brings it back", Placements.all().contains(house), "gone"));
@@ -467,10 +456,8 @@ final class UiScenes {
         act(() -> check("remove/editing: the hints say Delete removes", Placements.mode() == Placements.Mode.EDIT, "mode " + Placements.mode()));
         shot("remove_key_chips");
         act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.REMOVE));
-        waitTicks(5);
-        act(() -> PlaceScenes.tap(io.github.profetgit.cyanotype.interaction.Keys.REMOVE));
         waitTicks(6);
-        act(() -> check("remove/Delete twice while editing removes the edited placement", !Placements.all().contains(house), "still there"));
+        act(() -> check("remove/one Delete while editing removes the edited placement", !Placements.all().contains(house), "still there"));
         PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, false);
         waitTicks(6);
         act(() -> check("remove/and Ctrl+Z puts it back", Placements.all().contains(house), "gone"));

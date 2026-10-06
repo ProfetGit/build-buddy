@@ -43,6 +43,61 @@ final class NudgeScenes {
         waitTicks(10);
     }
 
+    /** Carrying a tall build from the ground: picked up by its roof, followed with the view lowered to the ground, put back with a right click. */
+    static void carry() {
+        UiScenes.setup();
+        act(() -> {
+            house = UiScenes.house;
+            Placements.setMode(Placements.Mode.EDIT);
+        });
+        until("carry/baked and drawn", 600, () -> GhostRenderer.verifierOf(house) != null && GhostRenderer.settled() && GhostRenderer.drawn(house));
+        // stand on the ground a little way from the house (it stands at x 0..10, z 6..18, base at G+1) and take hold of its roof
+        BlockPos[] o = new BlockPos[1];
+        look(5.5, G + 1, -6, 0, -10);
+        act(() -> {
+            o[0] = house.origin;
+            PlaceScenes.aim(mc(), 1.5, G + 10, 9);
+        });
+        waitTicks(6);
+        act(() -> check("carry/the roof is under the crosshair, no arrow", Interaction.hoverName().isEmpty(), "hover '" + Interaction.hoverName() + "'"));
+        act(() -> PlaceScenes.hold(mc().options.keyAttack));
+        waitTicks(4);
+        act(() -> check("carry/pressing on the roof picks the build up", Interaction.grabbing(), "grabbing " + Interaction.grabbing()));
+        // the view goes down to the ground, east of the house: the roof's plane is above the eye and cannot be met, the floor takes over
+        act(() -> PlaceScenes.aim(mc(), 12, G + 1, 4));
+        waitTicks(5);
+        act(() -> check("carry/lowering the view to the ground does not throw the build", house.origin.distSqr(o[0]) <= 2, "moved " + house.origin.subtract(o[0])));
+        act(() -> PlaceScenes.aim(mc(), 18, G + 1, 4));
+        waitTicks(6);
+        shot("carry_0_ground");
+        act(() -> {
+            BlockPos d = house.origin.subtract(o[0]);
+            check("carry/six blocks of ground are six blocks of build", Math.abs(d.getX() - 6) <= 1 && Math.abs(d.getZ()) <= 1 && d.getY() == 0, "moved " + d);
+        });
+        // a right click puts it back where it was picked up
+        act(() -> PlaceScenes.tap(mc().options.keyUse));
+        waitTicks(6);
+        act(() -> {
+            check("carry/a right click puts it back", house.origin.equals(o[0]) && !Interaction.grabbing(), "origin " + house.origin + ", from " + o[0] + ", grabbing " + Interaction.grabbing());
+            PlaceScenes.release(mc().options.keyAttack);
+        });
+        waitTicks(4);
+        act(() -> check("carry/and nothing is left to undo from the cancelled carry", house.origin.equals(o[0]), "origin " + house.origin));
+        // taking it away while it is held (the Delete key) leaves nothing to carry and does not fail
+        act(() -> PlaceScenes.aim(mc(), 1.5, G + 10, 9));
+        waitTicks(5);
+        act(() -> PlaceScenes.hold(mc().options.keyAttack));
+        waitTicks(3);
+        act(() -> Placements.removeUndoable(house));
+        waitTicks(4);
+        act(() -> check("carry/a build removed while held ends the carry", !Interaction.grabbing(), "grabbing"));
+        act(() -> PlaceScenes.release(mc().options.keyAttack));
+        waitTicks(3);
+        act(() -> Placements.undo());
+        waitTicks(3);
+        UiScenes.teardown();
+    }
+
     static void nudge() {
         UiScenes.setup();
         act(() -> {

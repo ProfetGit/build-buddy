@@ -265,12 +265,36 @@ public final class Interaction {
         if (p != null && g.moved()) Sfx.play(Sfx.LOCK, 1.0f);
     }
 
+    /** Drops the carry and puts the build back where it was picked up (right click). */
+    private static void cancelGrab(Minecraft mc) {
+        Placement p = grabbed;
+        BlockPos origin = grabOrigin;
+        grab = null;
+        grabbed = null;
+        if (p != null && origin != null && Placements.all().contains(p)) {
+            p.set(origin, p.orientation);
+            PlacementStore.markDirty();
+        }
+        Placements.forgetLast();
+        Sfx.play(Sfx.CLOSE, 1.1f);
+        say(mc, "Put back where it was");
+    }
+
     /** One frame of carrying: the build follows the view, in whole blocks. */
     private static void updateGrab(Minecraft mc, Vec3 camera, Vec3 look) {
         Grab g = grab;
         Placement p = grabbed;
+        // the placement went (an undo, a removal) while it was held: nothing left to carry
+        if (p == null || !Placements.all().contains(p)) {
+            grab = null;
+            grabbed = null;
+            return;
+        }
         g.update(camera, look, shift(mc));
         BlockPos target = grabOrigin.offset(g.dx, g.dy, g.dz);
+        // never out of the world: the build keeps its whole height between the bottom and the top of it
+        int lowest = mc.level.getMinY(), highest = mc.level.getMaxY() - p.sizeY();
+        if (target.getY() < lowest || target.getY() > Math.max(lowest, highest)) target = new BlockPos(target.getX(), Math.max(lowest, Math.min(Math.max(lowest, highest), target.getY())), target.getZ());
         if (!target.equals(p.origin)) {
             p.set(target, p.orientation);
             Sfx.play(Sfx.SNAP, 1.0f + 0.03f * Math.min(12, Math.abs(g.dx) + Math.abs(g.dz) + Math.abs(g.dy)));
@@ -302,6 +326,11 @@ public final class Interaction {
     /** The use button went down. */
     public static boolean onUse() {
         if (GhostRenderer.hidden) return false;
+        // a right click while carrying puts the build back where it was picked up
+        if (grab != null) {
+            cancelGrab(Minecraft.getInstance());
+            return true;
+        }
         Placement p = Placements.active();
         if (Placements.mode() == Mode.SELECT) {
             Selecting.onUse(Minecraft.getInstance());
@@ -360,6 +389,11 @@ public final class Interaction {
             redo(mc);
         }
         boolean down = mc.options.keyAttack.isDown();
+        // a build that was removed or undone while it was held (or dragged) leaves nothing to carry
+        if (grab != null && (grabbed == null || !Placements.all().contains(grabbed))) {
+            grab = null;
+            grabbed = null;
+        }
         if (drag != null && (!down || screen)) endDrag();
         if (grab != null && (!down || screen)) endGrab();
         if (Selecting.dragging() && (!down || screen)) Selecting.endDrag();
@@ -515,29 +549,14 @@ public final class Interaction {
         return Placements.mode() == Mode.EDIT ? Placements.active() : Placements.mode() == Mode.IDLE ? aimedPlacement(mc) : null;
     }
 
-    private static Placement pendingRemove;
-    private static long pendingRemoveNs;
-
-    /** How long the second press of Delete counts as the answer to the first. */
-    private static final long REMOVE_AGAIN_NS = 3_000_000_000L;
-
-    /** The Delete key: a first press says what it would remove, a second press within a few seconds removes it (Ctrl+Z brings it back). */
+    /** The Delete key: removes the placement it is about at once; Ctrl+Z brings it back. */
     private static void askRemove(Minecraft mc) {
         Placement p = targetOfKey(mc);
         if (p == null) return;
-        long now = System.nanoTime();
-        if (pendingRemove == p && now - pendingRemoveNs < REMOVE_AGAIN_NS) {
-            pendingRemove = null;
-            String name = p.name;
-            Placements.removeUndoable(p);
-            Sfx.play(Sfx.CLOSE, 0.8f);
-            say(mc, "Removed " + name + ". Ctrl+Z brings it back.");
-            return;
-        }
-        pendingRemove = p;
-        pendingRemoveNs = now;
-        Sfx.play(Sfx.PRESS, 0.9f);
-        say(mc, "Press " + Ui.keyName(Keys.REMOVE) + " again to remove " + p.name);
+        String name = p.name;
+        Placements.removeUndoable(p);
+        Sfx.play(Sfx.CLOSE, 0.8f);
+        say(mc, "Removed " + name + ". Ctrl+Z brings it back.");
     }
 
     /**
@@ -587,7 +606,6 @@ public final class Interaction {
 
     /** Forgets everything in progress (the world changed). */
     public static void reset() {
-        pendingRemove = null;
         Handles.forget();
         io.github.profetgit.cyanotype.paste.Paste.reset();
         drag = null;
@@ -667,7 +685,7 @@ public final class Interaction {
             // carrying it: the mouse is busy, so no arrows and no ring; only where it came from and how far it has come
             handles = null;
             updateGrab(mc, camera, look);
-            chips(mc, new Chips.Chip("Release", "Drop it here"), new Chips.Chip("Shift", "Lift it up / down"));
+            chips(mc, new Chips.Chip("Release", "Drop it here"), new Chips.Chip("Shift", "Lift it up / down"), new Chips.Chip("Right click", "Put it back"));
             return;
         }
         if (drag != null) {
@@ -686,11 +704,11 @@ public final class Interaction {
                 chips(mc, new Chips.Chip("Drag", first), new Chips.Chip("Scroll", "Push " + word(nudgeDir)), new Chips.Chip("Ctrl+Scroll", "Turn"),
                     new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"), new Chips.Chip(Ui.keyName(Keys.PASTE), "Paste it into the world"),
                     new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo"),
-                    new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove (press twice)"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
+                    new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
             } else {
                 chips(mc, new Chips.Chip("Drag", first), new Chips.Chip("Scroll", "Push " + word(nudgeDir)), new Chips.Chip("Ctrl+Scroll", "Turn"),
                     new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"), new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo"),
-                    new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove (press twice)"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
+                    new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
             }
         }
         handles.animate(hover, drag == null ? null : drag.handle, dt(), drag == null ? nudgeDir.getAxis() : null);
