@@ -252,7 +252,8 @@ public final class PreviewRaster {
     }
 
     /**
-     * Draws the scene.
+     * Draws the scene. The picture is cut into bands of rows that are drawn at the same time on the common pool: every band goes
+     * through all faces but only touches its own rows, so the result is the same as one pass and no band waits for another.
      *
      * @param stride draw every n-th face only (1 = all of them): used while the picture is being dragged, to stay fast on big builds
      * @param hover  the cell to light up (an index into the box), or -1
@@ -260,13 +261,32 @@ public final class PreviewRaster {
     public static Frame render(Scene s, View v, int w, int h, int stride, int hover) {
         int[] px = new int[w * h], ids = new int[w * h];
         if (s.empty()) return new Frame(w, h, px, ids);
-        double[] depth = new double[w * h];
-        Arrays.fill(depth, -Double.MAX_VALUE);
+        float[] depth = new float[w * h];
+        Arrays.fill(depth, -Float.MAX_VALUE);
+        int bands = Math.max(1, Math.min(Math.min(BANDS, h / 40), (int) Math.min(8, ((long) s.count + s.custom.length) / 400 + 1)));
+        if (bands == 1) {
+            band(s, v, w, h, stride, hover, px, ids, depth, 0, h);
+        } else {
+            int rows = (h + bands - 1) / bands;
+            java.util.stream.IntStream.range(0, bands).parallel().forEach(b -> band(s, v, w, h, stride, hover, px, ids, depth, b * rows, Math.min(h, (b + 1) * rows)));
+        }
+        return new Frame(w, h, px, ids);
+    }
+
+    private static final int BANDS = Math.max(1, Math.min(8, Runtime.getRuntime().availableProcessors() / 2));
+
+    /** Draws the rows {@code y0 <= y < y1} of the picture. */
+    private static void band(Scene s, View v, int w, int h, int stride, int hover, int[] px, int[] ids, float[] depth, int y0, int y1) {
         double cy = Math.cos(v.yaw), sy = Math.sin(v.yaw), cp = Math.cos(v.pitch), sp = Math.sin(v.pitch);
         double scale = fit(s, w, h) * v.zoom;
         boolean textured = scale >= TEXTURE_FROM;
         double ox = w / 2.0 + v.panX, oy = h / 2.0 + v.panY;
         double mx = s.ex / 2.0, my = s.ey / 2.0, mz = s.ez / 2.0;
+        // the screen position is linear in the build's coordinates: one step along each axis moves it by a fixed amount
+        double axX = cy * scale, axY = 0, axZ = -sy * scale;
+        // rx = qx*cy - qz*sy, rz = qx*sy + qz*cy; screen y = oy - (qy*cp - rz*sp)*scale; depth = qy*sp + rz*cp
+        double ayX = sy * sp * scale, ayY = -cp * scale, ayZ = cy * sp * scale;
+        double azX = sy * cp, azY = sp, azZ = cy * cp;
         // which way each face turns in the camera's space; a face looking away is skipped
         boolean[] front = new boolean[6];
         for (int d = 0; d < 6; d++) {
@@ -274,59 +294,69 @@ public final class PreviewRaster {
             front[d] = N[d][1] * sp + nz * cp > 1e-9;
         }
         double[] fx = new double[4], fy = new double[4], fz = new double[4], fu = new double[4], fv = new double[4];
+        int cellsPerLayer = s.ex * s.ez;
         // two sweeps: everything solid first, then the water over it (blended, not written to the depth buffer)
         for (int sweep = 0; sweep < 2; sweep++) {
-        for (int k = 0; k < s.count; k += stride) {
-            int code = s.faces[k];
-            int d = code & 7, i = code >>> 3;
-            if (!front[d]) continue;
-            boolean wet = s.looks[s.cells[i] - 1].translucent();
-            if (wet != (sweep == 1)) continue;
-            // the surface of water is a little below the top of its block
-            boolean lower = wet && !(i + s.ex * s.ez < s.cells.length && s.looks[Math.max(0, s.cells[i + s.ex * s.ez] - 1)].translucent() && s.cells[i + s.ex * s.ez] != 0);
-            int x = i % s.ex, z = (i / s.ex) % s.ez, y = i / (s.ex * s.ez);
-            for (int c = 0; c < 4; c++) {
-                int[] cc = CORNERS[d][c];
-                double qx = x + cc[0] - mx, qy = y + (lower && cc[1] == 1 ? 0.89 : cc[1]) - my, qz = z + cc[2] - mz;
-                double rx = qx * cy - qz * sy, rz = qx * sy + qz * cy;
-                fx[c] = ox + rx * scale;
-                fy[c] = oy - (qy * cp - rz * sp) * scale;
-                fz[c] = qy * sp + rz * cp;
-                fu[c] = u(d, cc[0], cc[2]);
-                fv[c] = v(d, cc[1], cc[2]);
+            for (int k = 0; k < s.count; k += stride) {
+                int code = s.faces[k];
+                int d = code & 7, i = code >>> 3;
+                if (!front[d]) continue;
+                boolean wet = s.looks[s.cells[i] - 1].translucent();
+                if (wet != (sweep == 1)) continue;
+                // the surface of water is a little below the top of its block
+                boolean lower = wet && !(i + cellsPerLayer < s.cells.length && s.cells[i + cellsPerLayer] != 0 && s.looks[s.cells[i + cellsPerLayer] - 1].translucent());
+                int x = i % s.ex, z = (i / s.ex) % s.ez, y = i / cellsPerLayer;
+                double qx0 = x - mx, qy0 = y - my, qz0 = z - mz;
+                double bx = ox + qx0 * axX + qy0 * axY + qz0 * axZ;
+                double by = oy + qx0 * ayX + qy0 * ayY + qz0 * ayZ;
+                double bz = qx0 * azX + qy0 * azY + qz0 * azZ;
+                double minY = Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
+                for (int c = 0; c < 4; c++) {
+                    int[] cc = CORNERS[d][c];
+                    double dy = lower && cc[1] == 1 ? 0.89 : cc[1];
+                    fx[c] = bx + cc[0] * axX + dy * axY + cc[2] * axZ;
+                    fy[c] = by + cc[0] * ayX + dy * ayY + cc[2] * ayZ;
+                    fz[c] = bz + cc[0] * azX + dy * azY + cc[2] * azZ;
+                    fu[c] = u(d, cc[0], cc[2]);
+                    fv[c] = v(d, cc[1], cc[2]);
+                    if (fy[c] < minY) minY = fy[c];
+                    if (fy[c] > maxY) maxY = fy[c];
+                }
+                if (maxY < y0 - 1 || minY > y1 + 1) continue;
+                BlockLook.Tex tex = s.looks[s.cells[i] - 1].face()[d];
+                boolean useTexture = textured && tex.px() != null;
+                double light = LIGHT[d] * (useTexture ? 1.0 : 0.94 + 0.12 * jitter(i));
+                boolean hot = i == hover;
+                tri(px, ids, depth, w, y0, y1, fx[0], fy[0], fz[0], fu[0], fv[0], fx[1], fy[1], fz[1], fu[1], fv[1], fx[2], fy[2], fz[2], fu[2], fv[2], tex, useTexture, light, hot, k + 1, wet);
+                tri(px, ids, depth, w, y0, y1, fx[0], fy[0], fz[0], fu[0], fv[0], fx[2], fy[2], fz[2], fu[2], fv[2], fx[3], fy[3], fz[3], fu[3], fv[3], tex, useTexture, light, hot, k + 1, wet);
             }
-            BlockLook.Tex tex = s.looks[s.cells[i] - 1].face()[d];
-            boolean useTexture = textured && tex.px() != null;
-            double light = LIGHT[d] * (useTexture ? 1.0 : 0.94 + 0.12 * jitter(i));
-            boolean hot = i == hover;
-            tri(px, ids, depth, w, h, fx[0], fy[0], fz[0], fu[0], fv[0], fx[1], fy[1], fz[1], fu[1], fv[1], fx[2], fy[2], fz[2], fu[2], fv[2], tex, useTexture, light, hot, k + 1, wet);
-            tri(px, ids, depth, w, h, fx[0], fy[0], fz[0], fu[0], fv[0], fx[2], fy[2], fz[2], fu[2], fv[2], fx[3], fy[3], fz[3], fu[3], fv[3], tex, useTexture, light, hot, k + 1, wet);
-        }
         }
         // the cells that are not cubes: every quad of their model, seen from either side
         double[] qx = new double[4], qy = new double[4], qz = new double[4];
         for (int k = 0; k < s.custom.length; k += stride) {
             int i = s.custom[k];
-            int x = i % s.ex, z = (i / s.ex) % s.ez, y = i / (s.ex * s.ez);
+            int x = i % s.ex, z = (i / s.ex) % s.ez, y = i / cellsPerLayer;
             BlockLook.Quad[] model = s.looks[s.cells[i] - 1].model();
             if (model == null) continue;
             for (BlockLook.Quad q : model) {
+                double minY = Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
                 for (int c = 0; c < 4; c++) {
                     double wx = x + q.p()[c * 3] - mx, wy = y + q.p()[c * 3 + 1] - my, wz = z + q.p()[c * 3 + 2] - mz;
-                    double rx = wx * cy - wz * sy, rz = wx * sy + wz * cy;
-                    qx[c] = ox + rx * scale;
-                    qy[c] = oy - (wy * cp - rz * sp) * scale;
-                    qz[c] = wy * sp + rz * cp;
+                    qx[c] = ox + wx * axX + wy * axY + wz * axZ;
+                    qy[c] = oy + wx * ayX + wy * ayY + wz * ayZ;
+                    qz[c] = wx * azX + wy * azY + wz * azZ;
+                    if (qy[c] < minY) minY = qy[c];
+                    if (qy[c] > maxY) maxY = qy[c];
                 }
+                if (maxY < y0 - 1 || minY > y1 + 1) continue;
                 double light = LIGHT[q.dir()] * 0.92 + 0.08;
                 boolean hot = i == hover;
                 boolean useTexture = q.tex().px() != null;
                 float[] uv = q.uv();
-                tri(px, ids, depth, w, h, qx[0], qy[0], qz[0], uv[0], uv[1], qx[1], qy[1], qz[1], uv[2], uv[3], qx[2], qy[2], qz[2], uv[4], uv[5], q.tex(), useTexture, light, hot, -(i + 1), false);
-                tri(px, ids, depth, w, h, qx[0], qy[0], qz[0], uv[0], uv[1], qx[2], qy[2], qz[2], uv[4], uv[5], qx[3], qy[3], qz[3], uv[6], uv[7], q.tex(), useTexture, light, hot, -(i + 1), false);
+                tri(px, ids, depth, w, y0, y1, qx[0], qy[0], qz[0], uv[0], uv[1], qx[1], qy[1], qz[1], uv[2], uv[3], qx[2], qy[2], qz[2], uv[4], uv[5], q.tex(), useTexture, light, hot, -(i + 1), false);
+                tri(px, ids, depth, w, y0, y1, qx[0], qy[0], qz[0], uv[0], uv[1], qx[2], qy[2], qz[2], uv[4], uv[5], qx[3], qy[3], qz[3], uv[6], uv[7], q.tex(), useTexture, light, hot, -(i + 1), false);
             }
         }
-        return new Frame(w, h, px, ids);
     }
 
     /** A steady number in 0..1 for a cell, so the variation between blocks does not flicker as the view moves. */
@@ -353,45 +383,61 @@ public final class PreviewRaster {
         return 0xFF000000 | r << 16 | g << 8 | b;
     }
 
-    private static void tri(int[] px, int[] ids, double[] depth, int w, int h,
-                            double x0, double y0, double z0, double u0, double v0,
-                            double x1, double y1, double z1, double u1, double v1,
+    /**
+     * One triangle into the rows {@code y0 <= y < y1}. The camera is orthographic, so depth and texture coordinates are flat
+     * functions of the pixel: they are worked out once for the triangle and stepped along a row, and each row's covered stretch
+     * is solved from the three edges, so no pixel outside the triangle is looked at.
+     */
+    private static void tri(int[] px, int[] ids, float[] depth, int w, int y0, int y1,
+                            double x0, double y0_, double z0, double u0, double v0,
+                            double x1, double y1_, double z1, double u1, double v1,
                             double x2, double y2, double z2, double u2, double v2,
                             BlockLook.Tex tex, boolean useTexture, double light, boolean hot, int id, boolean wet) {
+        double minY = Math.min(y0_, Math.min(y1_, y2)), maxY = Math.max(y0_, Math.max(y1_, y2));
         double minX = Math.min(x0, Math.min(x1, x2)), maxX = Math.max(x0, Math.max(x1, x2));
-        double minY = Math.min(y0, Math.min(y1, y2)), maxY = Math.max(y0, Math.max(y1, y2));
-        int ix0 = Math.max(0, (int) Math.floor(minX)), ix1 = Math.min(w - 1, (int) Math.ceil(maxX));
-        int iy0 = Math.max(0, (int) Math.floor(minY)), iy1 = Math.min(h - 1, (int) Math.ceil(maxY));
-        if (ix0 > ix1 || iy0 > iy1) return;
-        double area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
+        int iy0 = Math.max(y0, (int) Math.floor(minY)), iy1 = Math.min(y1 - 1, (int) Math.ceil(maxY));
+        int ixMin = Math.max(0, (int) Math.floor(minX)), ixMax = Math.min(w - 1, (int) Math.ceil(maxX));
+        if (iy0 > iy1 || ixMin > ixMax) return;
+        double area = (x1 - x0) * (y2 - y0_) - (x2 - x0) * (y1_ - y0_);
         if (Math.abs(area) < 1e-9) return;
         double inv = 1.0 / area;
+        // the three weights are a + b * pxx along a row (pxx = pixel middle); b does not change from row to row
+        double b0 = -inv * (y2 - y1_), b1 = -inv * (y0_ - y2), b2 = -b0 - b1;
+        double zx = b0 * z0 + b1 * z1 + b2 * z2, ux = b0 * u0 + b1 * u1 + b2 * u2, vx = b0 * v0 + b1 * v1 + b2 * v2;
+        final double eps = 0.02;
         int flat = shade(tex.avg(), light, hot);
         int[] texels = tex.px();
         int tw = tex.w(), th = tex.h();
         for (int y = iy0; y <= iy1; y++) {
             double py = y + 0.5;
-            for (int x = ix0; x <= ix1; x++) {
+            double a0 = inv * (x1 * (y2 - py) - x2 * (y1_ - py));
+            double a1 = inv * (x2 * (y0_ - py) - x0 * (y2 - py));
+            double a2 = 1 - a0 - a1;
+            // the stretch of this row where every weight is at least -eps (a little give so neighbouring faces leave no cracks)
+            double lo = ixMin + 0.5, hi = ixMax + 0.5;
+            if (b0 > 1e-12) lo = Math.max(lo, (-eps - a0) / b0); else if (b0 < -1e-12) hi = Math.min(hi, (-eps - a0) / b0); else if (a0 < -eps) continue;
+            if (b1 > 1e-12) lo = Math.max(lo, (-eps - a1) / b1); else if (b1 < -1e-12) hi = Math.min(hi, (-eps - a1) / b1); else if (a1 < -eps) continue;
+            if (b2 > 1e-12) lo = Math.max(lo, (-eps - a2) / b2); else if (b2 < -1e-12) hi = Math.min(hi, (-eps - a2) / b2); else if (a2 < -eps) continue;
+            int xs = Math.max(ixMin, (int) Math.ceil(lo - 0.5)), xe = Math.min(ixMax, (int) Math.floor(hi - 0.5));
+            if (xs > xe) continue;
+            double zRow = a0 * z0 + a1 * z1 + a2 * z2, uRow = a0 * u0 + a1 * u1 + a2 * u2, vRow = a0 * v0 + a1 * v1 + a2 * v2;
+            int at = y * w + xs;
+            for (int x = xs; x <= xe; x++, at++) {
                 double pxx = x + 0.5;
-                double w0 = ((x1 - pxx) * (y2 - py) - (x2 - pxx) * (y1 - py)) * inv;
-                double w1 = ((x2 - pxx) * (y0 - py) - (x0 - pxx) * (y2 - py)) * inv;
-                double w2 = 1 - w0 - w1;
-                // a pixel counts when its middle is inside, with a little give so neighbouring faces leave no cracks
-                if (w0 < -0.02 || w1 < -0.02 || w2 < -0.02) continue;
-                double z = w0 * z0 + w1 * z1 + w2 * z2;
-                int at = y * w + x;
+                float z = (float) (zRow + zx * pxx);
                 if (z <= depth[at]) continue;
                 if (wet) {
                     // water: blended over what is there, with no depth written, so what is behind it still shows and can still be pointed at
                     int dst = px[at];
-                    int src = flat;
-                    px[at] = dst == 0 ? (0xB0 << 24 | (src & 0xFFFFFF)) : blend(dst, src, 0.55);
+                    px[at] = dst == 0 ? (0xB0 << 24 | (flat & 0xFFFFFF)) : blend(dst, flat, 0.55);
                     if (ids[at] == 0) ids[at] = id;
                     continue;
                 }
                 int color = flat;
                 if (useTexture) {
-                    double uu = Math.max(0, Math.min(0.9999, w0 * u0 + w1 * u1 + w2 * u2)), vv = Math.max(0, Math.min(0.9999, w0 * v0 + w1 * v1 + w2 * v2));
+                    double uu = uRow + ux * pxx, vv = vRow + vx * pxx;
+                    uu = uu < 0 ? 0 : Math.min(0.9999, uu);
+                    vv = vv < 0 ? 0 : Math.min(0.9999, vv);
                     int t = texels[(int) (vv * th) * tw + (int) (uu * tw)];
                     if ((t >>> 24) < 128) continue;
                     color = shade(t, light, hot);

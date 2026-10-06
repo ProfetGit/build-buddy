@@ -3,7 +3,9 @@ package io.github.profetgit.cyanotype.ui;
 import com.mojang.blaze3d.platform.NativeImage;
 import io.github.profetgit.cyanotype.Cyanotype;
 import io.github.profetgit.cyanotype.blueprint.Blueprint;
+import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.IntStream;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -26,7 +28,7 @@ public final class BuildPreview {
     private static final long MAX_SAMPLES = 5_000_000L;
 
     /** A finished picture: what it shows, how big it was drawn compared with the screen ({@code ss} samples a pixel across), and the screen's GUI scale then. */
-    private record Shown(PreviewRaster.Frame frame, PreviewRaster.Scene scene, int ss, int res, boolean low) {
+    private record Shown(PreviewRaster.Frame frame, int[] abgr, PreviewRaster.Scene scene, int ss, int res, boolean low) {
     }
 
     private final Minecraft mc;
@@ -193,11 +195,8 @@ public final class BuildPreview {
         Ui.centered(g, msg, x + w / 2, y + h / 2 - 4, Ui.DIM);
     }
 
-    /** Puts the picture in the texture, averaging the samples of a pixel (weighted by how much of it is covered, so edges do not go dark). */
+    /** Puts the finished picture (already one pixel per texel, in the texture's byte order) in the texture with one copy. */
     private void upload(Shown sh, int tw, int th) {
-        int ss = sh.ss();
-        int[] src = sh.frame().px();
-        int sw = tw * ss;
         if (texture == null || texW != tw || texH != th) {
             close();
             NativeImage img = new NativeImage(tw, th, true);
@@ -209,11 +208,25 @@ public final class BuildPreview {
         }
         NativeImage img = texture.getPixels();
         if (img == null) return;
-        int n = ss * ss;
-        for (int yy = 0; yy < th; yy++) {
+        img.getPixelBytes().order(ByteOrder.nativeOrder()).asIntBuffer().put(sh.abgr(), 0, tw * th);
+        texture.upload();
+        uploadedSeq = frameSeq;
+    }
+
+    /**
+     * Averages the samples of each pixel (weighted by how much of it is covered, so edges do not go dark) and puts the colours in
+     * the texture's order (ABGR), a row at a time on several threads. Done on the worker so the game's frame only has to copy it.
+     */
+    private static int[] resolve(PreviewRaster.Frame f, int ss, int tw, int th) {
+        int[] src = f.px();
+        int[] out = new int[tw * th];
+        int sw = tw * ss, n = ss * ss;
+        IntStream.range(0, th).parallel().forEach(yy -> {
             for (int xx = 0; xx < tw; xx++) {
+                int o = yy * tw + xx;
                 if (ss == 1) {
-                    img.setPixel(xx, yy, src[yy * sw + xx]);
+                    int c = src[yy * sw + xx];
+                    out[o] = c & 0xFF00FF00 | (c & 255) << 16 | (c >> 16) & 255;
                     continue;
                 }
                 long a = 0, r = 0, g = 0, b = 0;
@@ -227,15 +240,10 @@ public final class BuildPreview {
                         b += (c & 255) * ca;
                     }
                 }
-                if (a == 0) {
-                    img.setPixel(xx, yy, 0);
-                } else {
-                    img.setPixel(xx, yy, (int) (a / n) << 24 | (int) (r / a) << 16 | (int) (g / a) << 8 | (int) (b / a));
-                }
+                if (a != 0) out[o] = (int) (a / n) << 24 | (int) (b / a) << 16 | (int) (g / a) << 8 | (int) (r / a);
             }
-        }
-        texture.upload();
-        uploadedSeq = frameSeq;
+        });
+        return out;
     }
 
     /** Releases the texture. */
@@ -261,16 +269,18 @@ public final class BuildPreview {
         boolean moving = System.nanoTime() - lastMoveNs < SETTLE_NS;
         int faces = s.count + s.custom.length;
         int stride = moving && faces > FAST_FACES ? (int) Math.ceil(faces / (double) FAST_FACES) : 1;
-        int ss = moving || (long) tw * th * 4 > MAX_SAMPLES ? 1 : 2;
+        int best = (long) tw * th * 4 > MAX_SAMPLES ? 1 : 2;
+        int ss = moving ? 1 : best;
         int hover = hoverCell;
-        boolean low = stride > 1 || ss == 1;
+        // "low" = a better picture will be drawn when the hand stops; one that is already the best never asks again
+        boolean low = stride > 1 || ss < best;
         Util.backgroundExecutor().execute(() -> {
             try {
                 // the pan is in GUI units; the picture is drawn in samples
                 double k = (double) res * ss;
                 PreviewRaster.View scaled = new PreviewRaster.View(v.yaw(), v.pitch(), v.zoom(), v.panX() * k, v.panY() * k);
                 PreviewRaster.Frame made = PreviewRaster.render(s, scaled, tw * ss, th * ss, stride, hover);
-                shown = new Shown(made, s, ss, res, low);
+                shown = new Shown(made, resolve(made, ss, tw, th), s, ss, res, low);
                 frameSeq++;
             } catch (RuntimeException e) {
                 Cyanotype.LOG.error("The preview could not be drawn", e);
