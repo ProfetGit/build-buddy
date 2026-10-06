@@ -242,7 +242,7 @@ public final class SaveScreen extends Screen {
     }
 
     private Path target() {
-        return BlueprintSaver.freePath(BlueprintLibrary.ownDir(), BlueprintSaver.stem(name.getValue()));
+        return BlueprintSaver.freePath(BlueprintLibrary.saveDir(), BlueprintSaver.stem(name.getValue()));
     }
 
     @Override
@@ -326,7 +326,7 @@ public final class SaveScreen extends Screen {
         Settings.changed();
         Util.backgroundExecutor().execute(() -> {
             try {
-                Path file = BlueprintSaver.save(bp, BlueprintLibrary.ownDir(), stem, tagList);
+                Path file = BlueprintSaver.save(bp, BlueprintLibrary.saveDir(), stem, tagList);
                 minecraft.execute(() -> saved(file, bp));
             } catch (IOException | RuntimeException e) {
                 Cyanotype.LOG.error("Cannot save the blueprint", e);

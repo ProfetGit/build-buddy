@@ -28,6 +28,8 @@ public final class Settings {
         public int range = 192;
         public boolean fade = true;
         public boolean verify = true;
+        /** Where new builds are saved (and downloads and dropped files go): the game's schematics folder, which Litematica reads too; off = config/cyanotype/blueprints. */
+        public boolean saveToSchematics = true;
         // Materials
         public boolean groupVariants = false;
         // Community: "ask" until the player answers the first-run notice, then "on" or "off"

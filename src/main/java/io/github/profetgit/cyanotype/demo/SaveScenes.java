@@ -146,6 +146,17 @@ final class SaveScenes {
         waitTicks(20);
     }
 
+    /** Removes the files a scene saved earlier, from both library folders (the old runs saved in the mod's own folder). */
+    static void deleteTestFiles(String prefix) {
+        for (Path dir : java.util.List.of(BlueprintLibrary.ownDir(), BlueprintLibrary.litematicaDir())) {
+            try (var files = Files.list(dir)) {
+                for (Path f : (Iterable<Path>) files::iterator) if (f.getFileName().toString().startsWith(prefix)) Files.deleteIfExists(f);
+            } catch (IOException e) {
+                // no folder yet: nothing to delete
+            }
+        }
+    }
+
     static long worldBlocks(SelectionBox b) {
         long n = 0;
         for (int y = b.y0(); y <= b.y1(); y++) for (int z = b.z0(); z <= b.z1(); z++) for (int x = b.x0(); x <= b.x1(); x++) if (!mc().level.getBlockState(new BlockPos(x, y, z)).isAir()) n++;
@@ -157,11 +168,7 @@ final class SaveScenes {
         act(() -> {
             Director.hideHud(mc(), false);
             SaveScreen.lastSaved = null;
-            try (var files = Files.list(BlueprintLibrary.ownDir())) {
-                for (Path f : (Iterable<Path>) files::iterator) if (f.getFileName().toString().startsWith("Test Hut")) Files.deleteIfExists(f);
-            } catch (IOException e) {
-                // no folder yet: nothing to delete
-            }
+            deleteTestFiles("Test Hut");
         });
 
         // ---- safety: clicking a corner must not break the block in creative
@@ -281,8 +288,8 @@ final class SaveScenes {
         act(() -> {
             try {
                 Path file = SaveScreen.lastSaved;
-                check("save/the file is in the library folder", file.getParent().equals(BlueprintLibrary.ownDir()) && file.getFileName().toString().equals(saved("Test Hut")), String.valueOf(file));
-                var tags = JsonParser.parseString(Files.readString(BlueprintLibrary.ownDir().resolve("Test Hut.cyanotype.json"))).getAsJsonObject().getAsJsonArray("tags");
+                check("save/the file is in the library folder", file.getParent().equals(BlueprintLibrary.saveDir()) && file.getFileName().toString().equals(saved("Test Hut")), String.valueOf(file));
+                var tags = JsonParser.parseString(Files.readString(BlueprintLibrary.saveDir().resolve("Test Hut.cyanotype.json"))).getAsJsonObject().getAsJsonArray("tags");
                 check("save/the tags are in the sidecar", tags.size() == 2 && tags.get(0).getAsString().equals("hut") && tags.get(1).getAsString().equals("wood"), tags.toString());
                 Blueprint bp;
                 try (var in = Files.newInputStream(file)) {
@@ -353,7 +360,7 @@ final class SaveScenes {
         act(() -> {
             try {
                 Path file = SaveScreen.lastSaved;
-                check("save/the same name gets a number, the first stays", file.getFileName().toString().equals(saved("Test Hut 2")) && Files.exists(BlueprintLibrary.ownDir().resolve("Test Hut.litematic")), String.valueOf(file.getFileName()));
+                check("save/the same name gets a number, the first stays", file.getFileName().toString().equals(saved("Test Hut 2")) && Files.exists(BlueprintLibrary.saveDir().resolve("Test Hut.litematic")), String.valueOf(file.getFileName()));
                 Blueprint bp = LitematicReader.read(file);
                 check("save/without trimming the whole box is kept", bp.sizeX == 11 && bp.sizeY == 6 && bp.sizeZ == 9, bp.sizeX + "x" + bp.sizeY + "x" + bp.sizeZ);
                 check("save/without block data there are none", bp.regions.get(0).blockEntities.isEmpty(), "entities " + bp.regions.get(0).blockEntities.size());

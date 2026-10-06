@@ -90,13 +90,13 @@ public final class DevCommands {
         say("Files: list | load <name> | sample | place [x y z]");
         say("Placements: placements | select <n or name> | show / hide / remove [n or name] | move x y z | rotate | mirror [x] | opacity 5-100 | info | clear");
         say("Building: status | layer <n> [m] / up / down / all | next | verify on or off");
-        say("Keys: V edit, H show or hide, Z undo (see Controls). Files go in " + BlueprintLibrary.ownDir() + " (Litematica's schematics folder works too).");
+        say("Keys: V edit, H show or hide, Z undo (see Controls). Files go in " + BlueprintLibrary.saveDir() + " (Litematica's schematics folder works too).");
     }
 
     private static void list() {
         List<Path> files = BlueprintLibrary.files();
         if (files.isEmpty()) {
-            say("No .litematic files yet. Put some in " + BlueprintLibrary.ownDir() + ", or try /cyanotype sample.");
+            say("No .litematic files yet. Put some in " + BlueprintLibrary.saveDir() + ", or try /cyanotype sample.");
             return;
         }
         for (Path p : files) say(p.getFileName().toString());

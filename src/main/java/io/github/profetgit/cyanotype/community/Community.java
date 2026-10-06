@@ -72,7 +72,7 @@ public final class Community {
     }
 
     public static CommunityModel newModel(String base) {
-        return new CommunityModel(client(base), pool(), Community::decode, BlueprintLibrary.ownDir(), Community::validate, System::currentTimeMillis);
+        return new CommunityModel(client(base), pool(), Community::decode, BlueprintLibrary.saveDir(), Community::validate, System::currentTimeMillis);
     }
 
     /** A downloaded file must open as a blueprint before it joins the library (shapes are not worked out: only the file is judged). */

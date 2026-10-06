@@ -99,11 +99,7 @@ final class PickScenes {
         act(() -> {
             Director.hideHud(mc(), false);
             SaveScreen.lastSaved = null;
-            try (var files = Files.list(BlueprintLibrary.ownDir())) {
-                for (Path f : (Iterable<Path>) files::iterator) if (f.getFileName().toString().startsWith("Test House")) Files.deleteIfExists(f);
-            } catch (IOException e) {
-                // no folder yet
-            }
+            SaveScenes.deleteTestFiles("Test House");
         });
         // grass dies under a roof when blocks get random ticks, which would change the ground between saving and checking
         cmd("gamerule random_tick_speed 0");

@@ -118,7 +118,7 @@ final class CommunityScenes {
 
         act(() -> {
             try {
-                Path dir = BlueprintLibrary.ownDir();
+                Path dir = BlueprintLibrary.saveDir();
                 Files.createDirectories(dir);
                 try (var files = Files.list(dir)) {
                     for (Path f : (Iterable<Path>) files::iterator) Files.deleteIfExists(f);
@@ -266,10 +266,10 @@ final class CommunityScenes {
             check("community/the download succeeded", d.download == CommunityModel.DownloadPhase.DONE, String.valueOf(d.downloadError));
             Path saved = d.saved;
             try {
-                check("community/it is in config/cyanotype/blueprints under the build's name", saved != null && saved.getParent().equals(BlueprintLibrary.ownDir()) && saved.getFileName().toString().equals("Cozy Cottage.litematic"), String.valueOf(saved));
+                check("community/it is in config/cyanotype/blueprints under the build's name", saved != null && saved.getParent().equals(BlueprintLibrary.saveDir()) && saved.getFileName().toString().equals("Cozy Cottage.litematic"), String.valueOf(saved));
                 check("community/the file is the one the site announced (sha-256)", saved != null && sha(saved).equals(d.data.sha256()), saved == null ? "" : sha(saved));
                 check("community/its size is the announced size", saved != null && Files.size(saved) == d.summary.fileBytes(), saved == null ? "" : Files.size(saved) + " vs " + d.summary.fileBytes());
-                check("community/the tags file says where it came from", saved != null && Files.readString(BlueprintLibrary.ownDir().resolve("Cozy Cottage.cyanotype.json")).contains(d.summary.id()), "sidecar");
+                check("community/the tags file says where it came from", saved != null && Files.readString(BlueprintLibrary.saveDir().resolve("Cozy Cottage.cyanotype.json")).contains(d.summary.id()), "sidecar");
                 firstHash = sha(saved);
             } catch (IOException e) {
                 check("community/download checks", false, e.toString());
@@ -305,10 +305,10 @@ final class CommunityScenes {
         act(() -> {
             CommunityModel.DetailState d = model().detail();
             try {
-                Path first = BlueprintLibrary.ownDir().resolve("Cozy Cottage.litematic");
+                Path first = BlueprintLibrary.saveDir().resolve("Cozy Cottage.litematic");
                 check("community/the second download is Cozy Cottage 2", d.saved != null && d.saved.getFileName().toString().equals("Cozy Cottage 2.litematic"), String.valueOf(d.saved));
                 check("community/the first file is untouched", sha(first).equals(firstHash), sha(first));
-                check("community/both files are there", Files.exists(BlueprintLibrary.ownDir().resolve("Cozy Cottage 2.litematic")) && Files.exists(first), "two files");
+                check("community/both files are there", Files.exists(BlueprintLibrary.saveDir().resolve("Cozy Cottage 2.litematic")) && Files.exists(first), "two files");
             } catch (IOException e) {
                 check("community/second download checks", false, e.toString());
             }
@@ -458,7 +458,7 @@ final class CommunityScenes {
     }
 
     private static long countFiles() {
-        try (var files = Files.list(BlueprintLibrary.ownDir())) {
+        try (var files = Files.list(BlueprintLibrary.saveDir())) {
             return files.count();
         } catch (IOException e) {
             return -1;

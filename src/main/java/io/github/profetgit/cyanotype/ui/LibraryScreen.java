@@ -450,11 +450,11 @@ public final class LibraryScreen extends Screen {
         if (was.equals("folder") && Ui.inside(mx, my, px + 10, fy, 86, 16)) {
             Sfx.play(Sfx.RELEASE);
             try {
-                Files.createDirectories(BlueprintLibrary.ownDir());
+                Files.createDirectories(BlueprintLibrary.saveDir());
             } catch (IOException ignored) {
                 // opening it will say
             }
-            com.mojang.blaze3d.Blaze3D.openPath(BlueprintLibrary.ownDir());
+            com.mojang.blaze3d.Blaze3D.openPath(BlueprintLibrary.saveDir());
             return true;
         }
         if (was.equals("close") && Ui.inside(mx, my, px + pw - 10 - 52, fy, 52, 16)) {
@@ -540,9 +540,9 @@ public final class LibraryScreen extends Screen {
                 continue;
             }
             try {
-                Files.createDirectories(BlueprintLibrary.ownDir());
-                Path target = BlueprintLibrary.ownDir().resolve(name);
-                for (int n = 2; Files.exists(target); n++) target = BlueprintLibrary.ownDir().resolve(name.replaceFirst("(?i)\\.litematic$", "") + " " + n + ".litematic");
+                Files.createDirectories(BlueprintLibrary.saveDir());
+                Path target = BlueprintLibrary.saveDir().resolve(name);
+                for (int n = 2; Files.exists(target); n++) target = BlueprintLibrary.saveDir().resolve(name.replaceFirst("(?i)\\.litematic$", "") + " " + n + ".litematic");
                 Files.copy(f, target, StandardCopyOption.COPY_ATTRIBUTES);
                 added++;
             } catch (IOException e) {

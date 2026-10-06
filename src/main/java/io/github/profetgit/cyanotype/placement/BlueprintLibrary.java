@@ -39,6 +39,11 @@ public final class BlueprintLibrary {
         return FabricLoader.getInstance().getGameDir().resolve("schematics");
     }
 
+    /** Where a new build is written: the game's schematics folder (shared with Litematica) unless the setting says the mod's own folder. */
+    public static Path saveDir() {
+        return io.github.profetgit.cyanotype.ui.Settings.get().saveToSchematics ? litematicaDir() : ownDir();
+    }
+
     /** Every .litematic in both folders, sorted by name within each. */
     public static List<Path> files() {
         List<Path> out = new ArrayList<>();

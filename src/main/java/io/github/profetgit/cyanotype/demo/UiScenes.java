@@ -76,6 +76,12 @@ final class UiScenes {
                 try (var files = java.nio.file.Files.list(dir)) {
                     for (java.nio.file.Path f : (Iterable<java.nio.file.Path>) files::iterator) java.nio.file.Files.deleteIfExists(f);
                 }
+                java.nio.file.Path other = io.github.profetgit.cyanotype.placement.BlueprintLibrary.litematicaDir();
+                if (java.nio.file.Files.isDirectory(other)) {
+                    try (var files = java.nio.file.Files.list(other)) {
+                        for (java.nio.file.Path f : (Iterable<java.nio.file.Path>) files::iterator) java.nio.file.Files.deleteIfExists(f);
+                    }
+                }
                 write(dir, "sample-house", Samples.house());
                 write(dir, "watch-tower", Samples.tower());
                 write(dir, "pyramid", Samples.pyramid());

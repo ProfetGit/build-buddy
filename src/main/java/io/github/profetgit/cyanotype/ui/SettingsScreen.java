@@ -144,6 +144,7 @@ public final class SettingsScreen extends Screen {
             }
             case SERVERS -> serverRows(r);
             case ADVANCED -> {
+                r.add(new Toggle("saveToSchematics", "Save into the schematics folder", "New builds go in the game's schematics folder, where Litematica finds them too. Off: config/cyanotype/blueprints. Both folders always show in the Library.", () -> d.saveToSchematics, v -> d.saveToSchematics = v));
                 r.add(new Toggle("showNames", "Names over ghosts", "Show each placement's name above its ghost.", () -> d.showNames, v -> d.showNames = v));
                 r.add(new Action("reset", "Reset all", "Back to the defaults."));
             }
