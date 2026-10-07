@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.57
+
+- Redrawn icons: the check mark (even arms, one glint), the help question mark (bold, on a white disc) and the restart arrow (a clean clockwise arrow). They are drawn like the rest of the icons: flat colours and hand-placed pixels.
+
 ## 0.0.56
 
 - Lessons polished. The little player is now the game's own player model in the default skin, with a walking swing and a soft shadow (it was a faceless block figure); the next-block marker is a gold cube with a bobbing arrow; footprints are boot prints; the turn ring has crisp edges.

@@ -27,6 +27,7 @@ BL = (110, 176, 245)    # light blue
 GR = (66, 190, 108)     # green
 RD = (226, 78, 78)      # red
 CY = (127, 227, 255)    # cyan, for marks drawn on the dark chips
+GL = (150, 232, 170)    # light green: the one glint of the check
 
 
 class Icon:
@@ -350,8 +351,11 @@ def select():
 
 
 def check():
+    """The red cross's two exact diagonals, 3 px thick, a long arm and a short one, with one light glint like the eye's."""
     i = Icon()
-    i.layer(lambda s: s.stroke([(3, 8), (6, 11), (12, 4)], GR, 3))
+    i.layer(lambda s: s.stroke([(2, 8), (5, 11), (13, 3)], GR, 3))
+    i.p(12, 3, GL)
+    i.p(11, 4, GL)
     return i
 
 
@@ -465,30 +469,62 @@ def step_next():
     return i
 
 
+RESTART_ROWS = [
+    "................",
+    "......##........",
+    "......####......",
+    ".....#######....",
+    "....########....",
+    "...##.####......",
+    "..###.##........",
+    "..##............",
+    "..##........##..",
+    "..##........##..",
+    "..###......###..",
+    "...##......##...",
+    "....########....",
+    ".....######.....",
+]
+
+
 def restart():
+    """A 2 px ring open at the top right with a triangle head at its top end pointing right (clockwise), flat blue like the sweep arrow. Hand-placed: a coarse arc keeps the pixels clean."""
+    sub = Icon()
+    for y, row in enumerate(RESTART_ROWS):
+        for x, ch in enumerate(row):
+            if ch == "#":
+                sub.p(x, y + 1, B)
     i = Icon()
-
-    def ring(s):
-        pts = [(8 + 4.4 * math.cos(math.radians(a)), 8 + 4.4 * math.sin(math.radians(a))) for a in range(30, 301, 15)]
-        s.stroke([(round(x), round(y)) for x, y in pts], B, 2)
-        s.poly([(9.6, 1.6), (9.4, 7.0), (14.4, 4.6)], B)
-
-    i.layer(ring)
+    i.put(sub.outlined(K))
     return i
 
 
+QMARK_ROWS = [
+    ".####.",
+    "##..##",
+    "##..##",
+    "....##",
+    "...##.",
+    "..##..",
+    "..##..",
+    "......",
+    "..##..",
+    "..##..",
+]
+
+
 def help_():
+    """A white disc with a bold blue question mark; a flat shade plane along the bottom, like the mouse's."""
     i = Icon()
-
-    def disc(s):
-        for y in range(16):
-            for x in range(16):
-                if (x + 0.5 - 8) ** 2 + (y + 0.5 - 8) ** 2 <= 6.8 ** 2:
-                    s.p(x, y, W)
-
-    i.layer(disc)
-    i.stroke([(5, 6), (5, 4), (8, 3), (10, 4), (10, 6), (8, 8), (8, 9)], B, 2)
-    i.rect(7, 11, 8, 12, B)
+    disc = {(x, y) for y in range(16) for x in range(16) if (x + 0.5 - 8) ** 2 + (y + 0.5 - 8) ** 2 <= 6.8 ** 2}
+    sub = Icon()
+    for (x, y) in disc:
+        sub.p(x, y, S if y >= 12 else W)
+    i.put(sub.outlined(K))
+    for dy, row in enumerate(QMARK_ROWS):
+        for dx, ch in enumerate(row):
+            if ch == "#":
+                i.p(5 + dx, 2 + dy, B)
     return i
 
 
