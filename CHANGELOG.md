@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.59
+
+- The lessons' sample cottage looks better: light birch walls, dark oak corner posts and door, brick roof, stone base.
+
 ## 0.0.58
 
 - The sample cottage in the lessons has its roof stairs the right way round (they sloped the wrong way).

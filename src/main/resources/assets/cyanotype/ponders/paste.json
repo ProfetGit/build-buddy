@@ -28,15 +28,15 @@
   "G": "minecraft:grass_block",
   "D": "minecraft:dirt",
   "c": "minecraft:cobblestone",
-  "p": "minecraft:oak_planks",
-  "l": "minecraft:oak_log",
+  "p": "minecraft:birch_planks",
+  "l": "minecraft:dark_oak_log",
   "g": "minecraft:glass",
   "n": "minecraft:brick_stairs[facing=south]",
   "s": "minecraft:brick_stairs[facing=north]",
   "t": "minecraft:brick_slab[type=bottom]",
   "u": "minecraft:bricks",
-  "b": "minecraft:oak_door[facing=south,half=lower]",
-  "B": "minecraft:oak_door[facing=south,half=upper]"
+  "b": "minecraft:dark_oak_door[facing=south,half=lower]",
+  "B": "minecraft:dark_oak_door[facing=south,half=upper]"
  },
  "groups": [
   {

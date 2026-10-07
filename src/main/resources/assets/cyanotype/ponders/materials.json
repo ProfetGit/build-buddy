@@ -37,15 +37,15 @@
   "G": "minecraft:grass_block",
   "D": "minecraft:dirt",
   "c": "minecraft:cobblestone",
-  "p": "minecraft:oak_planks",
-  "l": "minecraft:oak_log",
+  "p": "minecraft:birch_planks",
+  "l": "minecraft:dark_oak_log",
   "g": "minecraft:glass",
   "n": "minecraft:brick_stairs[facing=south]",
   "s": "minecraft:brick_stairs[facing=north]",
   "t": "minecraft:brick_slab[type=bottom]",
   "u": "minecraft:bricks",
-  "b": "minecraft:oak_door[facing=south,half=lower]",
-  "B": "minecraft:oak_door[facing=south,half=upper]"
+  "b": "minecraft:dark_oak_door[facing=south,half=lower]",
+  "B": "minecraft:dark_oak_door[facing=south,half=upper]"
  },
  "groups": [
   {
@@ -296,7 +296,7 @@
     5.2,
     7.6
    ],
-   "text": "Oak planks go here",
+   "text": "Birch planks go here",
    "color": "gold",
    "fade": 0.2
   },
@@ -340,7 +340,7 @@
      "20"
     ],
     [
-     "Oak planks",
+     "Birch planks",
      "19",
      "0",
      "19"
@@ -352,7 +352,7 @@
      "19"
     ],
     [
-     "Oak log",
+     "Dark oak log",
      "8",
      "0",
      "8"
@@ -370,7 +370,7 @@
      "3"
     ],
     [
-     "Oak door",
+     "Dark oak door",
      "1",
      "0",
      "1"
@@ -418,7 +418,7 @@
        "20"
       ],
       [
-       "Oak planks",
+       "Birch planks",
        "19",
        "0",
        "19"
@@ -430,7 +430,7 @@
        "19"
       ],
       [
-       "Oak log",
+       "Dark oak log",
        "8",
        "0",
        "8"
@@ -448,7 +448,7 @@
        "3"
       ],
       [
-       "Oak door",
+       "Dark oak door",
        "1",
        "0",
        "1"
@@ -471,7 +471,7 @@
        "20"
       ],
       [
-       "Oak planks",
+       "Birch planks",
        "19",
        "19",
        "enough"
@@ -483,7 +483,7 @@
        "19"
       ],
       [
-       "Oak log",
+       "Dark oak log",
        "8",
        "0",
        "8"
@@ -501,7 +501,7 @@
        "3"
       ],
       [
-       "Oak door",
+       "Dark oak door",
        "1",
        "0",
        "1"
@@ -524,7 +524,7 @@
        "20"
       ],
       [
-       "Oak planks",
+       "Birch planks",
        "19",
        "19",
        "enough"
@@ -536,7 +536,7 @@
        "19"
       ],
       [
-       "Oak log",
+       "Dark oak log",
        "8",
        "8",
        "enough"
@@ -554,7 +554,7 @@
        "enough"
       ],
       [
-       "Oak door",
+       "Dark oak door",
        "1",
        "0",
        "1"
@@ -585,7 +585,7 @@
        "20"
       ],
       [
-       "Oak planks",
+       "Birch planks",
        "19",
        "0",
        "19"
@@ -597,7 +597,7 @@
        "19"
       ],
       [
-       "Oak log",
+       "Dark oak log",
        "8",
        "0",
        "8"
@@ -615,7 +615,7 @@
        "3"
       ],
       [
-       "Oak door",
+       "Dark oak door",
        "1",
        "0",
        "1"

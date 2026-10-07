@@ -380,8 +380,8 @@ def materials():
     L.cam(8, ease="inOut", yaw=0.9)
     L.cam(16.5, ease="inOut", yaw=0.785)
     header = ["Material", "Need", "Have", "To get"]
-    rows0 = [["Cobblestone", "27", "0", "27"], ["Bricks", "20", "0", "20"], ["Oak planks", "19", "0", "19"], ["Brick stairs", "19", "0", "19"], ["Oak log", "8", "0", "8"],
-             ["Brick slab", "5", "0", "5"], ["Glass", "3", "0", "3"], ["Oak door", "1", "0", "1"]]
+    rows0 = [["Cobblestone", "27", "0", "27"], ["Bricks", "20", "0", "20"], ["Birch planks", "19", "0", "19"], ["Brick stairs", "19", "0", "19"], ["Dark oak log", "8", "0", "8"],
+             ["Brick slab", "5", "0", "5"], ["Glass", "3", "0", "3"], ["Dark oak door", "1", "0", "1"]]
     rows1 = [list(r) for r in rows0]
     rows1[0][2], rows1[0][3] = "27", "enough"
     rows2 = [list(r) for r in rows1]
@@ -404,7 +404,7 @@ def materials():
     L.cursor(14.4, ease="inOut", screen=[0.55, 0.86])
     L.click(14.6, hold=0.5)
     L.cursor(15.6, ease="inOut", alpha=0)
-    L.overlay("label", 6.0, 7.6, at=[C[0] + 2.5, C[1] + 3.2, C[2] + 5.6], text="Oak planks go here", color="gold", fade=0.2)
+    L.overlay("label", 6.0, 7.6, at=[C[0] + 2.5, C[1] + 3.2, C[2] + 5.6], text="Birch planks go here", color="gold", fade=0.2)
     L.overlay("label", 8.0, 9.4, at=[C[0] + 2.5, C[1] + 0.4, C[2] + 5.6], text="Cobblestone goes here", color="gold", fade=0.2)
 
     L.caption(0.0, 4.6, "Materials counts what the build still needs and what you carry. The biggest shortage comes first.", "1  The list")
