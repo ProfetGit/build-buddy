@@ -1,0 +1,673 @@
+{
+ "format": 1,
+ "id": "pick",
+ "title": "Pick a build to save",
+ "summary": "Click a build and a box fits itself round it; drag or scroll to change it, then save.",
+ "tags": [
+  "save",
+  "pick",
+  "smart pick",
+  "select",
+  "box",
+  "build",
+  "name"
+ ],
+ "action": "pick",
+ "duration": 21.0,
+ "stage": {
+  "size": [
+   12,
+   9,
+   11
+  ],
+  "focus": [
+   5.2,
+   3.4,
+   5.0
+  ]
+ },
+ "palette": {
+  "G": "minecraft:grass_block",
+  "D": "minecraft:dirt",
+  "c": "minecraft:cobblestone",
+  "p": "minecraft:oak_planks",
+  "l": "minecraft:oak_log",
+  "g": "minecraft:glass",
+  "n": "minecraft:spruce_stairs[facing=north]",
+  "s": "minecraft:spruce_stairs[facing=south]",
+  "t": "minecraft:spruce_slab[type=bottom]",
+  "u": "minecraft:spruce_planks",
+  "b": "minecraft:oak_door[facing=south,half=lower]",
+  "B": "minecraft:oak_door[facing=south,half=upper]",
+  "f": "minecraft:oak_leaves[persistent=false]",
+  "F": "minecraft:oak_fence"
+ },
+ "groups": [
+  {
+   "id": "ground",
+   "mode": "solid",
+   "pos": [
+    0,
+    0,
+    0
+   ],
+   "layers": [
+    [
+     "DDDDDDDDDDDD",
+     "DDDDDDDDDDDD",
+     "DDDDDDDDDDDD",
+     "DDDDDDDDDDDD",
+     "DDDDDDDDDDDD",
+     "DDDDDDDDDDDD",
+     "DDDDDDDDDDDD",
+     "DDDDDDDDDDDD",
+     "DDDDDDDDDDDD",
+     "DDDDDDDDDDDD",
+     "DDDDDDDDDDDD"
+    ],
+    [
+     "GGGGGGGGGGGG",
+     "GGGGGGGGGGGG",
+     "GGGGGGGGGGGG",
+     "GGGGGGGGGGGG",
+     "GGGGGGGGGGGG",
+     "GGGGGGGGGGGG",
+     "GGGGGGGGGGGG",
+     "GGGGGGGGGGGG",
+     "GGGGGGGGGGGG",
+     "GGGGGGGGGGGG",
+     "GGGGGGGGGGGG"
+    ]
+   ],
+   "start": "full"
+  },
+  {
+   "id": "cottage",
+   "mode": "solid",
+   "pos": [
+    2,
+    2,
+    3
+   ],
+   "layers": [
+    [
+     "ccccc",
+     "ccccc",
+     "ccccc",
+     "ccccc",
+     "ccccc"
+    ],
+    [
+     "lpppl",
+     "p...p",
+     "g...g",
+     "p...p",
+     "lpbpl"
+    ],
+    [
+     "lpgpl",
+     "p...p",
+     "p...p",
+     "p...p",
+     "lpBpl"
+    ],
+    [
+     "nnnnn",
+     "uuuuu",
+     "uuuuu",
+     "uuuuu",
+     "sssss"
+    ],
+    [
+     ".....",
+     "nnnnc",
+     "uuuuu",
+     "sssss",
+     "....."
+    ],
+    [
+     ".....",
+     "....c",
+     "ttttt",
+     ".....",
+     "....."
+    ]
+   ],
+   "start": "full"
+  },
+  {
+   "id": "tree",
+   "mode": "solid",
+   "pos": [
+    9,
+    2,
+    2
+   ],
+   "layers": [
+    [
+     "l"
+    ],
+    [
+     "l"
+    ],
+    [
+     "l"
+    ],
+    [
+     "l"
+    ],
+    [
+     "f"
+    ]
+   ],
+   "start": "full"
+  },
+  {
+   "id": "tree2",
+   "mode": "solid",
+   "pos": [
+    8,
+    6,
+    1
+   ],
+   "layers": [
+    [
+     "fff",
+     "fff",
+     "fff"
+    ],
+    [
+     "fff",
+     "fff",
+     "fff"
+    ]
+   ],
+   "start": "full"
+  },
+  {
+   "id": "fence",
+   "mode": "solid",
+   "pos": [
+    2,
+    2,
+    9
+   ],
+   "layers": [
+    [
+     "FFFFF"
+    ]
+   ],
+   "start": "full"
+  }
+ ],
+ "tracks": {
+  "camera": [
+   {
+    "t": 0,
+    "yaw": 0.785,
+    "pitch": 0.55,
+    "zoom": 1.45,
+    "focus": [
+     5.4,
+     3.4,
+     5.2
+    ]
+   },
+   {
+    "t": 10,
+    "yaw": 0.9,
+    "ease": "inOut"
+   },
+   {
+    "t": 21,
+    "yaw": 0.785,
+    "ease": "inOut"
+   }
+  ],
+  "cursor": [
+   {
+    "t": 0,
+    "screen": [
+     0.85,
+     0.7
+    ],
+    "alpha": 0
+   },
+   {
+    "t": 0.6,
+    "alpha": 1,
+    "ease": "out"
+   },
+   {
+    "t": 2.6,
+    "at": [
+     3.5,
+     3.7,
+     8.0
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 3.0,
+    "down": true
+   },
+   {
+    "t": 3.2,
+    "down": false
+   },
+   {
+    "t": 9.4,
+    "at": [
+     7.9,
+     5.0,
+     5.5
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 10.2,
+    "down": true
+   },
+   {
+    "t": 11.3,
+    "at": [
+     8.9,
+     5.0,
+     5.5
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 11.4,
+    "down": false
+   },
+   {
+    "t": 12.6,
+    "at": [
+     5.0,
+     9.2,
+     6.0
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 12.7,
+    "down": true
+   },
+   {
+    "t": 12.7,
+    "down": false
+   },
+   {
+    "t": 13.6,
+    "screen": [
+     0.85,
+     0.75
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 14.4,
+    "screen": [
+     0.85,
+     0.85
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 17.8,
+    "panel": [
+     "save",
+     0
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 18.3,
+    "down": true
+   },
+   {
+    "t": 18.6,
+    "down": false
+   },
+   {
+    "t": 19.2,
+    "alpha": 0,
+    "ease": "inOut"
+   }
+  ]
+ },
+ "captions": [
+  {
+   "t0": 0.0,
+   "t1": 4.4,
+   "text": "Open Save and choose Pick a build. Aim at the build and click once.",
+   "title": "1  Click it"
+  },
+  {
+   "t0": 4.4,
+   "t1": 9.4,
+   "text": "A box fits itself round the build, leaving out the tree, the fence and the lawn.",
+   "title": "2  The box"
+  },
+  {
+   "t0": 9.4,
+   "t1": 14.4,
+   "text": "Drag a side to change it, or scroll to grow the side you face.",
+   "title": "3  Adjust"
+  },
+  {
+   "t0": 14.4,
+   "t1": 21.0,
+   "text": "Right click to save. Give it a name and it goes into your Library.",
+   "title": "4  Save it"
+  }
+ ],
+ "chips": [
+  {
+   "t0": 0.4,
+   "t1": 4.4,
+   "rows": [
+    [
+     "Click",
+     "Fit a box round this build"
+    ],
+    [
+     "V",
+     "Cancel"
+    ]
+   ],
+   "lit": [
+    [
+     0,
+     3.0,
+     3.4
+    ]
+   ]
+  },
+  {
+   "t0": 4.4,
+   "t1": 14.4,
+   "rows": [
+    [
+     "Drag",
+     "Move the east side"
+    ],
+    [
+     "Scroll",
+     "Grow / shrink the box"
+    ],
+    [
+     "Right click",
+     "Save it..."
+    ],
+    [
+     "V",
+     "Cancel"
+    ]
+   ],
+   "lit": [
+    [
+     0,
+     10.2,
+     11.6
+    ],
+    [
+     1,
+     12.5,
+     12.9
+    ]
+   ]
+  }
+ ],
+ "overlays": [
+  {
+   "type": "box",
+   "t0": 3.1,
+   "t1": 14.8,
+   "from": [
+    3.5,
+    3.7,
+    8.0
+   ],
+   "to": [
+    3.5,
+    3.7,
+    8.0
+   ],
+   "fade": 0.2,
+   "keys": [
+    {
+     "t": 3.1,
+     "from": [
+      3.5,
+      3.7,
+      8.0
+     ],
+     "to": [
+      3.51,
+      3.71,
+      8.01
+     ]
+    },
+    {
+     "t": 4.3,
+     "ease": "out",
+     "from": [
+      2,
+      2,
+      3
+     ],
+     "to": [
+      7,
+      8,
+      8
+     ]
+    },
+    {
+     "t": 10.2,
+     "from": [
+      2,
+      2,
+      3
+     ],
+     "to": [
+      7,
+      8,
+      8
+     ]
+    },
+    {
+     "t": 11.3,
+     "ease": "inOut",
+     "from": [
+      2,
+      2,
+      3
+     ],
+     "to": [
+      8,
+      8,
+      8
+     ]
+    },
+    {
+     "t": 12.3,
+     "from": [
+      2,
+      2,
+      3
+     ],
+     "to": [
+      8,
+      8,
+      8
+     ]
+    },
+    {
+     "t": 12.7,
+     "ease": "inOut",
+     "from": [
+      2,
+      2,
+      3
+     ],
+     "to": [
+      7,
+      8,
+      8
+     ]
+    }
+   ]
+  },
+  {
+   "type": "label",
+   "t0": 4.4,
+   "t1": 9.2,
+   "at": [
+    4.5,
+    8.9,
+    5.5
+   ],
+   "text": "5 x 6 x 5",
+   "color": "cyan",
+   "fade": 0.3
+  },
+  {
+   "type": "arrow",
+   "t0": 9.6,
+   "t1": 13.8,
+   "at": [
+    7,
+    5,
+    5.5
+   ],
+   "dir": "+x",
+   "len": 1.9,
+   "fade": 0.3,
+   "keys": [
+    {
+     "t": 9.6,
+     "at": [
+      7,
+      5,
+      5.5
+     ]
+    },
+    {
+     "t": 10.2,
+     "at": [
+      7,
+      5,
+      5.5
+     ]
+    },
+    {
+     "t": 10.2,
+     "hot": 1
+    },
+    {
+     "t": 11.3,
+     "ease": "inOut",
+     "at": [
+      8,
+      5,
+      5.5
+     ]
+    },
+    {
+     "t": 11.4,
+     "hot": 0
+    },
+    {
+     "t": 12.3,
+     "at": [
+      8,
+      5,
+      5.5
+     ]
+    },
+    {
+     "t": 12.7,
+     "ease": "inOut",
+     "at": [
+      7,
+      5,
+      5.5
+     ]
+    },
+    {
+     "t": 13.8,
+     "at": [
+      7,
+      5,
+      5.5
+     ]
+    }
+   ]
+  },
+  {
+   "type": "label",
+   "t0": 10.5,
+   "t1": 11.9,
+   "at": [
+    8.6,
+    6.6,
+    5.5
+   ],
+   "text": "+1 east",
+   "color": "x",
+   "fade": 0.1
+  }
+ ],
+ "panels": [
+  {
+   "type": "save",
+   "t0": 14.6,
+   "t1": 20.2,
+   "name": "My cottage",
+   "typed": 0,
+   "hot": 0,
+   "tags": "house, wood",
+   "fade": 0.4,
+   "keys": [
+    {
+     "t": 15.4,
+     "typed": 0
+    },
+    {
+     "t": 17.0,
+     "ease": "linear",
+     "typed": 10
+    },
+    {
+     "t": 18.3,
+     "hot": 0
+    },
+    {
+     "t": 18.3,
+     "hot": 1
+    },
+    {
+     "t": 18.8,
+     "hot": 0
+    }
+   ]
+  },
+  {
+   "type": "stamp",
+   "t0": 18.7,
+   "t1": 20.0,
+   "text": "Saved to your Library",
+   "color": "green",
+   "size": 1,
+   "rect": [
+    0.2,
+    0.04,
+    0.6,
+    0.12
+   ],
+   "fade": 0.2
+  }
+ ]
+}

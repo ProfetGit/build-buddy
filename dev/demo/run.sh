@@ -5,6 +5,7 @@
 #      WIDTH/HEIGHT (1280x720), XMX (3G; big builds need more), MODS (extra jars, colon-separated), FABRIC_API=0 (on by default now),
 #      WORK_TAG (own game dir, for parallel runs), SKIP_BUILD=1, TIMEOUT (s), PROFILE=1 (the user's Fabric 26.3 mods;
 #      EXCLUDE=regex drops some), SHADERS=1 (Complementary Reimagined, with PROFILE=1 for Iris).
+#      PONDER (lesson ids for ponder-stills, default all), PONDER_STEP (seconds between stills, 2),
 #      SITE (community site address for the community scene), NBT=0 (skip its .nbt step when the site has no such build),
 #      WS (the workspace folder holding tools/; needed when running from a git worktree under .claude/worktrees). Gradle always runs on /usr/lib/jvm/java-25-openjdk.
 set -euo pipefail
@@ -15,7 +16,7 @@ OUT=$(realpath -m "${1:?usage: run.sh <out> [scenes]}")
 SCENES=${2:-house}
 export JAVA_HOME=/usr/lib/jvm/java-25-openjdk
 if [ -z "${SKIP_BUILD:-}" ]; then (cd "$ROOT" && ./gradlew -q --console=plain build --offline); fi
-JAR=$(ls -t "$ROOT"/build/libs/cyanotype-*.jar | grep -v -- -sources | head -1)
+JAR=$(ls -t "$ROOT"/build/libs/cyanotype-*.jar | grep -v -- -sources | sed -n 1p)
 WORLD="$HERE/.work/world-26.3"
 args=(26.3 fabric "$OUT" --game "$HERE/.work/game${WORK_TAG:+-$WORK_TAG}" --jar "$JAR" --world "$WORLD"
       -D "cyanotype.demo=$OUT" -D "cyanotype.demo.scenes=$SCENES" -D "cyanotype.demo.measure=${MEASURE:-300}"
@@ -24,6 +25,8 @@ args=(26.3 fabric "$OUT" --game "$HERE/.work/game${WORK_TAG:+-$WORK_TAG}" --jar 
 [ -n "${PERF:-}" ] && args+=(-D "cyanotype.demo.perf=$PERF")
 [ -n "${PERF_EDIT:-}" ] && args+=(-D "cyanotype.demo.perf.edit=true")
 [ -n "${SITE:-}" ] && args+=(-D "cyanotype.demo.site=$SITE")
+[ -n "${PONDER:-}" ] && args+=(-D "cyanotype.demo.ponder=$PONDER")
+[ -n "${PONDER_STEP:-}" ] && args+=(-D "cyanotype.demo.ponder.step=$PONDER_STEP")
 [ "${NBT:-}" = "0" ] && args+=(-D "cyanotype.demo.nbt=false")
 # the mod needs Fabric API (its resource loader serves the art and sounds), so every run has it unless FABRIC_API=0
 [ "${FABRIC_API:-1}" != "0" ] && args+=(--fabric-api)

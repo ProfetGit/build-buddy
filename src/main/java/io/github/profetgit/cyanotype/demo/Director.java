@@ -235,6 +235,7 @@ public final class Director {
                 case "carry" -> NudgeScenes.carry();
                 case "materials" -> MaterialsScenes.materials();
                 case "settings" -> SettingsScenes.settings();
+                case "ponder-stills" -> PonderScenes.stills();
                 case "look" -> PlaceScenes.look();
                 case "persist" -> PlaceScenes.persist();
                 case "persist-leave" -> PlaceScenes.persistLeave();

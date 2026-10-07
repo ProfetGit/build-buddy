@@ -427,12 +427,65 @@ def scroll_mark():
     return i
 
 
+def cursor():
+    """The mouse pointer of the lessons: the tip is the pixel at (3, 1)."""
+    i = Icon()
+    i.layer(lambda s: s.poly([(3, 1.2), (3, 13.2), (5.9, 10.4), (8.2, 14.6), (10.4, 13.6), (8.1, 9.4), (12, 9.4)], W))
+    return i
+
+
+def play():
+    i = Icon()
+    i.layer(lambda s: s.poly([(4, 2.2), (4, 13.8), (13.2, 8)], B))
+    return i
+
+
+def pause():
+    i = Icon()
+    i.layer(lambda s: (s.rect(3, 3, 6, 12, B), s.rect(9, 3, 12, 12, B)))
+    return i
+
+
+def step_next():
+    i = Icon()
+    i.layer(lambda s: (s.poly([(2, 3), (2, 13), (9.5, 8)], B), s.rect(11, 3, 13, 12, B)))
+    return i
+
+
+def restart():
+    i = Icon()
+
+    def ring(s):
+        pts = [(8 + 4.4 * math.cos(math.radians(a)), 8 + 4.4 * math.sin(math.radians(a))) for a in range(30, 301, 15)]
+        s.stroke([(round(x), round(y)) for x, y in pts], B, 2)
+        s.poly([(9.6, 1.6), (9.4, 7.0), (14.4, 4.6)], B)
+
+    i.layer(ring)
+    return i
+
+
+def help_():
+    i = Icon()
+
+    def disc(s):
+        for y in range(16):
+            for x in range(16):
+                if (x + 0.5 - 8) ** 2 + (y + 0.5 - 8) ** 2 <= 6.8 ** 2:
+                    s.p(x, y, W)
+
+    i.layer(disc)
+    i.stroke([(5, 6), (5, 4), (8, 3), (10, 4), (10, 6), (8, 8), (8, 9)], B, 2)
+    i.rect(7, 11, 8, 12, B)
+    return i
+
+
 ICONS = [
     ("folder", folder), ("move", move), ("layers", layers), ("hammer", hammer), ("list", list_), ("save", save),
     ("gear", gear), ("eye", eye), ("eye_off", eye_off), ("trash", trash), ("undo", undo), ("redo", lambda: undo().mirrored()),
     ("wand", wand), ("cube", cube), ("sweep", sweep), ("select", select), ("check", check), ("cross", cross),
     ("mouse_left", lambda: mouse(left=True)), ("mouse_right", lambda: mouse(right=True)), ("mouse_wheel", lambda: mouse(wheel=True)), ("mouse_none", lambda: mouse()),
     ("keycap", keycap), ("mark_drag", drag_mark), ("mark_scroll", scroll_mark), ("paste", paste),
+    ("cursor", cursor), ("play", play), ("pause", pause), ("step_next", step_next), ("step_prev", lambda: step_next().mirrored()), ("restart", restart), ("help", help_),
 ]
 
 

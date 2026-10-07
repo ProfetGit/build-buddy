@@ -1,0 +1,14 @@
+{
+ "format": 1,
+ "lessons": [
+  "place",
+  "edit",
+  "layers",
+  "build",
+  "auto",
+  "materials",
+  "pick",
+  "box",
+  "paste"
+ ]
+}

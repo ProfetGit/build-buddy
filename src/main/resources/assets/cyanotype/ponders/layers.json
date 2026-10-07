@@ -1,0 +1,706 @@
+{
+ "format": 1,
+ "id": "layers",
+ "title": "Show a few layers",
+ "summary": "Scroll a window of layers up and down the build, make it thicker, show it all again.",
+ "tags": [
+  "layers",
+  "slice",
+  "window",
+  "scroll",
+  "floor",
+  "level"
+ ],
+ "action": "layers",
+ "duration": 17.0,
+ "stage": {
+  "size": [
+   11,
+   9,
+   11
+  ],
+  "focus": [
+   5.5,
+   3.4,
+   5.5
+  ]
+ },
+ "palette": {
+  "G": "minecraft:grass_block",
+  "D": "minecraft:dirt",
+  "c": "minecraft:cobblestone",
+  "p": "minecraft:oak_planks",
+  "l": "minecraft:oak_log",
+  "g": "minecraft:glass",
+  "n": "minecraft:spruce_stairs[facing=north]",
+  "s": "minecraft:spruce_stairs[facing=south]",
+  "t": "minecraft:spruce_slab[type=bottom]",
+  "u": "minecraft:spruce_planks",
+  "b": "minecraft:oak_door[facing=south,half=lower]",
+  "B": "minecraft:oak_door[facing=south,half=upper]"
+ },
+ "groups": [
+  {
+   "id": "ground",
+   "mode": "solid",
+   "pos": [
+    0,
+    0,
+    0
+   ],
+   "layers": [
+    [
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD"
+    ],
+    [
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG"
+    ]
+   ],
+   "start": "full"
+  },
+  {
+   "id": "ghost",
+   "mode": "ghost",
+   "pos": [
+    3,
+    2,
+    3
+   ],
+   "layers": [
+    [
+     "ccccc",
+     "ccccc",
+     "ccccc",
+     "ccccc",
+     "ccccc"
+    ],
+    [
+     "lpppl",
+     "p...p",
+     "g...g",
+     "p...p",
+     "lpbpl"
+    ],
+    [
+     "lpgpl",
+     "p...p",
+     "p...p",
+     "p...p",
+     "lpBpl"
+    ],
+    [
+     "nnnnn",
+     "uuuuu",
+     "uuuuu",
+     "uuuuu",
+     "sssss"
+    ],
+    [
+     ".....",
+     "nnnnc",
+     "uuuuu",
+     "sssss",
+     "....."
+    ],
+    [
+     ".....",
+     "....c",
+     "ttttt",
+     ".....",
+     "....."
+    ]
+   ],
+   "start": "full"
+  }
+ ],
+ "tracks": {
+  "camera": [
+   {
+    "t": 0,
+    "yaw": 0.785,
+    "pitch": 0.55,
+    "zoom": 1.65,
+    "focus": [
+     5.5,
+     3.4,
+     5.5
+    ]
+   },
+   {
+    "t": 8.5,
+    "yaw": 0.95,
+    "ease": "inOut"
+   },
+   {
+    "t": 17,
+    "yaw": 0.785,
+    "ease": "inOut"
+   }
+  ],
+  "groups": {
+   "ghost": [
+    {
+     "t": 0,
+     "window": [
+      0,
+      5
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 1.6,
+     "window": [
+      0,
+      0
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 4.2,
+     "window": [
+      1,
+      1
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 5.0,
+     "window": [
+      2,
+      2
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 5.8,
+     "window": [
+      3,
+      3
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 6.6,
+     "window": [
+      4,
+      4
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 7.6,
+     "window": [
+      3,
+      3
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 9.0,
+     "window": [
+      3,
+      4
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 9.8,
+     "window": [
+      3,
+      5
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 10.8,
+     "window": [
+      3,
+      4
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 11.6,
+     "window": [
+      2,
+      3
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 12.4,
+     "window": [
+      2,
+      3
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 14.6,
+     "window": [
+      0,
+      5
+     ],
+     "ease": "step"
+    }
+   ]
+  }
+ },
+ "captions": [
+  {
+   "t0": 0.0,
+   "t1": 3.8,
+   "text": "Layers shows a few layers of the build at a time. It starts at the lowest one that is not finished.",
+   "title": "1  A window"
+  },
+  {
+   "t0": 3.8,
+   "t1": 8.6,
+   "text": "Scroll moves the window up and down the build.",
+   "title": "2  Move it"
+  },
+  {
+   "t0": 8.6,
+   "t1": 12.4,
+   "text": "Shift and scroll makes the window thicker or thinner.",
+   "title": "3  Thicker, thinner"
+  },
+  {
+   "t0": 12.4,
+   "t1": 17.0,
+   "text": "Click ends the tool and keeps what you see. In the tool, right click shows every layer again.",
+   "title": "4  Done"
+  }
+ ],
+ "chips": [
+  {
+   "t0": 1.6,
+   "t1": 12.4,
+   "rows": [
+    [
+     "Scroll",
+     "Move up / down"
+    ],
+    [
+     "Shift+Scroll",
+     "Thicker / thinner"
+    ],
+    [
+     "Click",
+     "Done"
+    ],
+    [
+     "Right click",
+     "Show all layers"
+    ]
+   ],
+   "lit": [
+    [
+     0,
+     4.2,
+     4.6
+    ],
+    [
+     0,
+     5.0,
+     5.4
+    ],
+    [
+     0,
+     5.8,
+     6.2
+    ],
+    [
+     0,
+     6.6,
+     7.0
+    ],
+    [
+     0,
+     7.6,
+     8.0
+    ],
+    [
+     1,
+     9.0,
+     9.4
+    ],
+    [
+     1,
+     9.8,
+     10.2
+    ],
+    [
+     1,
+     10.8,
+     11.2
+    ],
+    [
+     0,
+     11.6,
+     12.0
+    ],
+    [
+     2,
+     12.2,
+     12.4
+    ]
+   ]
+  },
+  {
+   "t0": 14.0,
+   "t1": 14.6,
+   "rows": [
+    [
+     "Scroll",
+     "Move up / down"
+    ],
+    [
+     "Shift+Scroll",
+     "Thicker / thinner"
+    ],
+    [
+     "Click",
+     "Done"
+    ],
+    [
+     "Right click",
+     "Show all layers"
+    ]
+   ],
+   "lit": [
+    [
+     3,
+     14.2,
+     14.6
+    ]
+   ]
+  }
+ ],
+ "overlays": [
+  {
+   "type": "box",
+   "t0": 1.6,
+   "t1": 12.4,
+   "from": [
+    3,
+    2,
+    3
+   ],
+   "to": [
+    8,
+    3,
+    8
+   ],
+   "fade": 0.25,
+   "keys": [
+    {
+     "t": 1.6,
+     "ease": "step",
+     "from": [
+      3,
+      2,
+      3
+     ],
+     "to": [
+      8,
+      3,
+      8
+     ]
+    },
+    {
+     "t": 4.2,
+     "ease": "step",
+     "from": [
+      3,
+      3,
+      3
+     ],
+     "to": [
+      8,
+      4,
+      8
+     ]
+    },
+    {
+     "t": 5.0,
+     "ease": "step",
+     "from": [
+      3,
+      4,
+      3
+     ],
+     "to": [
+      8,
+      5,
+      8
+     ]
+    },
+    {
+     "t": 5.8,
+     "ease": "step",
+     "from": [
+      3,
+      5,
+      3
+     ],
+     "to": [
+      8,
+      6,
+      8
+     ]
+    },
+    {
+     "t": 6.6,
+     "ease": "step",
+     "from": [
+      3,
+      6,
+      3
+     ],
+     "to": [
+      8,
+      7,
+      8
+     ]
+    },
+    {
+     "t": 7.6,
+     "ease": "step",
+     "from": [
+      3,
+      5,
+      3
+     ],
+     "to": [
+      8,
+      6,
+      8
+     ]
+    },
+    {
+     "t": 9.0,
+     "ease": "step",
+     "from": [
+      3,
+      5,
+      3
+     ],
+     "to": [
+      8,
+      7,
+      8
+     ]
+    },
+    {
+     "t": 9.8,
+     "ease": "step",
+     "from": [
+      3,
+      5,
+      3
+     ],
+     "to": [
+      8,
+      8,
+      8
+     ]
+    },
+    {
+     "t": 10.8,
+     "ease": "step",
+     "from": [
+      3,
+      5,
+      3
+     ],
+     "to": [
+      8,
+      7,
+      8
+     ]
+    },
+    {
+     "t": 11.6,
+     "ease": "step",
+     "from": [
+      3,
+      4,
+      3
+     ],
+     "to": [
+      8,
+      6,
+      8
+     ]
+    }
+   ]
+  },
+  {
+   "type": "box",
+   "t0": 14.0,
+   "t1": 14.6,
+   "from": [
+    3,
+    4,
+    3
+   ],
+   "to": [
+    8,
+    6,
+    8
+   ],
+   "fade": 0.1
+  },
+  {
+   "type": "label",
+   "t0": 1.6,
+   "t1": 4.2,
+   "at": [
+    5.5,
+    3.6,
+    5.5
+   ],
+   "text": "Layer 1 of 6",
+   "color": "cyan",
+   "fade": 0.1
+  },
+  {
+   "type": "label",
+   "t0": 4.2,
+   "t1": 5.0,
+   "at": [
+    5.5,
+    4.6,
+    5.5
+   ],
+   "text": "Layer 2 of 6",
+   "color": "cyan",
+   "fade": 0.1
+  },
+  {
+   "type": "label",
+   "t0": 5.0,
+   "t1": 5.8,
+   "at": [
+    5.5,
+    5.6,
+    5.5
+   ],
+   "text": "Layer 3 of 6",
+   "color": "cyan",
+   "fade": 0.1
+  },
+  {
+   "type": "label",
+   "t0": 5.8,
+   "t1": 6.6,
+   "at": [
+    5.5,
+    6.6,
+    5.5
+   ],
+   "text": "Layer 4 of 6",
+   "color": "cyan",
+   "fade": 0.1
+  },
+  {
+   "type": "label",
+   "t0": 6.6,
+   "t1": 7.6,
+   "at": [
+    5.5,
+    7.6,
+    5.5
+   ],
+   "text": "Layer 5 of 6",
+   "color": "cyan",
+   "fade": 0.1
+  },
+  {
+   "type": "label",
+   "t0": 7.6,
+   "t1": 9.0,
+   "at": [
+    5.5,
+    6.6,
+    5.5
+   ],
+   "text": "Layer 4 of 6",
+   "color": "cyan",
+   "fade": 0.1
+  },
+  {
+   "type": "label",
+   "t0": 9.0,
+   "t1": 9.8,
+   "at": [
+    5.5,
+    7.6,
+    5.5
+   ],
+   "text": "Layers 4 to 5 of 6",
+   "color": "cyan",
+   "fade": 0.1
+  },
+  {
+   "type": "label",
+   "t0": 9.8,
+   "t1": 10.8,
+   "at": [
+    5.5,
+    8.6,
+    5.5
+   ],
+   "text": "Layers 4 to 6 of 6",
+   "color": "cyan",
+   "fade": 0.1
+  },
+  {
+   "type": "label",
+   "t0": 10.8,
+   "t1": 11.6,
+   "at": [
+    5.5,
+    7.6,
+    5.5
+   ],
+   "text": "Layers 4 to 5 of 6",
+   "color": "cyan",
+   "fade": 0.1
+  },
+  {
+   "type": "label",
+   "t0": 11.6,
+   "t1": 12.4,
+   "at": [
+    5.5,
+    6.6,
+    5.5
+   ],
+   "text": "Layers 3 to 4 of 6",
+   "color": "cyan",
+   "fade": 0.1
+  }
+ ]
+}

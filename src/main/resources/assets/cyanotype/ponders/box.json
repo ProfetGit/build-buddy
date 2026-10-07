@@ -1,0 +1,724 @@
+{
+ "format": 1,
+ "id": "box",
+ "title": "Select a box",
+ "summary": "Click two corners, then drag the sides until the box holds your build; right click to save.",
+ "tags": [
+  "save",
+  "box",
+  "select",
+  "corner",
+  "area",
+  "size"
+ ],
+ "action": "box",
+ "duration": 17.0,
+ "stage": {
+  "size": [
+   11,
+   9,
+   11
+  ],
+  "focus": [
+   5.5,
+   3.6,
+   5.5
+  ]
+ },
+ "palette": {
+  "G": "minecraft:grass_block",
+  "D": "minecraft:dirt",
+  "c": "minecraft:cobblestone",
+  "p": "minecraft:oak_planks",
+  "l": "minecraft:oak_log",
+  "g": "minecraft:glass",
+  "n": "minecraft:spruce_stairs[facing=north]",
+  "s": "minecraft:spruce_stairs[facing=south]",
+  "t": "minecraft:spruce_slab[type=bottom]",
+  "u": "minecraft:spruce_planks",
+  "b": "minecraft:oak_door[facing=south,half=lower]",
+  "B": "minecraft:oak_door[facing=south,half=upper]"
+ },
+ "groups": [
+  {
+   "id": "ground",
+   "mode": "solid",
+   "pos": [
+    0,
+    0,
+    0
+   ],
+   "layers": [
+    [
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD"
+    ],
+    [
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG"
+    ]
+   ],
+   "start": "full"
+  },
+  {
+   "id": "cottage",
+   "mode": "solid",
+   "pos": [
+    3,
+    2,
+    3
+   ],
+   "layers": [
+    [
+     "ccccc",
+     "ccccc",
+     "ccccc",
+     "ccccc",
+     "ccccc"
+    ],
+    [
+     "lpppl",
+     "p...p",
+     "g...g",
+     "p...p",
+     "lpbpl"
+    ],
+    [
+     "lpgpl",
+     "p...p",
+     "p...p",
+     "p...p",
+     "lpBpl"
+    ],
+    [
+     "nnnnn",
+     "uuuuu",
+     "uuuuu",
+     "uuuuu",
+     "sssss"
+    ],
+    [
+     ".....",
+     "nnnnc",
+     "uuuuu",
+     "sssss",
+     "....."
+    ],
+    [
+     ".....",
+     "....c",
+     "ttttt",
+     ".....",
+     "....."
+    ]
+   ],
+   "start": "full"
+  }
+ ],
+ "tracks": {
+  "camera": [
+   {
+    "t": 0,
+    "yaw": 0.785,
+    "pitch": 0.55,
+    "zoom": 1.4,
+    "focus": [
+     5.5,
+     3.8,
+     5.5
+    ]
+   },
+   {
+    "t": 8.5,
+    "yaw": 0.93,
+    "ease": "inOut"
+   },
+   {
+    "t": 17,
+    "yaw": 0.785,
+    "ease": "inOut"
+   }
+  ],
+  "cursor": [
+   {
+    "t": 0,
+    "screen": [
+     0.85,
+     0.7
+    ],
+    "alpha": 0
+   },
+   {
+    "t": 0.5,
+    "alpha": 1,
+    "ease": "out"
+   },
+   {
+    "t": 1.8,
+    "at": [
+     2.5,
+     2.0,
+     2.5
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 2.2,
+    "down": true
+   },
+   {
+    "t": 2.38,
+    "down": false
+   },
+   {
+    "t": 4.6,
+    "at": [
+     8.5,
+     2.0,
+     8.5
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 5.0,
+    "down": true
+   },
+   {
+    "t": 5.18,
+    "down": false
+   },
+   {
+    "t": 8.6,
+    "screen": [
+     0.85,
+     0.7
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 9.4,
+    "at": [
+     1.1,
+     5.0,
+     5.5
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 9.6,
+    "down": true
+   },
+   {
+    "t": 10.5,
+    "at": [
+     2.1,
+     5.0,
+     5.5
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 10.6,
+    "down": false
+   },
+   {
+    "t": 10.9,
+    "at": [
+     5.5,
+     5.0,
+     1.1
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 11.0,
+    "down": true
+   },
+   {
+    "t": 11.9,
+    "at": [
+     5.5,
+     5.0,
+     2.1
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 11.95,
+    "down": false
+   },
+   {
+    "t": 12.6,
+    "alpha": 0,
+    "ease": "inOut"
+   }
+  ]
+ },
+ "captions": [
+  {
+   "t0": 0.0,
+   "t1": 4.2,
+   "text": "Open Save and choose Select a box. Click one corner.",
+   "title": "1  First corner"
+  },
+  {
+   "t0": 4.2,
+   "t1": 8.8,
+   "text": "Click the opposite corner. Scroll raises or lowers the box.",
+   "title": "2  Second corner"
+  },
+  {
+   "t0": 8.8,
+   "t1": 14.4,
+   "text": "Drag a side in, or scroll to shrink the side you face, until the box holds just your build.",
+   "title": "3  Fit it"
+  },
+  {
+   "t0": 14.4,
+   "t1": 17.0,
+   "text": "Right click to save it.",
+   "title": "4  Save"
+  }
+ ],
+ "chips": [
+  {
+   "t0": 0.4,
+   "t1": 4.2,
+   "rows": [
+    [
+     "Click",
+     "First corner"
+    ],
+    [
+     "V",
+     "Cancel"
+    ]
+   ],
+   "lit": [
+    [
+     0,
+     2.2,
+     2.6
+    ]
+   ]
+  },
+  {
+   "t0": 4.2,
+   "t1": 8.8,
+   "rows": [
+    [
+     "Click",
+     "Second corner"
+    ],
+    [
+     "Scroll",
+     "Raise / lower it"
+    ],
+    [
+     "Right click",
+     "Back"
+    ],
+    [
+     "V",
+     "Cancel"
+    ]
+   ],
+   "lit": [
+    [
+     0,
+     5.0,
+     5.4
+    ],
+    [
+     1,
+     6.0,
+     7.4
+    ]
+   ]
+  },
+  {
+   "t0": 8.8,
+   "t1": 14.4,
+   "rows": [
+    [
+     "Drag",
+     "Move the west side"
+    ],
+    [
+     "Scroll",
+     "Grow / shrink the box"
+    ],
+    [
+     "Right click",
+     "Save it..."
+    ],
+    [
+     "V",
+     "Cancel"
+    ]
+   ],
+   "lit": [
+    [
+     0,
+     9.6,
+     10.6
+    ],
+    [
+     0,
+     11.0,
+     12.0
+    ],
+    [
+     1,
+     12.5,
+     13.2
+    ]
+   ]
+  }
+ ],
+ "overlays": [
+  {
+   "type": "marker",
+   "t0": 2.2,
+   "t1": 5.0,
+   "at": [
+    2,
+    2,
+    2
+   ],
+   "beam": false,
+   "color": "cyan",
+   "fade": 0.1
+  },
+  {
+   "type": "box",
+   "t0": 5.1,
+   "t1": 14.6,
+   "from": [
+    2,
+    2,
+    2
+   ],
+   "to": [
+    9,
+    3,
+    9
+   ],
+   "fade": 0.2,
+   "keys": [
+    {
+     "t": 5.1,
+     "from": [
+      2,
+      2,
+      2
+     ],
+     "to": [
+      9,
+      3,
+      9
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 6.0,
+     "from": [
+      2,
+      2,
+      2
+     ],
+     "to": [
+      9,
+      4,
+      9
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 6.3,
+     "from": [
+      2,
+      2,
+      2
+     ],
+     "to": [
+      9,
+      5,
+      9
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 6.6,
+     "from": [
+      2,
+      2,
+      2
+     ],
+     "to": [
+      9,
+      6,
+      9
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 6.9,
+     "from": [
+      2,
+      2,
+      2
+     ],
+     "to": [
+      9,
+      7,
+      9
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 7.2,
+     "from": [
+      2,
+      2,
+      2
+     ],
+     "to": [
+      9,
+      8,
+      9
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 9.6,
+     "from": [
+      2,
+      2,
+      2
+     ],
+     "to": [
+      9,
+      8,
+      9
+     ]
+    },
+    {
+     "t": 10.5,
+     "from": [
+      3,
+      2,
+      2
+     ],
+     "to": [
+      9,
+      8,
+      9
+     ],
+     "ease": "inOut"
+    },
+    {
+     "t": 11.0,
+     "from": [
+      3,
+      2,
+      2
+     ],
+     "to": [
+      9,
+      8,
+      9
+     ]
+    },
+    {
+     "t": 11.9,
+     "from": [
+      3,
+      2,
+      3
+     ],
+     "to": [
+      9,
+      8,
+      9
+     ],
+     "ease": "inOut"
+    },
+    {
+     "t": 12.5,
+     "from": [
+      3,
+      2,
+      3
+     ],
+     "to": [
+      8,
+      8,
+      9
+     ],
+     "ease": "step"
+    },
+    {
+     "t": 13.0,
+     "from": [
+      3,
+      2,
+      3
+     ],
+     "to": [
+      8,
+      8,
+      8
+     ],
+     "ease": "step"
+    }
+   ]
+  },
+  {
+   "type": "arrow",
+   "t0": 9.0,
+   "t1": 10.9,
+   "at": [
+    2,
+    5,
+    5.5
+   ],
+   "dir": "-x",
+   "len": 1.9,
+   "fade": 0.2,
+   "keys": [
+    {
+     "t": 9.0,
+     "at": [
+      2,
+      5,
+      5.5
+     ]
+    },
+    {
+     "t": 9.6,
+     "at": [
+      2,
+      5,
+      5.5
+     ],
+     "hot": 1
+    },
+    {
+     "t": 10.5,
+     "ease": "inOut",
+     "at": [
+      3,
+      5,
+      5.5
+     ]
+    },
+    {
+     "t": 10.8,
+     "hot": 0
+    }
+   ]
+  },
+  {
+   "type": "arrow",
+   "t0": 10.9,
+   "t1": 12.2,
+   "at": [
+    5.5,
+    5,
+    2
+   ],
+   "dir": "-z",
+   "len": 1.9,
+   "fade": 0.2,
+   "keys": [
+    {
+     "t": 10.9,
+     "at": [
+      5.5,
+      5,
+      2
+     ]
+    },
+    {
+     "t": 11.0,
+     "at": [
+      5.5,
+      5,
+      2
+     ],
+     "hot": 1
+    },
+    {
+     "t": 11.9,
+     "ease": "inOut",
+     "at": [
+      5.5,
+      5,
+      3
+     ]
+    },
+    {
+     "t": 12.1,
+     "hot": 0
+    }
+   ]
+  },
+  {
+   "type": "label",
+   "t0": 7.4,
+   "t1": 9.2,
+   "at": [
+    5.5,
+    10.4,
+    5.5
+   ],
+   "text": "6 layers tall",
+   "color": "cyan",
+   "fade": 0.2
+  },
+  {
+   "type": "label",
+   "t0": 13.2,
+   "t1": 14.6,
+   "at": [
+    5.5,
+    10.4,
+    5.5
+   ],
+   "text": "5 x 6 x 5",
+   "color": "cyan",
+   "fade": 0.2
+  }
+ ],
+ "panels": [
+  {
+   "type": "save",
+   "t0": 14.8,
+   "t1": 16.6,
+   "name": "My cottage",
+   "typed": 10,
+   "hot": 0,
+   "tags": "house, wood",
+   "fade": 0.4
+  }
+ ]
+}

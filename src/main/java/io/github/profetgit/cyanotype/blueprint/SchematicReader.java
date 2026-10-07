@@ -153,7 +153,7 @@ public final class SchematicReader {
     }
 
     /** "minecraft:oak_stairs[facing=east,half=bottom]" as a palette entry {Name, Properties}. */
-    static CompoundTag stateTag(String state) {
+    public static CompoundTag stateTag(String state) {
         CompoundTag tag = new CompoundTag();
         int bracket = state.indexOf('[');
         String name = (bracket < 0 ? state : state.substring(0, bracket)).trim();

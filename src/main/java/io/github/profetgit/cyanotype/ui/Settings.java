@@ -39,6 +39,9 @@ public final class Settings {
         // Auto-place
         public int autoRate = io.github.profetgit.cyanotype.auto.Rate.DEFAULT;
         public boolean autoTurn = false;
+        // Lessons ("How it works"): shown the first time a tool is used; the ids already seen
+        public boolean lessons = true;
+        public java.util.List<String> lessonsSeen = new java.util.ArrayList<>();
         // Advanced
         public boolean showNames = true;
         /** The author last typed on the Save screen; empty = the player's name. */
@@ -85,6 +88,7 @@ public final class Settings {
         data.autoRate = io.github.profetgit.cyanotype.auto.Rate.clamp(data.autoRate);
         if (!"on".equals(data.community) && !"off".equals(data.community)) data.community = "ask";
         data.communityUrl = data.communityUrl == null ? "" : data.communityUrl.trim();
+        if (data.lessonsSeen == null) data.lessonsSeen = new java.util.ArrayList<>();
     }
 
     /** Pushes the settings into the parts that use them. */

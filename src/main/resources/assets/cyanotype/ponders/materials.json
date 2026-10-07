@@ -1,0 +1,626 @@
+{
+ "format": 1,
+ "id": "materials",
+ "title": "What you still need",
+ "summary": "Materials lists what the build needs, what you carry and what is left to get; click a row to see where it goes.",
+ "tags": [
+  "materials",
+  "list",
+  "shopping",
+  "inventory",
+  "need",
+  "have",
+  "gold",
+  "copy"
+ ],
+ "action": "materials",
+ "duration": 16.5,
+ "stage": {
+  "size": [
+   11,
+   9,
+   11
+  ],
+  "focus": [
+   6.4,
+   3.2,
+   4.6
+  ]
+ },
+ "palette": {
+  "G": "minecraft:grass_block",
+  "D": "minecraft:dirt",
+  "c": "minecraft:cobblestone",
+  "p": "minecraft:oak_planks",
+  "l": "minecraft:oak_log",
+  "g": "minecraft:glass",
+  "n": "minecraft:spruce_stairs[facing=north]",
+  "s": "minecraft:spruce_stairs[facing=south]",
+  "t": "minecraft:spruce_slab[type=bottom]",
+  "u": "minecraft:spruce_planks",
+  "b": "minecraft:oak_door[facing=south,half=lower]",
+  "B": "minecraft:oak_door[facing=south,half=upper]"
+ },
+ "groups": [
+  {
+   "id": "ground",
+   "mode": "solid",
+   "pos": [
+    0,
+    0,
+    0
+   ],
+   "layers": [
+    [
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD"
+    ],
+    [
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG"
+    ]
+   ],
+   "start": "full"
+  },
+  {
+   "id": "ghost",
+   "mode": "ghost",
+   "pos": [
+    3,
+    2,
+    3
+   ],
+   "layers": [
+    [
+     "ccccc",
+     "ccccc",
+     "ccccc",
+     "ccccc",
+     "ccccc"
+    ],
+    [
+     "lpppl",
+     "p...p",
+     "g...g",
+     "p...p",
+     "lpbpl"
+    ],
+    [
+     "lpgpl",
+     "p...p",
+     "p...p",
+     "p...p",
+     "lpBpl"
+    ],
+    [
+     "nnnnn",
+     "uuuuu",
+     "uuuuu",
+     "uuuuu",
+     "sssss"
+    ],
+    [
+     ".....",
+     "nnnnc",
+     "uuuuu",
+     "sssss",
+     "....."
+    ],
+    [
+     ".....",
+     "....c",
+     "ttttt",
+     ".....",
+     "....."
+    ]
+   ],
+   "start": "full"
+  }
+ ],
+ "tracks": {
+  "camera": [
+   {
+    "t": 0,
+    "yaw": 0.785,
+    "pitch": 0.55,
+    "zoom": 1.5,
+    "focus": [
+     6.4,
+     3.2,
+     4.6
+    ]
+   },
+   {
+    "t": 8,
+    "yaw": 0.9,
+    "ease": "inOut"
+   },
+   {
+    "t": 16.5,
+    "yaw": 0.785,
+    "ease": "inOut"
+   }
+  ],
+  "cursor": [
+   {
+    "t": 0,
+    "screen": [
+     0.9,
+     0.8
+    ],
+    "alpha": 0
+   },
+   {
+    "t": 4.4,
+    "alpha": 1,
+    "ease": "out"
+   },
+   {
+    "t": 5.3,
+    "panel": [
+     "list",
+     2
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 5.6,
+    "down": true
+   },
+   {
+    "t": 5.78,
+    "down": false
+   },
+   {
+    "t": 7.3,
+    "panel": [
+     "list",
+     0
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 7.6,
+    "down": true
+   },
+   {
+    "t": 7.78,
+    "down": false
+   },
+   {
+    "t": 14.0,
+    "screen": [
+     0.75,
+     0.86
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 14.4,
+    "screen": [
+     0.55,
+     0.86
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 14.6,
+    "down": true
+   },
+   {
+    "t": 15.1,
+    "down": false
+   },
+   {
+    "t": 15.6,
+    "alpha": 0,
+    "ease": "inOut"
+   }
+  ]
+ },
+ "captions": [
+  {
+   "t0": 0.0,
+   "t1": 4.6,
+   "text": "Materials counts what the build still needs and what you carry. The biggest shortage comes first.",
+   "title": "1  The list"
+  },
+  {
+   "t0": 4.6,
+   "t1": 9.8,
+   "text": "Click a row and the blocks that use it light up gold in the world.",
+   "title": "2  Where it goes"
+  },
+  {
+   "t0": 9.8,
+   "t1": 14.0,
+   "text": "As you gather blocks the list follows. Enough means you have them all.",
+   "title": "3  Gather"
+  },
+  {
+   "t0": 14.0,
+   "t1": 16.5,
+   "text": "Copy list or Save file takes the shopping list with you.",
+   "title": "4  Take it along"
+  }
+ ],
+ "overlays": [
+  {
+   "type": "tint",
+   "t0": 5.8,
+   "t1": 7.6,
+   "group": "ghost",
+   "key": "p",
+   "color": "gold",
+   "alpha": 0.7,
+   "pulse": true,
+   "fade": 0.15
+  },
+  {
+   "type": "tint",
+   "t0": 7.8,
+   "t1": 9.4,
+   "group": "ghost",
+   "key": "c",
+   "color": "gold",
+   "alpha": 0.7,
+   "pulse": true,
+   "fade": 0.15
+  },
+  {
+   "type": "label",
+   "t0": 6.0,
+   "t1": 7.6,
+   "at": [
+    5.5,
+    5.2,
+    8.6
+   ],
+   "text": "Oak planks go here",
+   "color": "gold",
+   "fade": 0.2
+  },
+  {
+   "type": "label",
+   "t0": 8.0,
+   "t1": 9.4,
+   "at": [
+    5.5,
+    2.4,
+    8.6
+   ],
+   "text": "Cobblestone goes here",
+   "color": "gold",
+   "fade": 0.2
+  }
+ ],
+ "panels": [
+  {
+   "type": "list",
+   "t0": 0.5,
+   "t1": 16.0,
+   "title": "Materials  Cottage",
+   "header": [
+    "Material",
+    "Need",
+    "Have",
+    "To get"
+   ],
+   "rows": [
+    [
+     "Cobblestone",
+     "27",
+     "0",
+     "27"
+    ],
+    [
+     "Spruce planks",
+     "20",
+     "0",
+     "20"
+    ],
+    [
+     "Oak planks",
+     "19",
+     "0",
+     "19"
+    ],
+    [
+     "Spruce stairs",
+     "19",
+     "0",
+     "19"
+    ],
+    [
+     "Oak log",
+     "8",
+     "0",
+     "8"
+    ],
+    [
+     "Spruce slab",
+     "5",
+     "0",
+     "5"
+    ],
+    [
+     "Glass",
+     "3",
+     "0",
+     "3"
+    ],
+    [
+     "Oak door",
+     "1",
+     "0",
+     "1"
+    ]
+   ],
+   "hot": -1,
+   "rect": [
+    0.47,
+    0.03,
+    0.52,
+    0.9
+   ],
+   "buttons": [
+    "Copy list",
+    "Save file"
+   ],
+   "lit": -1,
+   "fade": 0.4,
+   "states": [
+    {
+     "t": 5.6,
+     "hot": 2
+    },
+    {
+     "t": 7.6,
+     "hot": 0
+    },
+    {
+     "t": 9.4,
+     "hot": -1
+    },
+    {
+     "t": 10.2,
+     "rows": [
+      [
+       "Cobblestone",
+       "27",
+       "27",
+       "enough"
+      ],
+      [
+       "Spruce planks",
+       "20",
+       "0",
+       "20"
+      ],
+      [
+       "Oak planks",
+       "19",
+       "0",
+       "19"
+      ],
+      [
+       "Spruce stairs",
+       "19",
+       "0",
+       "19"
+      ],
+      [
+       "Oak log",
+       "8",
+       "0",
+       "8"
+      ],
+      [
+       "Spruce slab",
+       "5",
+       "0",
+       "5"
+      ],
+      [
+       "Glass",
+       "3",
+       "0",
+       "3"
+      ],
+      [
+       "Oak door",
+       "1",
+       "0",
+       "1"
+      ]
+     ]
+    },
+    {
+     "t": 11.4,
+     "rows": [
+      [
+       "Cobblestone",
+       "27",
+       "27",
+       "enough"
+      ],
+      [
+       "Spruce planks",
+       "20",
+       "0",
+       "20"
+      ],
+      [
+       "Oak planks",
+       "19",
+       "19",
+       "enough"
+      ],
+      [
+       "Spruce stairs",
+       "19",
+       "0",
+       "19"
+      ],
+      [
+       "Oak log",
+       "8",
+       "0",
+       "8"
+      ],
+      [
+       "Spruce slab",
+       "5",
+       "0",
+       "5"
+      ],
+      [
+       "Glass",
+       "3",
+       "0",
+       "3"
+      ],
+      [
+       "Oak door",
+       "1",
+       "0",
+       "1"
+      ]
+     ]
+    },
+    {
+     "t": 12.4,
+     "rows": [
+      [
+       "Cobblestone",
+       "27",
+       "27",
+       "enough"
+      ],
+      [
+       "Spruce planks",
+       "20",
+       "0",
+       "20"
+      ],
+      [
+       "Oak planks",
+       "19",
+       "19",
+       "enough"
+      ],
+      [
+       "Spruce stairs",
+       "19",
+       "0",
+       "19"
+      ],
+      [
+       "Oak log",
+       "8",
+       "8",
+       "enough"
+      ],
+      [
+       "Spruce slab",
+       "5",
+       "0",
+       "5"
+      ],
+      [
+       "Glass",
+       "3",
+       "3",
+       "enough"
+      ],
+      [
+       "Oak door",
+       "1",
+       "0",
+       "1"
+      ]
+     ]
+    },
+    {
+     "t": 14.6,
+     "lit": 0
+    },
+    {
+     "t": 15.2,
+     "lit": -1
+    },
+    {
+     "t": 15.6,
+     "rows": [
+      [
+       "Cobblestone",
+       "27",
+       "0",
+       "27"
+      ],
+      [
+       "Spruce planks",
+       "20",
+       "0",
+       "20"
+      ],
+      [
+       "Oak planks",
+       "19",
+       "0",
+       "19"
+      ],
+      [
+       "Spruce stairs",
+       "19",
+       "0",
+       "19"
+      ],
+      [
+       "Oak log",
+       "8",
+       "0",
+       "8"
+      ],
+      [
+       "Spruce slab",
+       "5",
+       "0",
+       "5"
+      ],
+      [
+       "Glass",
+       "3",
+       "0",
+       "3"
+      ],
+      [
+       "Oak door",
+       "1",
+       "0",
+       "1"
+      ]
+     ]
+    }
+   ]
+  }
+ ]
+}
