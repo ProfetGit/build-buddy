@@ -141,6 +141,35 @@ class ShippedLessonsTest {
     }
 
     @Test
+    void theGroundSlabIsNeverCutByTheFrameAtEitherLayout() {
+        // the picture is about 1.8 : 1 on a big window and about 1.45 : 1 in the compact layout; the slab all lessons stand on must be whole in both
+        List<String> cut = new ArrayList<>();
+        for (Scene s : LESSONS) {
+            Scene.Group ground = s.groups.stream().filter(g -> g.id.equals("ground")).findFirst().orElse(null);
+            if (ground == null) continue;
+            double worst = 0;
+            for (double aspect : new double[]{1.45, 1.8}) {
+                int h = 360, w = (int) Math.round(h * aspect);
+                for (double t = 0; t <= s.duration; t += 0.5) {
+                    Snapshot snap = Evaluator.at(s, t);
+                    StageRaster.Camera cam = StageRaster.camera(s, snap, w, h);
+                    for (int cx = 0; cx < 2; cx++) {
+                        for (int cy = 0; cy < 2; cy++) {
+                            for (int cz = 0; cz < 2; cz++) {
+                                double[] p = cam.project(ground.pos[0] + cx * ground.sx, ground.pos[1] + cy * ground.sy, ground.pos[2] + cz * ground.sz);
+                                double over = Math.max(Math.max(w * s.frame[0] + 1 - p[0], p[0] - (w * s.frame[2] - 1)), Math.max(h * s.frame[1] + 1 - p[1], p[1] - (h * s.frame[3] - 1)));
+                                if (over > worst) worst = over;
+                            }
+                        }
+                    }
+                }
+            }
+            if (worst > 0) cut.add(s.id + " (" + Math.round(worst) + " px of 360 out)");
+        }
+        assertTrue(cut.isEmpty(), "the frame cuts the ground slab in: " + cut);
+    }
+
+    @Test
     void theBuildingLessonsBuildEverythingTheirGhostShows() {
         // by the end of the building lessons every block of the ghost has been matched at some moment: nothing is left red
         for (String id : List.of("build", "auto", "paste")) {

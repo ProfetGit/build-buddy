@@ -17,16 +17,17 @@ def place():
     where the ghost goes, how it turns, what a lift and a mirror do and where the crosshair was are what the mod really did.
     The words, the camera, the Library card and the little pictures are written here and hang on the take's marks."""
     take = Take(Recording.load("place"), 0.0)
-    take.offset = 1.9 - take.rec.t("appear")          # the ghost appears at 1.9 s of the lesson
+    D = 1.3                                          # the Library stays on screen a little longer: a first-time reader needs it
+    take.offset = 1.9 + D - take.rec.t("appear")     # the ghost appears at 3.2 s of the lesson
     T = take.T
     L = Lesson("place", "Place a blueprint", "Pick a blueprint, turn it, lift it, mirror it and click to put it down.", action="place",
-               tags=["library", "ghost", "turn", "lift", "mirror", "lock", "place"], duration=18.0, size=(11, 9, 11), focus=[5.5, 3.2, 5.5])
+               tags=["library", "ghost", "turn", "lift", "mirror", "lock", "place"], duration=18.0 + D, size=(11, 9, 11), focus=[5.5, 3.2, 5.5])
     stage(L)
     cottage_keys(L)
     L.group("ghost", COTTAGE, pos=[0, TOP, 0], mode="ghost")
     L.cam(0, yaw=0.785, pitch=0.55, zoom=1.6, focus=[5.5, 3.2, 5.5])
-    L.cam(9, ease="inOut", yaw=0.90)
-    L.cam(18, ease="inOut", yaw=0.785)
+    L.cam(9 + D / 2, ease="inOut", yaw=0.90)
+    L.cam(18 + D, ease="inOut", yaw=0.785)
 
     # the ghost: the recorded transform, between its appearing and the end of the take, then it fades so the lesson loops
     appear, end = T("appear"), take.rec.duration + take.offset
@@ -34,33 +35,37 @@ def place():
     L.move("ghost", appear, ease="step", visible=1)
     L.move("ghost", appear + 0.4, ease="out", alpha=1)
     pos, turn = take.apply_ghost(L, "ghost", "Cottage")
-    L.move("ghost", 17.0, alpha=1)
-    L.move("ghost", 17.6, ease="inOut", alpha=0)
-    L.move("ghost", 17.7, ease="step", visible=0, turn=0)
-    L.move("ghost", 17.7, mirror=0)
+    L.move("ghost", 17.0 + D, alpha=1)
+    L.move("ghost", 17.6 + D, ease="inOut", alpha=0)
+    L.move("ghost", 17.7 + D, ease="step", visible=0, turn=0)
+    L.move("ghost", 17.7 + D, mirror=0)
 
     # the cursor: the card of the Library, then the crosshair of the take
     L.cursor(0, screen=[0.7, 0.62], alpha=0)
-    L.cursor(0.3, ease="out", alpha=1)
-    L.cursor(0.9, ease="inOut", panel=["library", 0])
-    L.click(1.1)
+    L.cursor(0.4, ease="out", alpha=1)
+    L.cursor(1.5, ease="inOut", panel=["library", 0])
+    L.click(1.9)
     first = take.rec.aim()[0]
     L.cursor(appear, ease="inOut", at=[first["x"], first["y"], first["z"]])
     take.cursor(L, until=T("done") + 0.5, after=appear + 0.05)
-    L.cursor(17.0, ease="inOut", alpha=0)
-    L.cursor(18.0, ease="inOut", screen=[0.7, 0.62], alpha=0)
-    L.panel("library", 0.0, appear, cards=["Cottage", "Barn", "Windmill"], keys=[{"t": 0, "hot": -1}, {"t": 0.9, "hot": 0}])
+    L.cursor(17.0 + D, ease="inOut", alpha=0)
+    L.cursor(18.0 + D, ease="inOut", screen=[0.7, 0.62], alpha=0)
+    L.panel("library", 0.0, appear, cards=["Cottage", "Barn", "Windmill"], keys=[{"t": 0, "hot": -1}, {"t": 1.5, "hot": 0}])
 
     # the steps hang on the marks
+    for m in ("turn1", "turn2", "lift_up", "lift_down"):
+        L.sound(T(m), "wheel_tick", 0.8)
+    L.sound(T("mirror"), "ui_press", 0.8)
+    L.sound(T("lock"), "lock")
     s2, s3, s4 = T("turn1") - 0.5, T("lift_up") - 0.6, T("lock") - 0.8
     L.caption(0.0, s2, "Pick a blueprint in the Library. It follows where you look.", "1  Pick it")
     L.caption(s2, s3, "Scroll to turn it a quarter at a time.", "2  Turn it")
     L.caption(s3, s4, "Shift and scroll lifts it, M mirrors it.", "3  Lift or mirror it")
-    L.caption(s4, 18.0, "Click to put it down. It settles and stays where you left it.", "4  Lock it")
+    L.caption(s4, 18.0 + D, "Click to put it down. It settles and stays where you left it.", "4  Lock it")
     rows = [["Scroll", "Turn"], ["Shift+Scroll", "Up / down"], ["M", "Mirror"], ["Click", "Lock in place"], ["V", "Cancel"], J]
     lit = [(0, T("turn1"), T("turn1") + 0.7), (0, T("turn2"), T("turn2") + 0.7), (1, T("lift_up"), T("lift_up") + 0.6), (1, T("lift_down"), T("lift_down") + 0.6),
            (2, T("mirror"), T("mirror") + 0.6), (3, T("lock"), T("lock") + 0.6)]
-    L.chips(appear + 0.3, 18.0, rows, lit=lit)
+    L.chips(appear + 0.3, 18.0 + D, rows, lit=lit)
 
     # how far it is lifted: a line from the ground to the ghost, while it is up
     up0, up1 = T("lift_up"), T("lift_down") + 0.9
@@ -74,7 +79,7 @@ def place():
         keys.append(k)
     L.overlay("dim", up0 - 0.05, up1, a=ground, b=ground, text="+1", color="gold", keys=keys)
     fx = pos.ks[-1][1]
-    L.overlay("label", T("lock") + 0.9, 17.0, at=[fx[0] + 2.5, TOP + 6.6, fx[2] + 2.5], text="Locked", color="green")
+    L.overlay("label", T("lock") + 0.9, 17.0 + D, at=[fx[0] + 2.5, TOP + 6.6, fx[2] + 2.5], text="Locked", color="green")
     return L
 
 
@@ -125,6 +130,10 @@ def edit():
     # the cursor rides on the thing it moves
     tip = (5.8, 3, 2.5)
     L.cursor(0, screen=[0.82, 0.55], alpha=0)
+    for m in ("drag_east", "drag_ring", "carry"):
+        L.sound(T(m) - 0.15, "ui_press", 0.8)
+    for m in ("drop_east", "drop_ring", "drop_body"):
+        L.sound(T(m), "snap")
     L.cursor(T("grab_east") - 0.9, ease="out", alpha=1)
     L.cursor(T("grab_east"), ease="inOut", at=add(pos.value_at(T("grab_east")), tip))
     L.cursor(T("drag_east") - 0.2, down=True)
@@ -214,6 +223,10 @@ def layers():
             text = f"Layer {w[0] + 1} of 6" if w[0] == w[1] else f"Layers {w[0] + 1} to {w[1] + 1} of 6"
             L.overlay("label", t, end, at=[C[0] + 2.5, C[1] + w[1] + 1.6, C[2] + 2.5], text=text, color="cyan", fade=0.1)
 
+    for m in ("up1", "up2", "up3", "up4", "down1", "down2", "thick1", "thick2", "thin1"):
+        L.sound(T(m), "wheel_tick", 0.8)
+    L.sound(T("click"), "ui_press", 0.8)
+    L.sound(T("right"), "ui_press", 0.8)
     s2, s3, s4 = T("up1") - 0.6, T("thick1") - 0.6, T("click") - 0.7
     L.caption(0.0, s2, "Layers shows a few layers of the build at a time. It starts at the lowest one that is not finished.", "1  A window")
     L.caption(s2, s3, "Scroll moves the window up and down the build.", "2  Move it")
@@ -261,7 +274,7 @@ def build():
         if i + 1 < len(nxt):
             marker_keys.append({"t": times[i], "ease": "step", "at": [C[0] + nxt[i + 1][0], C[1] + 2, C[2] + nxt[i + 1][2]]})
     L.overlay("marker", 13.4, 17.6, at=[C[0] + nxt[0][0], C[1] + 2, C[2] + nxt[0][2]], keys=marker_keys, fade=0.3)
-    L.overlay("label", 13.6, 17.4, at=[C[0] + 2.5, C[1] + 6.4, C[2] + 2.5], text="Next block", color="gold", fade=0.3)
+    L.overlay("label", 13.6, 17.4, at=[C[0] + 5.9, C[1] + 2.6, C[2] + 2.5], text="Next block", color="gold", anchor="left", fade=0.3)
     # the rest, then the reset
     B.go(17.9, cells_of(COTTAGE), 0.03)
     L.clear("real", 21.2, anim="fade", dur=0.5, all=True)
@@ -270,7 +283,8 @@ def build():
     L.panel("bar", 0.4, 21.0, label="Cottage", value=0, done=True, keys=[
         {"t": 4.6, "value": 0}, {"t": 6.4, "value": 0.05}, {"t": 8.2, "value": 0.24}, {"t": 9.6, "value": 0.24}, {"t": 10.8, "value": 0.38}, {"t": 12.2, "value": 0.37},
         {"t": 12.9, "value": 0.40}, {"t": 17.6, "value": 0.46}, {"t": 20.6, "value": 1.0}], fade=0.4)
-    L.panel("stamp", 20.6, 21.4, text="DONE", color="green", size=2, fade=0.1)
+    L.panel("stamp", 20.6, 21.4, text="DONE", color="green", rect=[0.58, 0.06, 0.2, 0.16], fade=0.1)
+    L.sound(20.6, "complete")
 
     L.caption(0.0, 4.4, "The ghost shows what is still missing. The bar counts what you have built.", "1  Check")
     L.caption(4.4, 9.4, "Place a block where the ghost is and the ghost lets go of it.", "2  Build")
@@ -320,7 +334,8 @@ def auto():
     walk = Follow(L, "ghost", "alpha")  # unused placeholder to keep the Follow import honest
     av_keys = [{"t": 5.6, "at": [9.6, 2, 10.4], "yaw": 2}, {"t": 6.8, "at": [5.5, 2, 10.4], "yaw": 2}, {"t": 9.8, "at": [5.5, 2, 10.4], "yaw": 2},
                {"t": 10.6, "at": [9.4, 2, 6.0], "yaw": 3}, {"t": 11.4, "at": [5.5, 2, 1.7], "yaw": 0}, {"t": 13.2, "at": [5.5, 2, 1.7], "yaw": 0}]
-    L.overlay("avatar", 5.6, 13.6, at=av_keys[0]["at"], yaw=2, keys=av_keys, fade=0.3)
+    walk_keys = [{"t": 5.6, "walk": 1}, {"t": 6.5, "walk": 1}, {"t": 6.9, "walk": 0}, {"t": 9.7, "walk": 0}, {"t": 10.0, "walk": 1}, {"t": 11.2, "walk": 1}, {"t": 11.6, "walk": 0}]
+    L.overlay("avatar", 5.6, 13.6, at=av_keys[0]["at"], yaw=2, keys=av_keys + walk_keys, fade=0.3)
     L.overlay("disc", 5.6, 13.6, center=av_keys[0]["at"], radius=reach, keys=[{"t": k["t"], "center": k["at"]} for k in av_keys], fade=0.3)
     all_cells = cells_of(COTTAGE)
 
@@ -334,7 +349,8 @@ def auto():
     second = [c for c in all_cells if in_reach(c, stops[1])]
     second.sort(key=lambda c: (c[1], (centre(c)[0] - stops[1][0]) ** 2 + (centre(c)[1] - stops[1][1]) ** 2))
     B.go(11.6, second, 0.04)
-    L.panel("stamp", 1.4, 13.6, text="AUTO: ON", color="gold", size=1, rect=[0.74, 0.03, 0.24, 0.1], fade=0.3)
+    L.panel("badge", 1.4, 5.6, title="AUTO: ON", right="Assist  20/s", status="Placed 15", color="cyan", rect=[0.72, 0.03, 0.26, 0.085], fade=0.3)
+    L.panel("badge", 5.6, 13.6, title="AUTO: ON", right="Sweep  4/s", status="Building what is in reach", color="cyan", rect=[0.72, 0.03, 0.26, 0.085], fade=0.3)
 
     # the server warning
     L.panel("warning", 13.9, 19.0, title="Auto-placing on a server",
@@ -355,17 +371,17 @@ def auto():
 
 def materials():
     L = Lesson("materials", "What you still need", "Materials lists what the build needs, what you carry and what is left to get; click a row to see where it goes.", action="materials",
-               tags=["materials", "list", "shopping", "inventory", "need", "have", "gold", "copy"], duration=16.5, size=(11, 9, 11), focus=[8.4, 3.2, -4.6])
-    stage(L)
+               tags=["materials", "list", "shopping", "inventory", "need", "have", "gold", "copy"], duration=16.5, size=(9, 9, 9), focus=[4.5, 3.2, 4.5], frame=[0.0, 0.0, 0.36, 1.0])
+    stage(L, 9, 9)
     cottage_keys(L)
-    C = [3, 2, 3]
+    C = [2, 2, 2]
     L.group("ghost", COTTAGE, pos=C, mode="ghost")
-    L.cam(0, yaw=0.785, pitch=0.55, zoom=1.05, focus=[8.4, 3.2, -4.6])
+    L.cam(0, yaw=0.785, pitch=0.55, zoom=1.2, focus=[4.5, 3.2, 4.5])
     L.cam(8, ease="inOut", yaw=0.9)
     L.cam(16.5, ease="inOut", yaw=0.785)
     header = ["Material", "Need", "Have", "To get"]
-    rows0 = [["Cobblestone", "27", "0", "27"], ["Spruce planks", "20", "0", "20"], ["Oak planks", "19", "0", "19"], ["Spruce stairs", "19", "0", "19"], ["Oak log", "8", "0", "8"],
-             ["Spruce slab", "5", "0", "5"], ["Glass", "3", "0", "3"], ["Oak door", "1", "0", "1"]]
+    rows0 = [["Cobblestone", "27", "0", "27"], ["Bricks", "20", "0", "20"], ["Oak planks", "19", "0", "19"], ["Brick stairs", "19", "0", "19"], ["Oak log", "8", "0", "8"],
+             ["Brick slab", "5", "0", "5"], ["Glass", "3", "0", "3"], ["Oak door", "1", "0", "1"]]
     rows1 = [list(r) for r in rows0]
     rows1[0][2], rows1[0][3] = "27", "enough"
     rows2 = [list(r) for r in rows1]
@@ -443,7 +459,7 @@ def pick():
     L.cursor(17.8, ease="inOut", panel=["save", 0])
     L.click(18.3, hold=0.3)
     L.cursor(19.2, ease="inOut", alpha=0)
-    L.panel("stamp", 18.7, 20.0, text="Saved to your Library", color="green", size=1, rect=[0.2, 0.04, 0.6, 0.12], fade=0.2)
+    L.panel("badge", 18.7, 20.0, title="Saved", status="My cottage is in your Library", color="green", icon="check", rect=[0.3, 0.03, 0.4, 0.085], fade=0.2)
 
     L.caption(0.0, 4.4, "Open Save and choose Pick a build. Aim at the build and click once.", "1  Click it")
     L.caption(4.4, 9.4, "A box fits itself round the build, leaving out the tree, the fence and the lawn.", "2  The box")

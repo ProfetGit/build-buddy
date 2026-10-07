@@ -172,4 +172,21 @@ class SceneReaderTest {
             return new List3(a, b, c);
         }
     }
+
+    @Test
+    void readsSoundsAndRejectsStrangeOnes() {
+        Scene s = SceneReader.read(with("\"captions\":", "\"sounds\":[{\"t\":2,\"name\":\"lock\"},{\"t\":1,\"name\":\"ui_press\",\"volume\":0.5,\"pitch\":1.2}],\"captions\":"));
+        assertEquals(2, s.sounds.size());
+        assertEquals("ui_press", s.sounds.get(0).name(), "kept in time order");
+        assertEquals(1.2f, s.sounds.get(0).pitch(), 1e-6);
+        assertTrue(bad(with("\"captions\":", "\"sounds\":[{\"t\":2,\"name\":\"boom\"}],\"captions\":")).getMessage().contains("sounds[0].name"));
+        assertTrue(bad(with("\"captions\":", "\"sounds\":[{\"t\":12,\"name\":\"lock\"}],\"captions\":")).getMessage().contains("sounds[0].t"));
+    }
+
+    @Test
+    void theFrameOfTheStageIsFractionsOfThePicture() {
+        assertEquals(0.4, SceneReader.read(withFirst("\"focus\":[3,1,3]}", "\"focus\":[3,1,3],\"frame\":[0,0,0.4,1]}")).frame[2], 1e-9);
+        assertEquals(1.0, SceneReader.read(GOOD).frame[2], 1e-9, "the whole picture by default");
+        assertTrue(bad(withFirst("\"focus\":[3,1,3]}", "\"focus\":[3,1,3],\"frame\":[0,0,0.1,1]}")).getMessage().contains("stage.frame"));
+    }
 }

@@ -17,14 +17,20 @@
  "duration": 16.5,
  "stage": {
   "size": [
-   11,
    9,
-   11
+   9,
+   9
   ],
   "focus": [
-   8.4,
+   4.5,
    3.2,
-   -4.6
+   4.5
+  ],
+  "frame": [
+   0.0,
+   0.0,
+   0.36,
+   1.0
   ]
  },
  "palette": {
@@ -34,10 +40,10 @@
   "p": "minecraft:oak_planks",
   "l": "minecraft:oak_log",
   "g": "minecraft:glass",
-  "n": "minecraft:spruce_stairs[facing=north]",
-  "s": "minecraft:spruce_stairs[facing=south]",
-  "t": "minecraft:spruce_slab[type=bottom]",
-  "u": "minecraft:spruce_planks",
+  "n": "minecraft:brick_stairs[facing=north]",
+  "s": "minecraft:brick_stairs[facing=south]",
+  "t": "minecraft:brick_slab[type=bottom]",
+  "u": "minecraft:bricks",
   "b": "minecraft:oak_door[facing=south,half=lower]",
   "B": "minecraft:oak_door[facing=south,half=upper]"
  },
@@ -52,30 +58,26 @@
    ],
    "layers": [
     [
-     "DDDDDDDDDDD",
-     "DDDDDDDDDDD",
-     "DDDDDDDDDDD",
-     "DDDDDDDDDDD",
-     "DDDDDDDDDDD",
-     "DDDDDDDDDDD",
-     "DDDDDDDDDDD",
-     "DDDDDDDDDDD",
-     "DDDDDDDDDDD",
-     "DDDDDDDDDDD",
-     "DDDDDDDDDDD"
+     "DDDDDDDDD",
+     "DDDDDDDDD",
+     "DDDDDDDDD",
+     "DDDDDDDDD",
+     "DDDDDDDDD",
+     "DDDDDDDDD",
+     "DDDDDDDDD",
+     "DDDDDDDDD",
+     "DDDDDDDDD"
     ],
     [
-     "GGGGGGGGGGG",
-     "GGGGGGGGGGG",
-     "GGGGGGGGGGG",
-     "GGGGGGGGGGG",
-     "GGGGGGGGGGG",
-     "GGGGGGGGGGG",
-     "GGGGGGGGGGG",
-     "GGGGGGGGGGG",
-     "GGGGGGGGGGG",
-     "GGGGGGGGGGG",
-     "GGGGGGGGGGG"
+     "GGGGGGGGG",
+     "GGGGGGGGG",
+     "GGGGGGGGG",
+     "GGGGGGGGG",
+     "GGGGGGGGG",
+     "GGGGGGGGG",
+     "GGGGGGGGG",
+     "GGGGGGGGG",
+     "GGGGGGGGG"
     ]
    ],
    "start": "full"
@@ -84,9 +86,9 @@
    "id": "ghost",
    "mode": "ghost",
    "pos": [
-    3,
     2,
-    3
+    2,
+    2
    ],
    "layers": [
     [
@@ -141,11 +143,11 @@
     "t": 0,
     "yaw": 0.785,
     "pitch": 0.55,
-    "zoom": 1.05,
+    "zoom": 1.2,
     "focus": [
-     8.4,
+     4.5,
      3.2,
-     -4.6
+     4.5
     ]
    },
    {
@@ -290,9 +292,9 @@
    "t0": 6.0,
    "t1": 7.6,
    "at": [
-    5.5,
+    4.5,
     5.2,
-    8.6
+    7.6
    ],
    "text": "Oak planks go here",
    "color": "gold",
@@ -303,9 +305,9 @@
    "t0": 8.0,
    "t1": 9.4,
    "at": [
-    5.5,
+    4.5,
     2.4,
-    8.6
+    7.6
    ],
    "text": "Cobblestone goes here",
    "color": "gold",
@@ -332,7 +334,7 @@
      "27"
     ],
     [
-     "Spruce planks",
+     "Bricks",
      "20",
      "0",
      "20"
@@ -344,7 +346,7 @@
      "19"
     ],
     [
-     "Spruce stairs",
+     "Brick stairs",
      "19",
      "0",
      "19"
@@ -356,7 +358,7 @@
      "8"
     ],
     [
-     "Spruce slab",
+     "Brick slab",
      "5",
      "0",
      "5"
@@ -410,7 +412,7 @@
        "enough"
       ],
       [
-       "Spruce planks",
+       "Bricks",
        "20",
        "0",
        "20"
@@ -422,7 +424,7 @@
        "19"
       ],
       [
-       "Spruce stairs",
+       "Brick stairs",
        "19",
        "0",
        "19"
@@ -434,7 +436,7 @@
        "8"
       ],
       [
-       "Spruce slab",
+       "Brick slab",
        "5",
        "0",
        "5"
@@ -463,7 +465,7 @@
        "enough"
       ],
       [
-       "Spruce planks",
+       "Bricks",
        "20",
        "0",
        "20"
@@ -475,7 +477,7 @@
        "enough"
       ],
       [
-       "Spruce stairs",
+       "Brick stairs",
        "19",
        "0",
        "19"
@@ -487,7 +489,7 @@
        "8"
       ],
       [
-       "Spruce slab",
+       "Brick slab",
        "5",
        "0",
        "5"
@@ -516,7 +518,7 @@
        "enough"
       ],
       [
-       "Spruce planks",
+       "Bricks",
        "20",
        "0",
        "20"
@@ -528,7 +530,7 @@
        "enough"
       ],
       [
-       "Spruce stairs",
+       "Brick stairs",
        "19",
        "0",
        "19"
@@ -540,7 +542,7 @@
        "enough"
       ],
       [
-       "Spruce slab",
+       "Brick slab",
        "5",
        "0",
        "5"
@@ -577,7 +579,7 @@
        "27"
       ],
       [
-       "Spruce planks",
+       "Bricks",
        "20",
        "0",
        "20"
@@ -589,7 +591,7 @@
        "19"
       ],
       [
-       "Spruce stairs",
+       "Brick stairs",
        "19",
        "0",
        "19"
@@ -601,7 +603,7 @@
        "8"
       ],
       [
-       "Spruce slab",
+       "Brick slab",
        "5",
        "0",
        "5"
@@ -621,6 +623,38 @@
      ]
     }
    ]
+  }
+ ],
+ "sounds": [
+  {
+   "t": 5.6,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 5.78,
+   "name": "ui_release",
+   "volume": 0.7
+  },
+  {
+   "t": 7.6,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 7.78,
+   "name": "ui_release",
+   "volume": 0.7
+  },
+  {
+   "t": 14.6,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 15.1,
+   "name": "ui_release",
+   "volume": 0.7
   }
  ]
 }

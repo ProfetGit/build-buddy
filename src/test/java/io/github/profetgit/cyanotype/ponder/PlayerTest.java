@@ -99,4 +99,45 @@ class PlayerTest {
         p.seek(99);
         assertTrue(p.time() < 10);
     }
+
+    private static Scene withSounds() {
+        return SceneReader.read(SceneReaderTest.GOOD.replace("\"captions\":", "\"sounds\":[{\"t\":1,\"name\":\"ui_press\"},{\"t\":9.8,\"name\":\"lock\",\"volume\":0.5}],\"captions\":"));
+    }
+
+    @Test
+    void aSoundComesDueOnceAsTheLessonPassesIt() {
+        Player p = new Player(withSounds(), false);
+        for (int i = 0; i < 19; i++) p.update(0.05);
+        assertTrue(p.drainSounds().isEmpty(), "nothing before 1 s");
+        p.update(0.05);
+        p.update(0.05);
+        var due = p.drainSounds();
+        assertEquals(1, due.size());
+        assertEquals("ui_press", due.get(0).name());
+        assertTrue(p.drainSounds().isEmpty(), "taken once");
+        for (int i = 0; i < 20; i++) p.update(0.05);
+        assertTrue(p.drainSounds().isEmpty(), "and not again");
+    }
+
+    @Test
+    void seekingAndStepsMakeNoNoise() {
+        Player p = new Player(withSounds(), false);
+        p.seek(9.9);
+        p.next();
+        p.previous();
+        p.seek(2);
+        assertTrue(p.drainSounds().isEmpty());
+    }
+
+    @Test
+    void aSoundJustBeforeTheLoopPointStillPlaysOnTheWrap() {
+        Player p = new Player(withSounds(), false);
+        p.seek(9.7);
+        p.update(0.25);
+        p.update(0.25);
+        var due = p.drainSounds();
+        assertEquals(1, due.size());
+        assertEquals("lock", due.get(0).name());
+        assertEquals(0.5f, due.get(0).volume(), 1e-6);
+    }
 }

@@ -33,10 +33,10 @@
   "p": "minecraft:oak_planks",
   "l": "minecraft:oak_log",
   "g": "minecraft:glass",
-  "n": "minecraft:spruce_stairs[facing=north]",
-  "s": "minecraft:spruce_stairs[facing=south]",
-  "t": "minecraft:spruce_slab[type=bottom]",
-  "u": "minecraft:spruce_planks",
+  "n": "minecraft:brick_stairs[facing=north]",
+  "s": "minecraft:brick_stairs[facing=south]",
+  "t": "minecraft:brick_slab[type=bottom]",
+  "u": "minecraft:bricks",
   "b": "minecraft:oak_door[facing=south,half=lower]",
   "B": "minecraft:oak_door[facing=south,half=upper]",
   "f": "minecraft:oak_leaves[persistent=false]",
@@ -663,19 +663,57 @@
    ]
   },
   {
-   "type": "stamp",
+   "type": "badge",
    "t0": 18.7,
    "t1": 20.0,
-   "text": "Saved to your Library",
+   "title": "Saved",
+   "status": "My cottage is in your Library",
    "color": "green",
-   "size": 1,
+   "icon": "check",
    "rect": [
-    0.2,
-    0.04,
-    0.6,
-    0.12
+    0.3,
+    0.03,
+    0.4,
+    0.085
    ],
    "fade": 0.2
+  }
+ ],
+ "sounds": [
+  {
+   "t": 3.0,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 3.2,
+   "name": "ui_release",
+   "volume": 0.7
+  },
+  {
+   "t": 10.2,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 11.4,
+   "name": "ui_release",
+   "volume": 0.7
+  },
+  {
+   "t": 12.7,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 18.3,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 18.6,
+   "name": "ui_release",
+   "volume": 0.7
   }
  ]
 }

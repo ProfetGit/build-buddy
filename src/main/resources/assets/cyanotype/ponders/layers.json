@@ -32,10 +32,10 @@
   "p": "minecraft:oak_planks",
   "l": "minecraft:oak_log",
   "g": "minecraft:glass",
-  "n": "minecraft:spruce_stairs[facing=north]",
-  "s": "minecraft:spruce_stairs[facing=south]",
-  "t": "minecraft:spruce_slab[type=bottom]",
-  "u": "minecraft:spruce_planks",
+  "n": "minecraft:brick_stairs[facing=north]",
+  "s": "minecraft:brick_stairs[facing=south]",
+  "t": "minecraft:brick_slab[type=bottom]",
+  "u": "minecraft:bricks",
   "b": "minecraft:oak_door[facing=south,half=lower]",
   "B": "minecraft:oak_door[facing=south,half=upper]"
  },
@@ -784,6 +784,63 @@
    "text": "Layers 1 to 6 of 6",
    "color": "cyan",
    "fade": 0.1
+  }
+ ],
+ "sounds": [
+  {
+   "t": 2.75,
+   "name": "wheel_tick",
+   "volume": 0.8
+  },
+  {
+   "t": 3.65,
+   "name": "wheel_tick",
+   "volume": 0.8
+  },
+  {
+   "t": 4.55,
+   "name": "wheel_tick",
+   "volume": 0.8
+  },
+  {
+   "t": 5.45,
+   "name": "wheel_tick",
+   "volume": 0.8
+  },
+  {
+   "t": 6.55,
+   "name": "wheel_tick",
+   "volume": 0.8
+  },
+  {
+   "t": 8.05,
+   "name": "wheel_tick",
+   "volume": 0.8
+  },
+  {
+   "t": 8.95,
+   "name": "wheel_tick",
+   "volume": 0.8
+  },
+  {
+   "t": 10.05,
+   "name": "wheel_tick",
+   "volume": 0.8
+  },
+  {
+   "t": 11.15,
+   "name": "wheel_tick",
+   "volume": 0.8
+  },
+  {
+   "t": 12.75,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 15.35,
+   "name": "ui_press",
+   "volume": 0.8
   }
  ]
 }

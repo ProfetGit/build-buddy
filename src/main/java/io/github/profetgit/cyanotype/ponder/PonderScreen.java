@@ -179,6 +179,7 @@ public final class PonderScreen extends Screen {
         Motion.frame();
         int mx = Ui.mx(rawX), my = Ui.my(rawY);
         if (!scrubbing) player.update(Motion.dt());
+        for (Scene.SoundCue cue : player.drainSounds()) io.github.profetgit.cyanotype.ui.Sfx.play(cue.name(), cue.pitch(), cue.volume());
         double t = player.time();
         if (snap == null || t != snapT) {
             snap = player.snapshot();

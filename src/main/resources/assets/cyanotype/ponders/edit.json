@@ -35,10 +35,10 @@
   "p": "minecraft:oak_planks",
   "l": "minecraft:oak_log",
   "g": "minecraft:glass",
-  "n": "minecraft:spruce_stairs[facing=north]",
-  "s": "minecraft:spruce_stairs[facing=south]",
-  "t": "minecraft:spruce_slab[type=bottom]",
-  "u": "minecraft:spruce_planks",
+  "n": "minecraft:brick_stairs[facing=north]",
+  "s": "minecraft:brick_stairs[facing=south]",
+  "t": "minecraft:brick_slab[type=bottom]",
+  "u": "minecraft:bricks",
   "b": "minecraft:oak_door[facing=south,half=lower]",
   "B": "minecraft:oak_door[facing=south,half=upper]"
  },
@@ -4096,6 +4096,35 @@
      ]
     }
    ]
+  }
+ ],
+ "sounds": [
+  {
+   "t": 2.0,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 3.85,
+   "name": "snap"
+  },
+  {
+   "t": 5.9,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 8.4,
+   "name": "snap"
+  },
+  {
+   "t": 10.55,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 13.65,
+   "name": "snap"
   }
  ]
 }

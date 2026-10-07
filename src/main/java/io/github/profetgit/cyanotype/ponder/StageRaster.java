@@ -20,6 +20,11 @@ public final class StageRaster {
     /** Block states by their string, for the palette of a lesson: the game's looks in play, flat colours in tests. */
     public interface Looks {
         BlockLook.Look of(String spec);
+
+        /** The 64 x 64 skin the little player wears, or null for flat colours (tests, no game). */
+        default BlockLook.@Nullable Tex skin() {
+            return null;
+        }
     }
 
     /** The orthographic camera of a picture: the point of the world at the middle of the picture, and how large a block is. */
@@ -115,10 +120,40 @@ public final class StageRaster {
     private Scene scene;
     private BlockLook.Look[] lookCache = new BlockLook.Look[0];
 
+    /**
+     * The camera of a picture: the lesson's own framing (yaw, pitch, zoom, focus), kept honest: when a lesson stands on a slab
+     * called "ground", the slab and the other groups at their places stay inside the picture (or the lesson's {@code frame}),
+     * first by moving the picture a little and only if that is not enough by drawing it smaller. Nothing is ever zoomed in.
+     */
     public static Camera camera(Scene s, Snapshot snap, int w, int h) {
         double radius = 0.5 * Math.sqrt((double) s.size[0] * s.size[0] + (double) s.size[1] * s.size[1] + (double) s.size[2] * s.size[2]);
         double scale = Math.min(w, h) * 0.92 / (2 * Math.max(1.0, radius)) * snap.zoom;
-        return new Camera(snap.yaw, snap.pitch, scale, w / 2.0, h / 2.0, snap.focus[0], snap.focus[1], snap.focus[2]);
+        double ox = w / 2.0, oy = h / 2.0;
+        if (s.groups.stream().anyMatch(g -> g.id.equals("ground"))) {
+            Camera base = new Camera(snap.yaw, snap.pitch, scale, ox, oy, snap.focus[0], snap.focus[1], snap.focus[2]);
+            double minX = Double.MAX_VALUE, maxX = -Double.MAX_VALUE, minY = Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
+            double[] p = new double[3];
+            for (Scene.Group g : s.groups) {
+                for (int k = 0; k < 8; k++) {
+                    base.project(g.pos[0] + (k & 1) * g.sx, g.pos[1] + (k >> 1 & 1) * g.sy, g.pos[2] + (k >> 2 & 1) * g.sz, p);
+                    minX = Math.min(minX, p[0]);
+                    maxX = Math.max(maxX, p[0]);
+                    minY = Math.min(minY, p[1]);
+                    maxY = Math.max(maxY, p[1]);
+                }
+            }
+            double margin = 0.03;
+            double rx0 = w * (s.frame[0] + margin), rx1 = w * (s.frame[2] - margin);
+            double ry0 = h * (s.frame[1] + margin), ry1 = h * (s.frame[3] - margin);
+            double k = Math.min(1.0, Math.min((rx1 - rx0) / Math.max(1e-6, maxX - minX), (ry1 - ry0) / Math.max(1e-6, maxY - minY)));
+            // the bounds after drawing smaller about the picture's middle
+            double bx0 = ox + (minX - ox) * k, bx1 = ox + (maxX - ox) * k, by0 = oy + (minY - oy) * k, by1 = oy + (maxY - oy) * k;
+            double dx = bx0 < rx0 ? rx0 - bx0 : bx1 > rx1 ? rx1 - bx1 : 0, dy = by0 < ry0 ? ry0 - by0 : by1 > ry1 ? ry1 - by1 : 0;
+            scale *= k;
+            ox += dx;
+            oy += dy;
+        }
+        return new Camera(snap.yaw, snap.pitch, scale, ox, oy, snap.focus[0], snap.focus[1], snap.focus[2]);
     }
 
     /** The text overlays (labels, dimension numbers) of the last picture, in samples. */
@@ -170,12 +205,49 @@ public final class StageRaster {
         }
     }
 
-    /** Blueprint paper: the grid of the ground plane, going on well past the stage. */
+    /** Blueprint paper: the grid of the ground plane, going on past the stage and fading out, with the soft shadow of the slab on it. */
     private void grid(Snapshot snap) {
-        int pad = 5;
-        int x0 = -pad, x1 = scene.size[0] + pad, z0 = -pad, z1 = scene.size[2] + pad;
-        for (int x = x0; x <= x1; x++) line(x, 0, z0, x, 0, z1, GRID, 0.5, 1.0, UNDER | NOTEST);
-        for (int z = z0; z <= z1; z++) line(x0, 0, z, x1, 0, z, GRID, 0.5, 1.0, UNDER | NOTEST);
+        int pad = 6;
+        double[] fp = footprint();
+        int x0 = (int) Math.floor(fp[0]) - pad, x1 = (int) Math.ceil(fp[2]) + pad, z0 = (int) Math.floor(fp[1]) - pad, z1 = (int) Math.ceil(fp[3]) + pad;
+        for (int x = x0; x <= x1; x++) {
+            for (int z = z0; z < z1; z++) gridSegment(fp, x, z, x, z + 1, pad);
+        }
+        for (int z = z0; z <= z1; z++) {
+            for (int x = x0; x < x1; x++) gridSegment(fp, x, z, x + 1, z, pad);
+        }
+        shadow(fp);
+    }
+
+    /** The ground slab's footprint: minX, minZ, maxX, maxZ (the whole stage when a lesson has no group called "ground"). */
+    private double[] footprint() {
+        for (Scene.Group g : scene.groups) {
+            if (g.id.equals("ground")) return new double[]{g.pos[0], g.pos[2], g.pos[0] + g.sx, g.pos[2] + g.sz};
+        }
+        return new double[]{0, 0, scene.size[0], scene.size[2]};
+    }
+
+    private void gridSegment(double[] fp, double xa, double za, double xb, double zb, int pad) {
+        double mx = (xa + xb) / 2, mz = (za + zb) / 2;
+        double dx = Math.max(0, Math.max(fp[0] - mx, mx - fp[2])), dz = Math.max(0, Math.max(fp[1] - mz, mz - fp[3]));
+        double fade = 1 - Math.min(1, Math.hypot(dx, dz) / (pad + 0.5));
+        if (fade <= 0.02) return;
+        line(xa, 0, za, xb, 0, zb, GRID, 0.5, Math.pow(fade, 1.3), UNDER | NOTEST);
+    }
+
+    /** A soft shadow on the paper beside the slab, away from the light: three growing layers of the same dark. */
+    private void shadow(double[] fp) {
+        boolean has = false;
+        for (Scene.Group g : scene.groups) if (g.id.equals("ground")) has = true;
+        if (!has) return;
+        double ox = 0.9, oz = -0.9;
+        for (int k = 0; k < 4; k++) {
+            double e = 0.15 + k * 0.45;
+            double x0 = fp[0] + ox - e, x1 = fp[2] + ox + e, z0 = fp[1] + oz - e, z1 = fp[3] + oz + e;
+            double[] a = cam.project(x0, 0, z0), b = cam.project(x1, 0, z0), c = cam.project(x1, 0, z1), d = cam.project(x0, 0, z1);
+            addTri(a, b, c, null, null, null, null, 0xFF06142A, 1.0, WHITE, 0, 0, 0.13, UNDER | FLAT | BLEND | NOTEST);
+            addTri(a, c, d, null, null, null, null, 0xFF06142A, 1.0, WHITE, 0, 0, 0.13, UNDER | FLAT | BLEND | NOTEST);
+        }
     }
 
     // ---- groups
@@ -658,20 +730,23 @@ public final class StageRaster {
         double k = 1 + 0.25 * hot;
         double[] base = at.clone();
         base[axis] += sign * off;
-        double w = 0.11 * k, hw = 0.3 * k, shaft = len * 0.62;
+        solidArrow(base, axis, sign, len * k, 0.11 * k, 0.3 * k, 0.62, color, a);
+    }
+
+    /** A solid arrow from {@code base} along an axis: a square shaft and a pyramid head, lit, always on top (the handles of the game are). */
+    private void solidArrow(double[] base, int axis, double sign, double len, double w, double hw, double shaftFrac, int color, double a) {
+        double shaft = len * shaftFrac;
         double[] ax = new double[3], u = new double[3], v = new double[3];
         ax[axis] = sign;
         u[(axis + 1) % 3] = 1;
         v[(axis + 2) % 3] = 1;
-        double[] s0 = base, s1 = {base[0] + ax[0] * shaft, base[1] + ax[1] * shaft, base[2] + ax[2] * shaft}, tip = {base[0] + ax[0] * len * k, base[1] + ax[1] * len * k, base[2] + ax[2] * len * k};
-        // the shaft: a box
+        double[] s0 = base, s1 = {base[0] + ax[0] * shaft, base[1] + ax[1] * shaft, base[2] + ax[2] * shaft}, tip = {base[0] + ax[0] * len, base[1] + ax[1] * len, base[2] + ax[2] * len};
         double[][] ring0 = square(s0, u, v, w), ring1 = square(s1, u, v, w);
         for (int i = 0; i < 4; i++) {
             int j = (i + 1) % 4;
             shadedQuad(ring0[i], ring0[j], ring1[j], ring1[i], color, a, true);
         }
         shadedQuad(ring1[0], ring1[1], ring1[2], ring1[3], color, a, true);
-        // the head: a pyramid
         double[][] hb = square(s1, u, v, hw);
         for (int i = 0; i < 4; i++) {
             int j = (i + 1) % 4;
@@ -730,6 +805,14 @@ public final class StageRaster {
             flatTri(p0, p1, p2, color, al, BLEND | NOTEST);
             flatTri(p0, p2, p3, color, al, BLEND | NOTEST);
         }
+        // the band's two edges, crisp, so it reads as a ring and not a smear
+        int edge = mix(color, WHITE, 0.5);
+        for (int i = 0; i < n; i++) {
+            double t0 = i * 2 * Math.PI / n, t1 = (i + 1) * 2 * Math.PI / n;
+            for (double rr : new double[]{r - band, r + band}) {
+                line(c[0] + Math.cos(t0) * rr, y, c[2] + Math.sin(t0) * rr, c[0] + Math.cos(t1) * rr, y, c[2] + Math.sin(t1) * rr, edge, 1.0, (0.55 + 0.3 * hot) * a, BLEND | NOTEST);
+            }
+        }
         // four chevrons going round clockwise seen from above, turned by the angle (quarter turns)
         for (int k = 0; k < 4; k++) {
             double t = (k * 0.25 + angle * 0.25) * 2 * Math.PI;
@@ -744,35 +827,32 @@ public final class StageRaster {
         double[] at = it.vec("at", new double[]{0, 0, 0});
         int color = color(it.str("color", "gold"));
         double pulse = 0.5 + 0.5 * Math.sin(it.age() * 6);
-        double x0 = at[0], y0 = at[1], z0 = at[2], x1 = x0 + 1, y1 = y0 + 1, z1 = z0 + 1;
         double g = 0.01;
-        x0 -= g;
-        y0 -= g;
-        z0 -= g;
-        x1 += g;
-        y1 += g;
-        z1 += g;
+        double x0 = at[0] - g, y0 = at[1] - g, z0 = at[2] - g, x1 = at[0] + 1 + g, y1 = at[1] + 1 + g, z1 = at[2] + 1 + g;
         double[][] c = {{x0, y0, z0}, {x1, y0, z0}, {x1, y0, z1}, {x0, y0, z1}, {x0, y1, z0}, {x1, y1, z0}, {x1, y1, z1}, {x0, y1, z1}};
         int[][] edges = {{0, 1}, {1, 2}, {2, 3}, {3, 0}, {4, 5}, {5, 6}, {6, 7}, {7, 4}, {0, 4}, {1, 5}, {2, 6}, {3, 7}};
-        double[][] faces = {{0, 1, 2, 3}, {4, 5, 6, 7}, {0, 1, 5, 4}, {1, 2, 6, 5}, {2, 3, 7, 6}, {3, 0, 4, 7}};
-        for (double[] f : faces) {
-            double[] p0 = cam.project(c[(int) f[0]][0], c[(int) f[0]][1], c[(int) f[0]][2]), p1 = cam.project(c[(int) f[1]][0], c[(int) f[1]][1], c[(int) f[1]][2]), p2 = cam.project(c[(int) f[2]][0], c[(int) f[2]][1], c[(int) f[2]][2]),
-                p3 = cam.project(c[(int) f[3]][0], c[(int) f[3]][1], c[(int) f[3]][2]);
-            double al = (0.10 + 0.12 * pulse) * a;
+        int[][] faces = {{0, 1, 2, 3}, {4, 5, 6, 7}, {0, 1, 5, 4}, {1, 2, 6, 5}, {2, 3, 7, 6}, {3, 0, 4, 7}};
+        for (int[] f : faces) {
+            double[] p0 = cam.project(c[f[0]][0], c[f[0]][1], c[f[0]][2]), p1 = cam.project(c[f[1]][0], c[f[1]][1], c[f[1]][2]), p2 = cam.project(c[f[2]][0], c[f[2]][1], c[f[2]][2]), p3 = cam.project(c[f[3]][0], c[f[3]][1], c[f[3]][2]);
+            double al = (0.14 + 0.14 * pulse) * a;
             flatTri(p0, p1, p2, color, al, BLEND | NOTEST);
             flatTri(p0, p2, p3, color, al, BLEND | NOTEST);
         }
-        int edge = mix(WHITE, color, 0.3 * (1 - pulse));
-        for (int[] e : edges) line(c[e[0]][0], c[e[0]][1], c[e[0]][2], c[e[1]][0], c[e[1]][1], c[e[1]][2], edge, 2.0, (0.75 + 0.25 * pulse) * a, BLEND | NOTEST);
+        int edge = mix(color, WHITE, 0.35 + 0.35 * (1 - pulse));
+        for (int[] e : edges) line(c[e[0]][0], c[e[0]][1], c[e[0]][2], c[e[1]][0], c[e[1]][1], c[e[1]][2], edge, 1.4, (0.7 + 0.3 * pulse) * a, BLEND | NOTEST);
+        for (double[] corner : c) {
+            for (int axis = 0; axis < 3; axis++) {
+                double[] dir = {0, 0, 0};
+                double lo = axis == 0 ? x0 : axis == 1 ? y0 : z0;
+                dir[axis] = corner[axis] == lo ? 0.3 : -0.3;
+                line(corner[0], corner[1], corner[2], corner[0] + dir[0], corner[1] + dir[1], corner[2] + dir[2], WHITE, 2.4, a, BLEND | NOTEST);
+            }
+        }
         if (it.bool("beam", true)) {
-            double mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, top = y1;
-            double beam = 2.6 + 0.2 * pulse;
-            line(mx, top, mz, mx, top + beam, mz, color, 2.2, 0.85 * a, BLEND | NOTEST);
-            double tipY = top + 0.15;
-            line(mx, tipY, mz, mx + 0.35, tipY + 0.55, mz, color, 2.2, 0.9 * a, BLEND | NOTEST);
-            line(mx, tipY, mz, mx - 0.35, tipY + 0.55, mz, color, 2.2, 0.9 * a, BLEND | NOTEST);
-            line(mx, tipY, mz, mx, tipY + 0.55, mz + 0.35, color, 2.2, 0.9 * a, BLEND | NOTEST);
-            line(mx, tipY, mz, mx, tipY + 0.55, mz - 0.35, color, 2.2, 0.9 * a, BLEND | NOTEST);
+            // a solid arrow bobbing over the block, point down
+            double bob = 0.16 * Math.sin(it.age() * 4);
+            double mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, tipY = y1 + 0.28 + bob;
+            solidArrow(new double[]{mx, tipY + 1.5, mz}, 1, -1, 1.5, 0.13, 0.38, 0.5, mix(color, WHITE, 0.15), a);
         }
     }
 
@@ -803,79 +883,111 @@ public final class StageRaster {
         flatTri(p0, p2, p3, color, 0.95 * a, BLEND | NOTEST);
     }
 
-    /** A little player: legs, body, head, standing at the point, turned by the yaw (quarter turns). */
+    // The little player: the same boxes and skin layout as the game's player model (a pixel is 1.8 / 32 of a block), so the
+    // default skin lands on it unchanged. Each part: x0 y0 z0 x1 y1 z1 (pixels, feet at 0, front towards +z, the player's right at -x),
+    // the skin's origin u v, the pivot height of its swing, a sign for how it swings, and a fallback colour.
+    private static final double PIXEL = 1.8 / 32;
+    private static final double[][] PLAYER = {
+        {-4, 0, -2, 0, 12, 2, 0, 16, 12, 1, 0xFF2A4C8A}, {0, 0, -2, 4, 12, 2, 16, 48, 12, -1, 0xFF2A4C8A},
+        {-4, 12, -2, 4, 24, 2, 16, 16, 24, 0, 0},
+        {-8, 12, -2, -4, 24, 2, 40, 16, 22, -1, 0}, {4, 12, -2, 8, 24, 2, 32, 48, 22, 1, 0},
+        {-4, 24, -4, 4, 32, 4, 0, 0, 24, 0, 0xFFE3B58A}};
+
     private void avatar(Snapshot.ItemView it, double a) {
         double[] at = it.vec("at", new double[]{0, 0, 0});
         double yaw = it.num("yaw", 0) * Math.PI / 2;
+        double walk = Math.max(0, Math.min(1, it.num("walk", 0)));
         int shirt = color(it.str("color", "cyan"));
+        BlockLook.Tex skin = looks.skin();
+        double phase = it.age() * 9.0, swing = Math.sin(phase) * 0.8 * walk, bob = Math.abs(Math.cos(phase)) * 0.05 * walk;
         double c = Math.cos(yaw), s = Math.sin(yaw);
-        double[][] parts = {
-            // x0, y0, z0, x1, y1, z1, colour
-            {-0.25, 0, -0.12, 0, 0.75, 0.12, 0xFF2A4C8A}, {0, 0, -0.12, 0.25, 0.75, 0.12, 0xFF2A4C8A},
-            {-0.25, 0.75, -0.15, 0.25, 1.45, 0.15, shirt}, {-0.5, 0.75, -0.12, -0.25, 1.45, 0.12, shirt}, {0.25, 0.75, -0.12, 0.5, 1.45, 0.12, shirt},
-            {-0.25, 1.45, -0.25, 0.25, 1.95, 0.25, 0xFFE3B58A}};
-        for (double[] b : parts) {
-            double[][] v = new double[8][3];
-            int k = 0;
-            for (int xi = 0; xi < 2; xi++) {
-                for (int yi = 0; yi < 2; yi++) {
-                    for (int zi = 0; zi < 2; zi++) {
-                        double lx = xi == 0 ? b[0] : b[3], ly = yi == 0 ? b[1] : b[4], lz = zi == 0 ? b[2] : b[5];
-                        v[k][0] = at[0] + lx * c - lz * s;
-                        v[k][1] = at[1] + ly;
-                        v[k][2] = at[2] + lx * s + lz * c;
-                        k++;
-                    }
-                }
+        // its shadow first: a soft dark disc on the ground under the feet
+        double sr = 0.42;
+        double[] mid = cam.project(at[0], at[1] + 0.02, at[2]);
+        for (int i = 0; i < 20; i++) {
+            double t0 = i * 2 * Math.PI / 20, t1 = (i + 1) * 2 * Math.PI / 20;
+            double[] p0 = cam.project(at[0] + Math.cos(t0) * sr, at[1] + 0.02, at[2] + Math.sin(t0) * sr), p1 = cam.project(at[0] + Math.cos(t1) * sr, at[1] + 0.02, at[2] + Math.sin(t1) * sr);
+            addTri(mid, p0, p1, null, null, null, null, 0xFF06142A, 1.0, WHITE, 0, 0, 0.32 * a, BLEND | OVER | FLAT);
+        }
+        for (double[] part : PLAYER) drawPart(at, c, s, bob, part, swing, skin, part[10] == 0 && part[1] >= 12 && part[4] < 30 ? shirt : (int) part[10], a, 0);
+        if (skin != null) drawPart(at, c, s, bob, new double[]{-4, 24, -4, 4, 32, 4, 32, 0, 24, 0, 0}, 0, skin, 0, a, 0.5);
+    }
+
+    /** One box of the player, turned to the yaw, its limb swung about the pivot, textured from the skin (or one flat colour). */
+    private void drawPart(double[] at, double c, double s, double bob, double[] p, double swing, BlockLook.@Nullable Tex skin, int fallback, double a, double grow) {
+        double x0 = p[0] - grow, y0 = p[1] - grow, z0 = p[2] - grow, x1 = p[3] + grow, y1 = p[4] + grow, z1 = p[5] + grow;
+        double w = p[3] - p[0], h = p[4] - p[1], d = p[5] - p[2];
+        double u = p[6], v = p[7], pivot = p[8], rot = swing * p[9];
+        // texture rectangles (pixels): right, front, left, back, top, bottom
+        double[][] rect = {{u, v + d, d, h}, {u + d, v + d, w, h}, {u + d + w, v + d, d, h}, {u + 2 * d + w, v + d, w, h}, {u + d, v, w, d}, {u + d + w, v, w, d}};
+        // corners of each face (x, y, z in the box), in the order top-left, top-right, bottom-right, bottom-left of its picture
+        double[][][] face = {
+            {{x0, y1, z0}, {x0, y1, z1}, {x0, y0, z1}, {x0, y0, z0}},
+            {{x0, y1, z1}, {x1, y1, z1}, {x1, y0, z1}, {x0, y0, z1}},
+            {{x1, y1, z1}, {x1, y1, z0}, {x1, y0, z0}, {x1, y0, z1}},
+            {{x1, y1, z0}, {x0, y1, z0}, {x0, y0, z0}, {x1, y0, z0}},
+            {{x0, y1, z0}, {x1, y1, z0}, {x1, y1, z1}, {x0, y1, z1}},
+            {{x0, y0, z1}, {x1, y0, z1}, {x1, y0, z0}, {x0, y0, z0}}};
+        double[][] normal = {{-1, 0, 0}, {0, 0, 1}, {1, 0, 0}, {0, 0, -1}, {0, 1, 0}, {0, -1, 0}};
+        double cr = Math.cos(rot), sr = Math.sin(rot);
+        double[][] corner = new double[4][3];
+        double[][] cuv = new double[4][2];
+        double[] uvx = {0, 1, 1, 0}, uvy = {0, 0, 1, 1};
+        for (int f = 0; f < 6; f++) {
+            double ny = normal[f][1] * cr - normal[f][2] * sr, nz = normal[f][1] * sr + normal[f][2] * cr, nx = normal[f][0];
+            double wx = nx * c - nz * s, wz = nx * s + nz * c;
+            if (!front(wx, ny, wz)) continue;
+            for (int k = 0; k < 4; k++) {
+                double lx = face[f][k][0], ly = face[f][k][1], lz = face[f][k][2];
+                double dy = ly - pivot, rz = lz;
+                double ry = pivot + dy * cr - rz * sr, rzz = dy * sr + rz * cr;
+                double gx = lx * PIXEL, gy = ry * PIXEL + bob, gz = rzz * PIXEL;
+                double[] sv = cam.project(at[0] + gx * c - gz * s, at[1] + gy, at[2] + gx * s + gz * c);
+                corner[k][0] = sv[0];
+                corner[k][1] = sv[1];
+                corner[k][2] = sv[2];
+                cuv[k][0] = skin == null ? 0 : (rect[f][0] + uvx[k] * rect[f][2]) / skin.w();
+                cuv[k][1] = skin == null ? 0 : (rect[f][1] + uvy[k] * rect[f][3]) / skin.h();
             }
-            int col = (int) b[6];
-            // vertex index = xi * 4 + yi * 2 + zi
-            int[][] sides = {{4, 5, 7, 6}, {0, 2, 3, 1}, {2, 6, 7, 3}, {0, 1, 5, 4}, {1, 3, 7, 5}, {0, 4, 6, 2}};
-            for (int[] sd : sides) shadedQuadTested(v[sd[0]], v[sd[1]], v[sd[2]], v[sd[3]], col, a);
+            double light = shade(wx, ny, wz);
+            quad(corner, cuv, skin != null && skin.px() != null ? skin : null, fallback, light, WHITE, 0, 0, a, a < 0.995 ? BLEND : 0);
         }
     }
 
-    private void shadedQuadTested(double[] a, double[] b, double[] c, double[] d, int color, double alpha) {
-        double nx = (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]);
-        double ny = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]);
-        double nz = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
-        double len = Math.sqrt(nx * nx + ny * ny + nz * nz);
-        if (len < 1e-12) return;
-        nx /= len;
-        ny /= len;
-        nz /= len;
-        // the picture's own front test: only the sides that face the camera
-        if (!front(nx, ny, nz)) {
-            nx = -nx;
-            ny = -ny;
-            nz = -nz;
-            if (!front(nx, ny, nz)) return;
-            double[] t = b;
-            b = d;
-            d = t;
-        }
-        int col = lit(color, shade(nx, ny, nz), WHITE, 0, 0);
-        double[] pa = cam.project(a[0], a[1], a[2]), pb = cam.project(b[0], b[1], b[2]), pc = cam.project(c[0], c[1], c[2]), pd = cam.project(d[0], d[1], d[2]);
-        // opaque, with depth, so the blocks hide it and it hides them
-        addTri(pa, pb, pc, null, null, null, null, col, 1.0, WHITE, 0, 0, alpha, alpha < 0.995 ? BLEND : 0);
-        addTri(pa, pc, pd, null, null, null, null, col, 1.0, WHITE, 0, 0, alpha, alpha < 0.995 ? BLEND : 0);
-    }
-
-    /** Footsteps: small squares along a path on the ground. */
+    /** Footsteps: a pair of small boot prints, left and right in turn, along a path on the ground. */
     private void path(Snapshot.ItemView it, double a) {
         List<double[]> pts = it.props().points("points");
         int color = color(it.str("color", "dim"));
+        int step = 0;
         for (int i = 0; i + 1 < pts.size(); i++) {
             double[] p = pts.get(i), q = pts.get(i + 1);
-            double len = Math.sqrt((q[0] - p[0]) * (q[0] - p[0]) + (q[2] - p[2]) * (q[2] - p[2]));
-            int n = Math.max(1, (int) (len / 0.6));
-            for (int k = 0; k <= n; k++) {
+            double dx = q[0] - p[0], dz = q[2] - p[2], len = Math.sqrt(dx * dx + dz * dz);
+            if (len < 1e-6) continue;
+            dx /= len;
+            dz /= len;
+            int n = Math.max(1, (int) (len / 0.62));
+            for (int k = 0; k <= n; k++, step++) {
                 double f = k / (double) n;
-                double x = p[0] + (q[0] - p[0]) * f, y = p[1] + (q[1] - p[1]) * f + 0.03, z = p[2] + (q[2] - p[2]) * f;
-                double r = 0.11;
-                double[] a0 = cam.project(x - r, y, z - r), a1 = cam.project(x + r, y, z - r), a2 = cam.project(x + r, y, z + r), a3 = cam.project(x - r, y, z + r);
-                flatTri(a0, a1, a2, color, 0.8 * a, BLEND | NOTEST);
-                flatTri(a0, a2, a3, color, 0.8 * a, BLEND | NOTEST);
+                double side = step % 2 == 0 ? 0.13 : -0.13;
+                double x = p[0] + (q[0] - p[0]) * f - dz * side, y = p[1] + (q[1] - p[1]) * f + 0.03, z = p[2] + (q[2] - p[2]) * f + dx * side;
+                boot(x, y, z, dx, dz, color, a);
+            }
+        }
+    }
+
+    /** One boot print: a long oval with a smaller one for the heel, pointing the way it walks. */
+    private void boot(double x, double y, double z, double dx, double dz, int color, double a) {
+        double px = -dz, pz = dx;
+        for (int part = 0; part < 2; part++) {
+            double cx = x + dx * (part == 0 ? 0.07 : -0.1), cz = z + dz * (part == 0 ? 0.07 : -0.1);
+            double hl = part == 0 ? 0.16 : 0.09, hw = part == 0 ? 0.11 : 0.08;
+            double[] mid = cam.project(cx, y, cz);
+            int m = 8;
+            for (int i = 0; i < m; i++) {
+                double t0 = i * 2 * Math.PI / m, t1 = (i + 1) * 2 * Math.PI / m;
+                double[] p0 = cam.project(cx + dx * Math.cos(t0) * hl + px * Math.sin(t0) * hw, y, cz + dz * Math.cos(t0) * hl + pz * Math.sin(t0) * hw);
+                double[] p1 = cam.project(cx + dx * Math.cos(t1) * hl + px * Math.sin(t1) * hw, y, cz + dz * Math.cos(t1) * hl + pz * Math.sin(t1) * hw);
+                flatTri(mid, p0, p1, color, 0.85 * a, BLEND);
             }
         }
     }

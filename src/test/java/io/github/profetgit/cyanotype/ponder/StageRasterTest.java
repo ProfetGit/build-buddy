@@ -204,4 +204,50 @@ class StageRasterTest {
         int c = at(half, W, p[0], p[1]);
         assertTrue(r(c) > 150 && g(c) < 60, "red: " + Integer.toHexString(c));
     }
+
+    private static int differing(int[] a, int[] b) {
+        int n = 0;
+        for (int i = 0; i < a.length; i++) if (a[i] != b[i]) n++;
+        return n;
+    }
+
+    @Test
+    void theLittlePlayerIsDrawnAndItsWalkMovesItsLegs() {
+        String groups = "\"groups\":[],\"overlays\":[{\"type\":\"avatar\",\"t0\":0,\"t1\":9,\"at\":[4,0,4],\"yaw\":0,\"keys\":[{\"t\":0,\"walk\":0},{\"t\":0.1,\"walk\":1}]}]";
+        Scene s = scene(groups);
+        Scene none = scene("\"groups\":[]");
+        assertTrue(differing(draw(s, 0.3, W, H), draw(none, 0.3, W, H)) > 200, "a figure stands on the stage");
+        // standing, it is the same picture whenever; walking, the limbs swing and the picture changes with time
+        Scene standing = scene(groups.replace("\"walk\":1", "\"walk\":0"));
+        assertEquals(0, differing(draw(standing, 0.3, W, H), draw(standing, 0.6, W, H)));
+        assertTrue(differing(draw(s, 0.3, W, H), draw(s, 0.45, W, H)) > 20, "the legs swing while it walks");
+    }
+
+    @Test
+    void theGroundSlabIsKeptInsideThePictureAndNothingZoomsIn() {
+        String ground = "\"groups\":[{\"id\":\"ground\",\"pos\":[0,0,0],\"layers\":[[\"rrrrrrrr\",\"rrrrrrrr\",\"rrrrrrrr\",\"rrrrrrrr\",\"rrrrrrrr\",\"rrrrrrrr\",\"rrrrrrrr\",\"rrrrrrrr\"]]}],\"tracks\":{\"camera\":[{\"t\":0,\"zoom\":%s,\"focus\":[4,-6,4]}]}";
+        for (String zoom : new String[]{"1.0", "1.8", "0.5"}) {
+            Scene s = scene(String.format(ground, zoom));
+            Snapshot snap = Evaluator.at(s, 0);
+            StageRaster.Camera cam = StageRaster.camera(s, snap, W, H);
+            for (int k = 0; k < 8; k++) {
+                double[] p = cam.project((k & 1) * 8, (k >> 1 & 1), (k >> 2 & 1) * 8);
+                assertTrue(p[0] >= 0 && p[0] <= W && p[1] >= 0 && p[1] <= H, "zoom " + zoom + " corner " + k + " at " + p[0] + "," + p[1]);
+            }
+            // zoomed out stays zoomed out: the fit only ever makes a picture smaller
+            if (zoom.equals("0.5")) assertEquals(0.5 * Math.min(W, H) * 0.92 / (2 * 0.5 * Math.sqrt(64 + 36 + 64)), cam.scale(), 1e-6);
+        }
+    }
+
+    @Test
+    void aFrameKeepsTheStageOutOfTheSideOfAPanel() {
+        String ground = "\"groups\":[{\"id\":\"ground\",\"pos\":[0,0,0],\"layers\":[[\"rrrrrrrr\",\"rrrrrrrr\",\"rrrrrrrr\",\"rrrrrrrr\",\"rrrrrrrr\",\"rrrrrrrr\",\"rrrrrrrr\",\"rrrrrrrr\"]]}]";
+        Scene s = SceneReader.read("{\"format\":1,\"id\":\"t\",\"title\":\"T\",\"summary\":\"S\",\"duration\":10,\"stage\":{\"size\":[8,6,8],\"focus\":[4,1,4],\"frame\":[0,0,0.4,1]},\"palette\":{\"r\":\"minecraft:red\"},"
+            + ground + "}");
+        StageRaster.Camera cam = StageRaster.camera(s, Evaluator.at(s, 0), W, H);
+        for (int k = 0; k < 8; k++) {
+            double[] p = cam.project((k & 1) * 8, (k >> 1 & 1), (k >> 2 & 1) * 8);
+            assertTrue(p[0] >= 0 && p[0] <= W * 0.4, "corner " + k + " at " + p[0]);
+        }
+    }
 }

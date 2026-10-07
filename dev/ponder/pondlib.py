@@ -13,12 +13,13 @@ def r(x, n=4):
 
 
 class Lesson:
-    def __init__(self, id, title, summary, action="none", tags=(), duration=16.0, size=(13, 9, 13), focus=None):
+    def __init__(self, id, title, summary, action="none", tags=(), duration=16.0, size=(13, 9, 13), focus=None, frame=None):
         self.id, self.title, self.summary, self.action = id, title, summary, action
         self.tags = list(tags)
         self.duration = duration
         self.size = list(size)
         self.focus = list(focus) if focus else [size[0] / 2, 2.5, size[2] / 2]
+        self.frame = list(frame) if frame else None
         self.palette = {}
         self.groups = []
         self.ops = []
@@ -29,6 +30,7 @@ class Lesson:
         self.chips_ = []
         self.overlays_ = []
         self.panels_ = []
+        self.sounds_ = []
 
     # ---- blocks
     def key(self, ch, spec):
@@ -96,10 +98,23 @@ class Lesson:
             k["ease"] = ease
         self.cursor_keys.append(k)
 
-    def click(self, t, hold=0.18):
-        """The button goes down at t and up again after hold seconds, wherever the cursor is."""
+    def click(self, t, hold=0.18, sound=True):
+        """The button goes down at t and up again after hold seconds, wherever the cursor is (with the click's sounds)."""
         self.cursor(t, down=True)
         self.cursor(t + hold, down=False)
+        if sound:
+            self.sound(t, "ui_press", 0.8)
+            if hold >= 0.1:
+                self.sound(t + hold, "ui_release", 0.7)
+
+    def sound(self, t, name, volume=1.0, pitch=1.0):
+        """A sound of the mod's interface at a time (it plays only while the lesson is playing, at the player's Sounds volume)."""
+        c = {"t": r(t), "name": name}
+        if volume != 1.0:
+            c["volume"] = volume
+        if pitch != 1.0:
+            c["pitch"] = pitch
+        self.sounds_.append(c)
 
     # ---- words
     def caption(self, t0, t1, text, title=None):
@@ -145,7 +160,7 @@ class Lesson:
             tracks["cursor"] = sorted(self.cursor_keys, key=lambda k: k["t"])
         d = {
             "format": 1, "id": self.id, "title": self.title, "summary": self.summary, "tags": self.tags, "action": self.action,
-            "duration": self.duration, "stage": {"size": self.size, "focus": self.focus},
+            "duration": self.duration, "stage": {"size": self.size, "focus": self.focus, **({"frame": self.frame} if self.frame else {})},
             "palette": self.palette, "groups": self.groups,
         }
         if self.ops:
@@ -159,6 +174,8 @@ class Lesson:
             d["overlays"] = self.overlays_
         if self.panels_:
             d["panels"] = self.panels_
+        if self.sounds_:
+            d["sounds"] = sorted(self.sounds_, key=lambda c: c["t"])
         return d
 
     def write(self, directory=SHIP):
@@ -267,8 +284,8 @@ def cells_of(layers, pred=lambda ch, x, y, z: True):
 
 def cottage_keys(L):
     L.keys(c="minecraft:cobblestone", p="minecraft:oak_planks", l="minecraft:oak_log", g="minecraft:glass",
-           n="minecraft:spruce_stairs[facing=north]", s="minecraft:spruce_stairs[facing=south]", t="minecraft:spruce_slab[type=bottom]",
-           u="minecraft:spruce_planks", b="minecraft:oak_door[facing=south,half=lower]", B="minecraft:oak_door[facing=south,half=upper]")
+           n="minecraft:brick_stairs[facing=north]", s="minecraft:brick_stairs[facing=south]", t="minecraft:brick_slab[type=bottom]",
+           u="minecraft:bricks", b="minecraft:oak_door[facing=south,half=lower]", B="minecraft:oak_door[facing=south,half=upper]")
 
 
 # The cottage every lesson builds or moves: 5 wide, 5 deep, 6 high. Its door is in the south wall and its chimney in the north-east

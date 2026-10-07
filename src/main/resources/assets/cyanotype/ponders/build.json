@@ -34,10 +34,10 @@
   "p": "minecraft:oak_planks",
   "l": "minecraft:oak_log",
   "g": "minecraft:glass",
-  "n": "minecraft:spruce_stairs[facing=north]",
-  "s": "minecraft:spruce_stairs[facing=south]",
-  "t": "minecraft:spruce_slab[type=bottom]",
-  "u": "minecraft:spruce_planks",
+  "n": "minecraft:brick_stairs[facing=north]",
+  "s": "minecraft:brick_stairs[facing=south]",
+  "t": "minecraft:brick_slab[type=bottom]",
+  "u": "minecraft:bricks",
   "b": "minecraft:oak_door[facing=south,half=lower]",
   "B": "minecraft:oak_door[facing=south,half=upper]",
   "x": "minecraft:stone"
@@ -964,12 +964,13 @@
    "t0": 13.6,
    "t1": 17.4,
    "at": [
-    5.5,
-    8.4,
+    8.9,
+    4.6,
     5.5
    ],
    "text": "Next block",
    "color": "gold",
+   "anchor": "left",
    "fade": 0.3
   }
  ],
@@ -1027,8 +1028,19 @@
    "t1": 21.4,
    "text": "DONE",
    "color": "green",
-   "size": 2,
+   "rect": [
+    0.58,
+    0.06,
+    0.2,
+    0.16
+   ],
    "fade": 0.1
+  }
+ ],
+ "sounds": [
+  {
+   "t": 20.6,
+   "name": "complete"
   }
  ]
 }

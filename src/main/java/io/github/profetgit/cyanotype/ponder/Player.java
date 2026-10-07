@@ -71,11 +71,29 @@ public final class Player {
     /** Moves on by a frame's time; goes back to the start at the end. */
     public void update(double dt) {
         if (!playing) return;
+        double before = t;
         t += Math.max(0, Math.min(dt, 0.25)) * speed;
+        boolean wrapped = false;
         if (t >= scene.duration) {
             t %= scene.duration;
             loops++;
+            wrapped = true;
         }
+        // the sounds the lesson passed over in this frame, once each; a seek or a step jumps over them
+        for (Scene.SoundCue c : scene.sounds) {
+            boolean passed = wrapped ? c.t() > before || c.t() <= t : c.t() > before && c.t() <= t;
+            if (passed) due.add(c);
+        }
+    }
+
+    private final java.util.List<Scene.SoundCue> due = new java.util.ArrayList<>();
+
+    /** The sounds that came due since the last call (the screen plays them; a lesson on its own makes no noise). */
+    public java.util.List<Scene.SoundCue> drainSounds() {
+        if (due.isEmpty()) return java.util.List.of();
+        java.util.List<Scene.SoundCue> out = new java.util.ArrayList<>(due);
+        due.clear();
+        return out;
     }
 
     public void seek(double to) {

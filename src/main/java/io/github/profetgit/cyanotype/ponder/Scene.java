@@ -218,6 +218,10 @@ public final class Scene {
         }
     }
 
+    /** A sound the lesson plays when it passes {@code t}: one of the mod's interface sounds, at a volume and pitch. */
+    public record SoundCue(double t, String name, float volume, float pitch) {
+    }
+
     public record Caption(double t0, double t1, String title, String text) {
     }
 
@@ -239,6 +243,8 @@ public final class Scene {
     public final double duration;
     public final int[] size;
     public final double[] focus;
+    /** The part of the picture the stage has to stay inside, as fractions: x0, y0, x1, y1 (a lesson with a panel on one side keeps the stage out from under it). */
+    public final double[] frame;
     /** Palette number minus one -> block state string, and the one-character key the file gave it. */
     public final List<String> palette, paletteKeys;
     public final List<Group> groups;
@@ -247,9 +253,10 @@ public final class Scene {
     public final List<Caption> captions;
     public final List<Chips> chips;
     public final List<Item> overlays, panels;
+    public final List<SoundCue> sounds;
 
-    Scene(String id, String title, String summary, String action, List<String> tags, double duration, int[] size, double[] focus, List<String> palette, List<String> paletteKeys, List<Group> groups, Keyed camera,
-          List<CursorKey> cursor, List<Caption> captions, List<Chips> chips, List<Item> overlays, List<Item> panels) {
+    Scene(String id, String title, String summary, String action, List<String> tags, double duration, int[] size, double[] focus, double[] frame, List<String> palette, List<String> paletteKeys, List<Group> groups, Keyed camera,
+          List<CursorKey> cursor, List<Caption> captions, List<Chips> chips, List<Item> overlays, List<Item> panels, List<SoundCue> sounds) {
         this.id = id;
         this.title = title;
         this.summary = summary;
@@ -258,6 +265,7 @@ public final class Scene {
         this.duration = duration;
         this.size = size;
         this.focus = focus;
+        this.frame = frame;
         this.palette = palette;
         this.paletteKeys = paletteKeys;
         this.groups = groups;
@@ -267,6 +275,7 @@ public final class Scene {
         this.chips = chips;
         this.overlays = overlays;
         this.panels = panels;
+        this.sounds = sounds;
     }
 
     public @Nullable Group group(String id) {

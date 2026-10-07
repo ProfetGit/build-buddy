@@ -27,6 +27,11 @@ final class PonderPanels {
                 case "warning" -> warning(g, p, x, y, w, h, a);
                 case "bar" -> bar(g, p, x, y, w, h, a);
                 case "stamp" -> stamp(g, p, x, y, w, h, a);
+                case "badge" -> {
+                    // a HUD badge keeps the size of the real one (it must hold its words), at the corner the lesson names
+                    int bw = Math.max(w, 176), bh = Math.max(h, 29);
+                    badge(g, p, Math.min(x, vx + vw - bw - 4), y, bw, bh, a);
+                }
                 default -> {
                 }
             }
@@ -91,7 +96,7 @@ final class PonderPanels {
             boolean on = i == hot;
             Ui.blit(g, "button_0", x + 6, ry, w - 12, rowH, a);
             if (on) Ui.blit(g, "button_1", x + 6, ry, w - 12, rowH, a);
-            Ui.icon(g, "cube", x + 10, ry + 2, false, 16, a);
+            Ui.icon(g, "house", x + 10, ry + 2, false, 16, a);
             Ui.text(g, Ui.fit(cards.get(i), w - 42), x + 30, ry + 6, fade(on ? Ui.WHITE : Ui.LINE, a));
             if (on) Ui.marching(g, x + 4, ry - 2, w - 8, rowH + 4, fade(Ui.CYAN, a), p.t);
         }
@@ -104,7 +109,7 @@ final class PonderPanels {
         // the picture of the build, as a framed square on the left
         int pw = Math.min(w / 3, h - 52), px = x + 8, py = y + 20;
         Ui.inset(g, px, py, pw, pw);
-        Ui.icon(g, "cube", px + (pw - 32) / 2, py + (pw - 32) / 2, false, 32, a);
+        Ui.icon(g, "house", px + (pw - 32) / 2, py + (pw - 32) / 2, false, 32, a);
         int fx = px + pw + 8, fw = x + w - 8 - fx;
         Ui.text(g, "Name", fx, py, fade(Ui.DIM, a));
         Ui.inset(g, fx, py + 10, fw, 14);
@@ -232,15 +237,52 @@ final class PonderPanels {
         if (p.bool("done", false) && v >= 0.999) Ui.icon(g, "check", x + w - 4 - 16, y - 7, false, 16, a);
     }
 
+    /** The "done" stamp of the progress panel, as the HUD draws it: lands a little large, turned 12 degrees, a ring of sparks. */
     private static void stamp(GuiGraphicsExtractor g, Snapshot.ItemView p, int x, int y, int w, int h, float a) {
         String text = p.str("text", "DONE");
-        // a stamp: it lands slightly large and settles
-        double k = Motion.reduced() ? 1 : 1 + 0.5 * Math.max(0, 1 - p.age() / 0.25);
-        float size = (float) p.num("size", 2);
+        int color = io.github.profetgit.cyanotype.ponder.StageRaster.color(p.str("color", "green"));
+        double since = p.age();
+        double e = Motion.reduced() ? 1 : Motion.easeOut(Math.min(1, since / 0.18));
+        int cx = x + w / 2, cy = y + h / 2;
+        int half = Math.max(15, (Ui.font().width(text) + 8) / 2);
         g.pose().pushMatrix();
-        g.pose().translate(x + w / 2f, y + h / 2f);
-        g.pose().scale((float) (size * k), (float) (size * k));
-        Ui.centered(g, text, 0, -4, fade(io.github.profetgit.cyanotype.ponder.StageRaster.color(p.str("color", "green")), a));
+        g.pose().translate(cx, cy);
+        g.pose().scale(1f + (float) ((1 - e) * 0.8), 1f + (float) ((1 - e) * 0.8));
+        g.pose().rotate((float) Math.toRadians(-12));
+        g.pose().scale(1.5f, 1.5f);
+        g.fill(-half, -7, half, 7, Ui.withAlpha(Ui.DEEP, (float) e * 0.85f * a));
+        g.outline(-half, -7, half * 2, 14, Ui.withAlpha(color, (float) e * a));
+        Ui.centered(g, text, 0, -4, Ui.withAlpha(color, (float) e * a));
         g.pose().popMatrix();
+        if (!Motion.reduced() && since < 0.7) {
+            for (int i = 0; i < 8; i++) {
+                double ang = i * Math.PI / 4 + 0.3, r = 6 + since * 40;
+                float al = (float) Math.max(0, 1 - since / 0.7) * a;
+                int px = (int) (cx + Math.cos(ang) * r), py = (int) (cy + Math.sin(ang) * r * 0.6);
+                int col = Ui.withAlpha(Ui.WARN, al);
+                g.fill(px - 1, py, px + 2, py + 1, col);
+                g.fill(px, py - 1, px + 1, py + 2, col);
+            }
+        }
+    }
+
+    /** A HUD badge ("AUTO: ON" and the like): a small panel, a pulsing dot or a check, a title, a note on the right and a line of status. */
+    private static void badge(GuiGraphicsExtractor g, Snapshot.ItemView p, int x, int y, int w, int h, float a) {
+        Ui.blit(g, "panel", x, y, w, h, a);
+        int accent = io.github.profetgit.cyanotype.ponder.StageRaster.color(p.str("color", "cyan"));
+        boolean check = p.str("icon", "dot").equals("check");
+        int tx = x + 18;
+        if (check) {
+            Ui.icon(g, "check", x + 2, y + 1, false, 16, a);
+            tx = x + 20;
+        } else {
+            float pulse = Motion.reduced() ? 1f : (float) (0.55 + 0.45 * Math.sin(p.t * 4));
+            g.fill(x + 8, y + 8, x + 13, y + 13, fade(accent, a * pulse));
+        }
+        Ui.text(g, p.str("title", ""), tx, y + 6, fade(accent, a));
+        String right = p.str("right", "");
+        if (!right.isEmpty()) Ui.right(g, right, x + w - 8, y + 6, fade(Ui.LINE, a));
+        String status = p.str("status", "");
+        if (!status.isEmpty()) Ui.text(g, Ui.fit(status, w - 16), x + 8, y + 18, fade(Ui.DIM, a));
     }
 }

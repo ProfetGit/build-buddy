@@ -18,6 +18,9 @@ import org.junit.jupiter.api.Test;
  * lesson's group, evaluated at that moment, is at the same place in the world.
  */
 class RecordedLessonTest {
+    /** When the ghost appears in the place lesson: dev/ponder/scenes.py place() (1.9 + D). */
+    private static final double APPEAR = 3.2;
+
     private static final Path REC = Path.of("dev/ponder/rec/place.rec.json"), LESSON = Path.of("src/main/resources/assets/cyanotype/ponders/place.json");
 
     /** Where a cell of the unturned blueprint goes in the stage under the game's own orientation: mirror first, then the rotation. */
@@ -50,7 +53,7 @@ class RecordedLessonTest {
     @Test
     void theLessonStandsWhereTheRecordingSaysThePlacementStood() throws IOException {
         JsonObject rec = JsonParser.parseString(Files.readString(REC)).getAsJsonObject();
-        checkStands(rec, SceneReader.read(Files.readString(LESSON)), 1.9 - rec.getAsJsonObject("marks").get("appear").getAsDouble(), 25);
+        checkStands(rec, SceneReader.read(Files.readString(LESSON)), APPEAR - rec.getAsJsonObject("marks").get("appear").getAsDouble(), 25);
     }
 
     @Test
@@ -133,7 +136,7 @@ class RecordedLessonTest {
     void theCaptionsFollowTheMarks() throws IOException {
         JsonObject marks = JsonParser.parseString(Files.readString(REC)).getAsJsonObject().getAsJsonObject("marks");
         Scene lesson = SceneReader.read(Files.readString(LESSON));
-        double offset = 1.9 - marks.get("appear").getAsDouble();
+        double offset = APPEAR - marks.get("appear").getAsDouble();
         // each step begins just before the thing it is about happens
         assertTrue(lesson.captions.get(1).t0() < marks.get("turn1").getAsDouble() + offset);
         assertTrue(lesson.captions.get(2).t0() < marks.get("lift_up").getAsDouble() + offset);

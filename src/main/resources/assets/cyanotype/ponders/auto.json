@@ -34,10 +34,10 @@
   "p": "minecraft:oak_planks",
   "l": "minecraft:oak_log",
   "g": "minecraft:glass",
-  "n": "minecraft:spruce_stairs[facing=north]",
-  "s": "minecraft:spruce_stairs[facing=south]",
-  "t": "minecraft:spruce_slab[type=bottom]",
-  "u": "minecraft:spruce_planks",
+  "n": "minecraft:brick_stairs[facing=north]",
+  "s": "minecraft:brick_stairs[facing=south]",
+  "t": "minecraft:brick_slab[type=bottom]",
+  "u": "minecraft:bricks",
   "b": "minecraft:oak_door[facing=south,half=lower]",
   "B": "minecraft:oak_door[facing=south,half=upper]"
  },
@@ -1092,6 +1092,14 @@
      "yaw": 2
     },
     {
+     "t": 5.6,
+     "walk": 1
+    },
+    {
+     "t": 6.5,
+     "walk": 1
+    },
+    {
      "t": 6.8,
      "at": [
       5.5,
@@ -1099,6 +1107,14 @@
       10.4
      ],
      "yaw": 2
+    },
+    {
+     "t": 6.9,
+     "walk": 0
+    },
+    {
+     "t": 9.7,
+     "walk": 0
     },
     {
      "t": 9.8,
@@ -1110,6 +1126,10 @@
      "yaw": 2
     },
     {
+     "t": 10.0,
+     "walk": 1
+    },
+    {
      "t": 10.6,
      "at": [
       9.4,
@@ -1119,6 +1139,10 @@
      "yaw": 3
     },
     {
+     "t": 11.2,
+     "walk": 1
+    },
+    {
      "t": 11.4,
      "at": [
       5.5,
@@ -1126,6 +1150,10 @@
       1.7
      ],
      "yaw": 0
+    },
+    {
+     "t": 11.6,
+     "walk": 0
     },
     {
      "t": 13.2,
@@ -1203,17 +1231,34 @@
  ],
  "panels": [
   {
-   "type": "stamp",
+   "type": "badge",
    "t0": 1.4,
-   "t1": 13.6,
-   "text": "AUTO: ON",
-   "color": "gold",
-   "size": 1,
+   "t1": 5.6,
+   "title": "AUTO: ON",
+   "right": "Assist  20/s",
+   "status": "Placed 15",
+   "color": "cyan",
    "rect": [
-    0.74,
+    0.72,
     0.03,
-    0.24,
-    0.1
+    0.26,
+    0.085
+   ],
+   "fade": 0.3
+  },
+  {
+   "type": "badge",
+   "t0": 5.6,
+   "t1": 13.6,
+   "title": "AUTO: ON",
+   "right": "Sweep  4/s",
+   "status": "Building what is in reach",
+   "color": "cyan",
+   "rect": [
+    0.72,
+    0.03,
+    0.26,
+    0.085
    ],
    "fade": 0.3
   },
@@ -1243,6 +1288,18 @@
      "lit": 1
     }
    ]
+  }
+ ],
+ "sounds": [
+  {
+   "t": 17.7,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 17.95,
+   "name": "ui_release",
+   "volume": 0.7
   }
  ]
 }

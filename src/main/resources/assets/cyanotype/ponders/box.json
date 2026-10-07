@@ -32,10 +32,10 @@
   "p": "minecraft:oak_planks",
   "l": "minecraft:oak_log",
   "g": "minecraft:glass",
-  "n": "minecraft:spruce_stairs[facing=north]",
-  "s": "minecraft:spruce_stairs[facing=south]",
-  "t": "minecraft:spruce_slab[type=bottom]",
-  "u": "minecraft:spruce_planks",
+  "n": "minecraft:brick_stairs[facing=north]",
+  "s": "minecraft:brick_stairs[facing=south]",
+  "t": "minecraft:brick_slab[type=bottom]",
+  "u": "minecraft:bricks",
   "b": "minecraft:oak_door[facing=south,half=lower]",
   "B": "minecraft:oak_door[facing=south,half=upper]"
  },
@@ -731,6 +731,48 @@
    "hot": 0,
    "tags": "house, wood",
    "fade": 0.4
+  }
+ ],
+ "sounds": [
+  {
+   "t": 2.2,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 2.38,
+   "name": "ui_release",
+   "volume": 0.7
+  },
+  {
+   "t": 5.0,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 5.18,
+   "name": "ui_release",
+   "volume": 0.7
+  },
+  {
+   "t": 9.6,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 10.6,
+   "name": "ui_release",
+   "volume": 0.7
+  },
+  {
+   "t": 11.0,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 11.95,
+   "name": "ui_release",
+   "volume": 0.7
   }
  ]
 }

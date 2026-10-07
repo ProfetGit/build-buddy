@@ -294,6 +294,19 @@ def cube():
     return i
 
 
+def house():
+    """A cottage: the glyph of a blueprint in the lessons' mock Library and Save screens."""
+    i = Icon()
+    i.layer(lambda s: s.rect(11, 2, 12, 6, S))
+    i.layer(lambda s: s.rect(2, 8, 13, 14, W))
+    i.layer(lambda s: s.poly([(0.6, 8.6), (8, 1.4), (15.4, 8.6)], B))
+    i.hline(5, 6, 6, BL)
+    i.rect(7, 10, 8, 14, B)
+    i.rect(3, 10, 4, 11, BL)
+    i.rect(11, 10, 12, 11, BL)
+    return i
+
+
 def sweep():
     i = Icon()
     for x in (1, 6, 11):
@@ -485,7 +498,7 @@ ICONS = [
     ("wand", wand), ("cube", cube), ("sweep", sweep), ("select", select), ("check", check), ("cross", cross),
     ("mouse_left", lambda: mouse(left=True)), ("mouse_right", lambda: mouse(right=True)), ("mouse_wheel", lambda: mouse(wheel=True)), ("mouse_none", lambda: mouse()),
     ("keycap", keycap), ("mark_drag", drag_mark), ("mark_scroll", scroll_mark), ("paste", paste),
-    ("cursor", cursor), ("play", play), ("pause", pause), ("step_next", step_next), ("step_prev", lambda: step_next().mirrored()), ("restart", restart), ("help", help_),
+    ("cursor", cursor), ("play", play), ("pause", pause), ("step_next", step_next), ("step_prev", lambda: step_next().mirrored()), ("restart", restart), ("help", help_), ("house", house),
 ]
 
 

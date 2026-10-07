@@ -43,7 +43,7 @@ public final class SceneReader {
         }
     }
 
-    private static final Set<String> TOP = Set.of("format", "id", "title", "summary", "tags", "action", "duration", "stage", "palette", "groups", "ops", "tracks", "captions", "chips", "overlays", "panels");
+    private static final Set<String> TOP = Set.of("format", "id", "title", "summary", "tags", "action", "duration", "stage", "palette", "groups", "ops", "tracks", "captions", "chips", "overlays", "panels", "sounds");
     private static final Set<String> GROUP = Set.of("id", "mode", "pos", "layers", "start", "match");
     private static final Set<String> OP = Set.of("t", "group", "do", "cells", "layer", "layers", "box", "key", "all", "anim", "dur", "stagger", "order", "from");
     private static final Set<String> CAMERA_FIELDS = Set.of("t", "ease", "yaw", "pitch", "zoom", "focus");
@@ -54,6 +54,8 @@ public final class SceneReader {
     private static final Map<String, Integer> ARITY = Map.ofEntries(Map.entry("pos", 3), Map.entry("focus", 3), Map.entry("window", 2), Map.entry("at", 3), Map.entry("from", 3), Map.entry("to", 3), Map.entry("a", 3),
         Map.entry("b", 3), Map.entry("center", 3), Map.entry("screen", 2), Map.entry("cell", 3));
     /** Fields that switch rather than glide. */
+    /** The interface sounds a lesson may play (Sfx). */
+    static final Set<String> SOUND_NAMES = Set.of("ui_press", "ui_release", "wheel_tick", "lock", "snap", "complete", "error");
     private static final Set<String> STEPPED = Set.of("mirror", "visible", "down", "hot", "row");
 
     /** What each overlay type may have besides the common fields. */
@@ -66,7 +68,7 @@ public final class SceneReader {
         "tint", Set.of("group", "key", "cells", "color", "alpha", "pulse"),
         "label", Set.of("at", "text", "color", "anchor"),
         "dim", Set.of("a", "b", "text", "color"),
-        "avatar", Set.of("at", "yaw", "color"),
+        "avatar", Set.of("at", "yaw", "color", "walk"),
         "path", Set.of("points", "color"));
     private static final Map<String, Set<String>> PANEL_TYPES = Map.of(
         "library", Set.of("rect", "cards", "hot", "title"),
@@ -74,7 +76,8 @@ public final class SceneReader {
         "list", Set.of("rect", "title", "rows", "hot", "note", "header", "buttons", "lit"),
         "warning", Set.of("rect", "title", "text", "buttons", "focus", "lit", "wait"),
         "bar", Set.of("rect", "label", "value", "done"),
-        "stamp", Set.of("rect", "text", "color", "size"));
+        "stamp", Set.of("rect", "text", "color", "size"),
+        "badge", Set.of("rect", "title", "right", "status", "color", "icon"));
 
     static Scene parse(JsonElement root) {
         JsonObject o = obj(root, "");
@@ -91,15 +94,20 @@ public final class SceneReader {
 
         int[] size = {16, 8, 16};
         double[] focus;
+        double[] frame = {0, 0, 1, 1};
         if (o.has("stage")) {
             JsonObject st = obj(o.get("stage"), "stage");
-            strict(st, "stage", Set.of("size", "focus"));
+            strict(st, "stage", Set.of("size", "focus", "frame"));
             double[] s = vec(st, "size", 3, "stage", true);
             for (int i = 0; i < 3; i++) {
                 size[i] = (int) s[i];
                 if (size[i] < 1 || size[i] > 64) throw new SceneException("stage.size", "each side is 1 to 64 blocks");
             }
             focus = st.has("focus") ? vec(st, "focus", 3, "stage", true) : new double[]{size[0] / 2.0, size[1] / 2.0, size[2] / 2.0};
+            if (st.has("frame")) {
+                frame = vec(st, "frame", 4, "stage", true);
+                if (frame[0] < 0 || frame[1] < 0 || frame[2] > 1 || frame[3] > 1 || frame[2] - frame[0] < 0.2 || frame[3] - frame[1] < 0.2) throw new SceneException("stage.frame", "x0, y0, x1, y1 as fractions of the picture, at least 0.2 wide and tall");
+            }
         } else {
             focus = new double[]{size[0] / 2.0, size[1] / 2.0, size[2] / 2.0};
         }
@@ -212,10 +220,26 @@ public final class SceneReader {
             }
         }
 
+        List<Scene.SoundCue> sounds = new ArrayList<>();
+        if (o.has("sounds")) {
+            JsonArray sa = arr(o.get("sounds"), "sounds");
+            for (int i = 0; i < sa.size(); i++) {
+                String path = "sounds[" + i + "]";
+                JsonObject c = obj(sa.get(i), path);
+                strict(c, path, Set.of("t", "name", "volume", "pitch"));
+                double t = num(c, "t", path, true, 0);
+                if (t < 0 || t >= duration) throw new SceneException(path + ".t", "inside the lesson, 0 to " + duration);
+                String name = str(c, "name", path, true, "");
+                if (!SOUND_NAMES.contains(name)) throw new SceneException(path + ".name", "one of " + SOUND_NAMES);
+                sounds.add(new Scene.SoundCue(t, name, (float) num(c, "volume", path, false, 1), (float) num(c, "pitch", path, false, 1)));
+            }
+            sounds.sort(Comparator.comparingDouble(Scene.SoundCue::t));
+        }
+
         List<Scene.Item> overlays = readItems(o, "overlays", OVERLAY_TYPES, duration, groupAt);
         List<Scene.Item> panels = readItems(o, "panels", PANEL_TYPES, duration, groupAt);
-        return new Scene(id, title, summary, action, List.copyOf(tags), duration, size, focus, List.copyOf(palette), List.copyOf(paletteIndex.keySet()), List.copyOf(finalGroups), camera, List.copyOf(cursor), List.copyOf(captions), List.copyOf(chips), List.copyOf(overlays),
-            List.copyOf(panels));
+        return new Scene(id, title, summary, action, List.copyOf(tags), duration, size, focus, frame, List.copyOf(palette), List.copyOf(paletteIndex.keySet()), List.copyOf(finalGroups), camera, List.copyOf(cursor), List.copyOf(captions), List.copyOf(chips), List.copyOf(overlays),
+            List.copyOf(panels), List.copyOf(sounds));
     }
 
     // ---- groups
