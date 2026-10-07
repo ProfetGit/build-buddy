@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.65
+
+- The turn ring has its original look back (flat band, crisp edges, the four clockwise chevrons). It still pops in and drifts.
+
 ## 0.0.64
 
 - The pointed arrow shape is back (square shaft, pyramid head), now chunkier and better looking: every face is shaded softly as if lit from above, in pastel colour, with a thin light edge that keeps it clear over any background. The soft turn ring stays.

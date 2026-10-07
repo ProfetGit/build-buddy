@@ -345,11 +345,11 @@ final class Handles {
 
     /** The turn ring: a soft translucent band at the base with four rounded arrows showing clockwise. */
     private void ring(float hover, float press, float visible, double drift) {
-        double band = 0.62 * ring.unit * (1 + 0.25 * hover - 0.1 * press);
+        double band = 0.5 * ring.unit * (1 + 0.25 * hover - 0.1 * press);
         double r0 = ring.radius - band / 2, r1 = ring.radius + band / 2;
-        int stroke = alpha(mix(RING_COLOR, WHITE, 0.2f + 0.8f * hover), visible * (0.45 + 0.5 * hover));
-        float sw = 1.6f + 1.6f * hover;
-        int fill = alpha(RING_COLOR, (0.26 + 0.35 * hover) * visible);
+        int stroke = alpha(mix(RING_COLOR, WHITE, 0.2f + 0.8f * hover), visible);
+        float sw = 2.2f + 2.0f * hover;
+        int fill = alpha(RING_COLOR, (0.28 + 0.35 * hover) * visible);
         int n = 72;
         Vec3[] in = new Vec3[n + 1], out = new Vec3[n + 1];
         for (int i = 0; i <= n; i++) {
@@ -364,23 +364,14 @@ final class Handles {
             Gizmos.line(in[i], in[i + 1], stroke, sw).setAlwaysOnTop();
             Gizmos.line(out[i], out[i + 1], stroke, sw).setAlwaysOnTop();
         }
-        // four round-nosed arrowheads pointing clockwise (toward +z from +x, as seen from above): a fan of small steps whose
-        // width shrinks along the way, so the tip is blunt
-        double w = 0.62 * ring.unit * (1 + 0.2 * hover), len = 1.5 * ring.unit / ring.radius;
-        int steps = 6;
-        GizmoStyle head = GizmoStyle.fill(alpha(WHITE, (0.7 + 0.25 * hover) * visible));
+        // chevrons pointing clockwise (toward +z from +x, as seen from above)
+        double w = 0.55 * ring.unit * (1 + 0.2 * hover), tipAngle = 0.8 * ring.unit / ring.radius;
         for (int k = 0; k < 4; k++) {
             double a = k * Math.PI / 2 + Math.PI / 4 + drift;
-            for (int i = 0; i < steps; i++) {
-                double t0 = (double) i / steps, t1 = (double) (i + 1) / steps;
-                double w0 = w * Math.sqrt(Math.max(0, 1 - t0 * t0)), w1 = w * Math.sqrt(Math.max(0, 1 - t1 * t1));
-                double a0 = a + len * t0, a1 = a + len * t1;
-                Gizmos.rect(
-                    new Vec3(ring.cx + Math.cos(a0) * (ring.radius - w0), ring.y, ring.cz + Math.sin(a0) * (ring.radius - w0)),
-                    new Vec3(ring.cx + Math.cos(a0) * (ring.radius + w0), ring.y, ring.cz + Math.sin(a0) * (ring.radius + w0)),
-                    new Vec3(ring.cx + Math.cos(a1) * (ring.radius + w1), ring.y, ring.cz + Math.sin(a1) * (ring.radius + w1)),
-                    new Vec3(ring.cx + Math.cos(a1) * (ring.radius - w1), ring.y, ring.cz + Math.sin(a1) * (ring.radius - w1)), head).setAlwaysOnTop();
-            }
+            Vec3 tip = new Vec3(ring.cx + Math.cos(a + tipAngle) * ring.radius, ring.y, ring.cz + Math.sin(a + tipAngle) * ring.radius);
+            Vec3 l = new Vec3(ring.cx + Math.cos(a) * (ring.radius - w), ring.y, ring.cz + Math.sin(a) * (ring.radius - w));
+            Vec3 r = new Vec3(ring.cx + Math.cos(a) * (ring.radius + w), ring.y, ring.cz + Math.sin(a) * (ring.radius + w));
+            Gizmos.rect(l, tip, tip, r, GizmoStyle.strokeAndFill(stroke, sw, alpha(WHITE, (0.55 + 0.35 * hover) * visible))).setAlwaysOnTop();
         }
     }
 
