@@ -240,6 +240,7 @@ final class UiScenes {
             }
         });
         waitTicks(30);
+        until("library/the new files are read", 300, () -> screen() instanceof io.github.profetgit.cyanotype.ui.LibraryScreen ls && ls.entries().size() == 10 && ls.entries().stream().allMatch(e -> e.loaded() || e.error != null));
         act(() -> {
             var list = ((io.github.profetgit.cyanotype.ui.LibraryScreen) screen()).entries();
             var late = list.stream().filter(e -> e.fileName.equals("late-arrival.litematic")).findFirst().orElse(null);
