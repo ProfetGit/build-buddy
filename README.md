@@ -1,8 +1,8 @@
 ![Cyanotype](https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/banner.webp)
 
 <p align="center">
-<a href="https://github.com/ProfetGit"><img src="https://raw.githubusercontent.com/ProfetGit/assets/main/buttons/github.gif" alt="GitHub" width="23.96%"></a>
-<a href="https://ko-fi.com/profetgit"><img src="https://raw.githubusercontent.com/ProfetGit/assets/main/buttons/kofi.gif" alt="Ko-fi" width="23.96%"></a>
+<a href="https://github.com/ProfetGit"><img src="https://raw.githubusercontent.com/ProfetGit/assets/main/buttons/github.webp" alt="GitHub" width="23.96%"></a>
+<a href="https://ko-fi.com/profetgit"><img src="https://raw.githubusercontent.com/ProfetGit/assets/main/buttons/kofi.webp" alt="Ko-fi" width="23.96%"></a>
 </p>
 
 **Blueprints, made easy.** Load a build, see it as a see-through ghost in your world, and put it up block by block while the screen tells you what to do next. For Minecraft 26.3 on Fabric. It runs on your client alone, so it works on any server, and you never need a tutorial to use it.
@@ -61,11 +61,11 @@ Put the Cyanotype jar and Fabric API in your `mods` folder. Builds go in `config
 
 Cyanotype is free. If it saves you some building time, a coffee helps fund the next update.
 
-[![Support me on Ko-fi](https://raw.githubusercontent.com/ProfetGit/assets/main/kofi-banner.gif)](https://ko-fi.com/profetgit)
+[![Support me on Ko-fi](https://raw.githubusercontent.com/ProfetGit/assets/main/kofi-banner.webp)](https://ko-fi.com/profetgit)
 
 Want your own server to play on with friends? My BisectHosting affiliate link gives you 25% off the first month, and I get a small commission.
 
-[![Get 25% off your first month at BisectHosting](https://raw.githubusercontent.com/ProfetGit/assets/main/bisecthosting-banner.gif)](https://url-shortener.curseforge.com/Pp2BN)
+[![Get 25% off your first month at BisectHosting](https://raw.githubusercontent.com/ProfetGit/assets/main/bisecthosting-banner.webp)](https://url-shortener.curseforge.com/Pp2BN)
 
 ![License](https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/desc/title-license.webp)
 

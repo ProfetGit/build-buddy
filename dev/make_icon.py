@@ -28,7 +28,10 @@ N = 128
 U = 24                      # px per unit along x and z (and up)
 HU = U // 2
 OX, OY = 64, 68             # screen position of world (0, 0, 0)
-FPS, FRAMES = 20, 80
+import os
+TICK = 20                       # the design's step rate: stepped beats (blink, sparks) hold for 1/20 s
+FPS = int(os.environ.get("CYANO_FPS", TICK))
+FRAMES = int(4.0 * FPS)
 LEN = FRAMES / FPS
 STILL_FRAME = 28
 GIF_SIZE, GIF_LIMIT = 256, 256 * 1024
@@ -181,7 +184,7 @@ def piece_state(i, t):
     tl = td + T["fall"]
     rank = len(PIECES) - 1 - i
     tr = T["reset"] + T["reset_gap"] * rank
-    f = lambda x: int(round(x * FPS))
+    f = lambda x: int(math.floor(x * TICK + 1e-6))
     if t < td - 1e-9:
         pre = T["pre"]
         light = 0.0
@@ -194,9 +197,9 @@ def piece_state(i, t):
         sc = (0.55, 0.55, 0.55) if f(t) == f(td) else (1, 1, 1)
         return dict(ghost=True, light=0.0, lines=True, solid=True, move=y, scale=sc, flash=0.5 if f(t) == f(td) else 0.0)
     if t < tr - 1e-9:
-        n = f(t) - f(tl)
-        sc = SQUASH[n] if n < len(SQUASH) else (1, 1, 1)
-        fl = FLASH[n] if n < len(FLASH) else 0.0
+        n = (t - tl) * TICK + 1e-6
+        sc = tuple(float(np.interp(n, range(len(SQUASH) + 1), [q[c] for q in SQUASH] + [1.0])) for c in range(3))
+        fl = float(np.interp(n, range(len(FLASH) + 1), FLASH + [0.0]))
         return dict(ghost=False, light=0.0, solid=True, move=0.0, scale=sc, flash=fl)
     n = f(t) - f(tr)
     if n == 0:
@@ -266,12 +269,13 @@ def ring_fx(rgb, a, cell, n):
     """Snap ring on the floor under a wall piece: a 2:1 diamond growing over six frames."""
     if n >= 6:
         return
+    ni = int(n)
     cx = OX + U * (cell[0] - cell[2])
     cy = OY + HU * (cell[0] + cell[2] + 1) - U * cell[1]
-    r = [5, 11, 17, 23, 28, 32][n]
+    r = float(np.interp(n, range(6), [5, 11, 17, 23, 28, 32]))
     d = np.abs(XX + 0.5 - cx) / 2 + np.abs(YY + 0.5 - cy)
     m = np.abs(d - r / 2) < 0.75
-    colr = [LINE, LINE, CYAN, CYAN, DIM, DIM][n]
+    colr = [LINE, LINE, CYAN, CYAN, DIM, DIM][ni]
     rgb[m] = colr
     a[m] = 1.0
 
@@ -333,7 +337,7 @@ def frame(f):
     a = np.zeros((N, N))
 
     for i, st in enumerate(states):
-        n = round((t - T["drop"][i] - T["fall"]) * FPS)
+        n = (t - T["drop"][i] - T["fall"]) * TICK + 1e-6
         if i < 4 and 0 <= n < 6 and st["solid"] and not st["ghost"]:
             ring_fx(rgb, a, PIECES[i].cell, n)
 
@@ -397,16 +401,16 @@ def frame(f):
     rgb = out_rgb
 
     # sparkles and the check
-    bk = (t - T["badge"]) * FPS
+    bk = (t - T["badge"]) * TICK + 1e-6
     if t >= T["badge"] and t < T["reset"]:
         k = 0.4 if bk < 1 else 1.0
         badge(rgb, a, k)
     if t >= T["reset"]:
-        bk2 = (t - T["reset"]) * FPS
+        bk2 = (t - T["reset"]) * TICK + 1e-6
         if bk2 < 2:
             badge(rgb, a, 1.0 if bk2 < 1 else 0.4)
     for j, (sx, sy, st0) in enumerate(((-40, -14, 0.0), (44, -4, 0.10), (-6, -46, 0.20), (22, 34, 0.30), (-34, 26, 0.38))):
-        k = round((t - T["done"] - st0) * FPS)
+        k = int(math.floor((t - T["done"] - st0) * TICK + 1e-6))
         step = {0: 2, 1: 1, 2: 1, 3: 2}.get(k)
         if step:
             spark(rgb, a, OX + sx, OY + sy, step)

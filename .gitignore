@@ -14,3 +14,6 @@ dev/icon/out/
 dev/icon/contact*.png
 dev/icon/review*.png
 dev/icon/sprites/review*.png
+release-art/
+dev/icon/frames60/
+dev/icon/banner_frames60/
