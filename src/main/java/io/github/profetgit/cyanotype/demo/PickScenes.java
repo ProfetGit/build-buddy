@@ -528,10 +528,26 @@ final class PickScenes {
         act(() -> io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(3000, G + 1, 3000, 3005, G + 3, 3005)));
         waitTicks(16);
         grabSide("top");
-        act(() -> check("pick/far from the origin the blocks inside are lit", io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size() > 20, String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size())));
+        act(() -> check("pick/far from the origin the blocks inside are lit", io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size() >= 3, String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size())));
+        letGo();
+        // a big, solid box: every seen face is lit (nothing skipped), as a few big rectangles
+        act(() -> {
+            io.github.profetgit.cyanotype.interaction.Selecting.cancel(mc());
+            Director.run(mc(), "fill 3000 " + (G + 1) + " 3010 3031 " + (G + 20) + " 3041 minecraft:stone_bricks");
+        });
+        waitTicks(40);
+        act(() -> io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(3000, G + 1, 3010, 3031, G + 20, 3041)));
+        waitTicks(16);
+        grabSide("top");
+        act(() -> {
+            int lit = io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size();
+            check("pick/a big solid box lights its whole skin as a few rectangles", lit >= 4 && lit <= 20, lit + " shapes");
+        });
+        shot("pick_9_big");
         letGo();
         act(() -> {
             io.github.profetgit.cyanotype.interaction.Selecting.cancel(mc());
+            Director.run(mc(), "fill 3000 " + (G + 1) + " 3010 3031 " + (G + 20) + " 3041 minecraft:air");
             Director.hideHud(mc(), true);
             Director.run(mc(), "fill 3000 " + (G + 1) + " 3000 3005 " + (G + 6) + " 3005 minecraft:air");
         });
