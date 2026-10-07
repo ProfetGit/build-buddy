@@ -216,6 +216,15 @@ class Follow:
         return out
 
 
+def follow_cursor(L, f, offset, t0, t1, ease="linear"):
+    """Cursor keys that stay at `offset` from a Follow's value between two times (the cursor rides on the thing being moved)."""
+    L.cursor(t0, ease="inOut", at=add(f.value_at(t0), offset))
+    for t, v, e in f.ks:
+        if t0 < t < t1:
+            L.cursor(t, ease=e or ease, at=add(v, offset))
+    L.cursor(t1, ease=ease, at=add(f.value_at(t1), offset))
+
+
 def add(p, d):
     return [p[i] + d[i] for i in range(3)]
 

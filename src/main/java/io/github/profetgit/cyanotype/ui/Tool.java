@@ -8,6 +8,7 @@ import io.github.profetgit.cyanotype.interaction.Selecting;
 import io.github.profetgit.cyanotype.paste.Paste;
 import io.github.profetgit.cyanotype.placement.Placement;
 import io.github.profetgit.cyanotype.placement.Placements;
+import io.github.profetgit.cyanotype.ponder.Lessons;
 import net.minecraft.client.Minecraft;
 
 /**
@@ -17,16 +18,16 @@ import net.minecraft.client.Minecraft;
  * Pick and the box under Save.
  */
 public enum Tool {
-    LIBRARY("Library", "folder", "Pick a blueprint to place") {
+    LIBRARY("Library", "folder", "Pick a blueprint to place", "place") {
         @Override
         void run(Minecraft mc) {
             mc.gui.setScreen(new LibraryScreen());
         }
     },
-    EDIT("Edit", "move", "Move, turn and mirror the placement") {
+    EDIT("Edit", "move", "Move, turn and mirror the placement", "edit") {
         @Override
         void run(Minecraft mc) {
-            Interaction.enterEdit(mc);
+            Lessons.firstUse(mc, "edit", () -> Interaction.enterEdit(mc));
         }
 
         @Override
@@ -42,10 +43,10 @@ public enum Tool {
             return loading ? "The blueprint is still loading." : "Click to put the blueprint down first.";
         }
     },
-    LAYERS("Layers", "layers", "Show only some layers") {
+    LAYERS("Layers", "layers", "Show only some layers", "layers") {
         @Override
         void run(Minecraft mc) {
-            Interaction.startLayers(mc);
+            Lessons.firstUse(mc, "layers", () -> Interaction.startLayers(mc));
         }
 
         @Override
@@ -53,10 +54,10 @@ public enum Tool {
             return needBuild();
         }
     },
-    BUILD("Build", "hammer", "Help with building: next block, auto-place") {
+    BUILD("Build", "hammer", "Help with building: next block, auto-place", "build") {
         @Override
         void run(Minecraft mc) {
-            mc.gui.setScreen(buildScreen(mc));
+            Lessons.firstUse(mc, "build", () -> mc.gui.setScreen(buildScreen(mc)));
         }
 
         @Override
@@ -65,10 +66,10 @@ public enum Tool {
             return AutoBuilder.on() || Interaction.guide ? "" : needBuild();
         }
     },
-    MATERIALS("Materials", "list", "What is still needed") {
+    MATERIALS("Materials", "list", "What is still needed", "materials") {
         @Override
         void run(Minecraft mc) {
-            mc.gui.setScreen(new MaterialsScreen());
+            Lessons.firstUse(mc, "materials", () -> mc.gui.setScreen(new MaterialsScreen()));
         }
 
         @Override
@@ -76,19 +77,21 @@ public enum Tool {
             return needBuild();
         }
     },
-    SAVE("Save", "save", "Save a build of yours as a blueprint") {
+    SAVE("Save", "save", "Save a build of yours as a blueprint", "pick") {
         @Override
         void run(Minecraft mc) {
             mc.gui.setScreen(saveScreen());
         }
     };
 
-    public final String label, icon, hint;
+    /** What the wheel shows, and the id of the lesson (How it works) for the tool. */
+    public final String label, icon, hint, lesson;
 
-    Tool(String label, String icon, String hint) {
+    Tool(String label, String icon, String hint, String lesson) {
         this.label = label;
         this.icon = icon;
         this.hint = hint;
+        this.lesson = lesson;
     }
 
     abstract void run(Minecraft mc);
@@ -128,11 +131,11 @@ public enum Tool {
         boolean ready = locked() != null;
         String need = ready ? "" : "Place a blueprint first.  ";
         java.util.List<ChoiceScreen.Choice> choices = java.util.List.of(
-            new ChoiceScreen.Choice("cube", "Build it myself", "Nothing is placed for you.", true, !AutoBuilder.on(), () -> AutoBuilder.request(mc, AutoBuilder.Mode.OFF)),
+            new ChoiceScreen.Choice("cube", "Build it myself", "Nothing is placed for you.", true, !AutoBuilder.on(), () -> AutoBuilder.request(mc, AutoBuilder.Mode.OFF), "build"),
             new ChoiceScreen.Choice("hammer", "Place what I look at", "Hold use on a ghost block and it goes down at once. Nothing else can be placed.", ready, AutoBuilder.mode() == AutoBuilder.Mode.ASSIST,
-                () -> AutoBuilder.request(mc, AutoBuilder.Mode.ASSIST)),
+                () -> Lessons.firstUse(mc, "auto", () -> AutoBuilder.request(mc, AutoBuilder.Mode.ASSIST)), "auto"),
             new ChoiceScreen.Choice("sweep", "Place everything in reach", "Builds what is near you, lowest layer first, while you walk.", ready, AutoBuilder.mode() == AutoBuilder.Mode.SWEEP,
-                () -> AutoBuilder.request(mc, AutoBuilder.Mode.SWEEP)),
+                () -> Lessons.firstUse(mc, "auto", () -> AutoBuilder.request(mc, AutoBuilder.Mode.SWEEP)), "auto"),
             pasteChoice(mc, ready));
         ChoiceScreen.Toggle next = new ChoiceScreen.Toggle("Mark the next block to build", "A marker and an arrow show where to build next.", () -> Interaction.guide, v -> {
             Interaction.reveal();
@@ -147,7 +150,7 @@ public enum Tool {
         String why = Paste.unavailable(mc);
         boolean ok = ready && why.isEmpty() && Paste.ready(Placements.active()) && !Paste.busy();
         String desc = !why.isEmpty() ? why : !ready ? "Place a blueprint first." : Paste.busy() ? "A paste is running." : "Creative: puts the whole build in the world at once. Ctrl+Z undoes it.";
-        return new ChoiceScreen.Choice("paste", "Paste it into the world", desc, ok, false, () -> askPaste(mc));
+        return new ChoiceScreen.Choice("paste", "Paste it into the world", desc, ok, false, () -> Lessons.firstUse(mc, "paste", () -> askPaste(mc)), "paste");
     }
 
     /** Asks before pasting the active build into the world: how many blocks go in, how many that are in the way are replaced. Esc or Not now keeps everything. */
@@ -177,8 +180,8 @@ public enum Tool {
     static ChoiceScreen saveScreen() {
         Minecraft mc = Minecraft.getInstance();
         java.util.List<ChoiceScreen.Choice> choices = java.util.List.of(
-            new ChoiceScreen.Choice("wand", "Pick a build", "Click a build and a box fits itself round it. Drag the sides to change it.", true, false, () -> Picking.start(mc)),
-            new ChoiceScreen.Choice("select", "Select a box", "Click two corners, then drag the sides until it holds your build.", true, false, () -> Selecting.start(mc)));
+            new ChoiceScreen.Choice("wand", "Pick a build", "Click a build and a box fits itself round it. Drag the sides to change it.", true, false, () -> Lessons.firstUse(mc, "pick", () -> Picking.start(mc)), "pick"),
+            new ChoiceScreen.Choice("select", "Select a box", "Click two corners, then drag the sides until it holds your build.", true, false, () -> Lessons.firstUse(mc, "box", () -> Selecting.start(mc)), "box"));
         return new ChoiceScreen("Save a build", "Either way you name it next and it goes into your Library.", choices, null);
     }
 }

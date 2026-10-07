@@ -255,13 +255,13 @@ public final class Selecting {
             case FIRST -> {
                 BlockPos cell = aim(mc, camera, look, 0);
                 cell(cell, 0.9);
-                Interaction.chips(mc, new Chips.Chip("Click", "First corner"), new Chips.Chip(cancel, "Cancel"));
+                Interaction.chips(mc, new Chips.Chip("Click", "First corner"), new Chips.Chip(cancel, "Cancel"), Interaction.helpChip());
             }
             case SECOND -> {
                 BlockPos cell = aim(mc, camera, look, lift);
                 SelectionBox b = SelectionBox.of(first.getX(), first.getY(), first.getZ(), cell.getX(), cell.getY(), cell.getZ());
                 drawBox(b, camera, true, null, false);
-                Interaction.chips(mc, new Chips.Chip("Click", "Second corner"), new Chips.Chip("Scroll", "Raise / lower it"), new Chips.Chip("Right click", "Back"), new Chips.Chip(cancel, "Cancel"));
+                Interaction.chips(mc, new Chips.Chip("Click", "Second corner"), new Chips.Chip("Scroll", "Raise / lower it"), new Chips.Chip("Right click", "Back"), new Chips.Chip(cancel, "Cancel"), Interaction.helpChip());
             }
             case ADJUST -> adjust(mc, camera, look, cancel);
         }
@@ -282,7 +282,7 @@ public final class Selecting {
             hover = handles.pick(camera, look);
             Interaction.chips(mc, new Chips.Chip("Drag", hover == null ? "An arrow resizes the box" : "Move the " + face(hover.dir) + " side"),
                 new Chips.Chip("Scroll", "Grow / shrink the box"),
-                new Chips.Chip("Right click", "Save it..."), new Chips.Chip(cancel, "Cancel"));
+                new Chips.Chip("Right click", "Save it..."), new Chips.Chip(cancel, "Cancel"), Interaction.helpChip());
         }
         handles.animate(hover, dragHandle == null ? null : hover, Interaction.dt());
         Direction pointed = hover != null ? hover.dir : (now - scrollNs < 1_200_000_000L ? scrollFace : null);

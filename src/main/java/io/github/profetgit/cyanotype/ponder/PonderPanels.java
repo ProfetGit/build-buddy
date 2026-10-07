@@ -133,7 +133,7 @@ final class PonderPanels {
         List<String> header = p.props().strings("header");
         int hot = (int) Math.round(p.num("hot", -1));
         int cols = rows.isEmpty() ? 2 : rows.get(0).size();
-        int needR = w - 8 - (cols >= 4 ? 78 : 8), haveR = w - 8 - 54, toL = w - 8 - 52;
+        int needR = w - 120, haveR = w - 84, toL = w - 76;
         int ry = y + 20;
         if (!header.isEmpty()) {
             Ui.text(g, header.get(0), x + 26, ry, fade(Ui.DIM, a));
@@ -157,13 +157,13 @@ final class PonderPanels {
                 g.fill(x + 6, ry, x + w - 6, ry + rowH, fade(0xFF123456, a * 0.5f));
             }
             Ui.icon(g, "cube", x + 8, ry - 1, false, 16, a);
-            Ui.text(g, Ui.fit(r.get(0), (cols >= 4 ? needR - 24 : w - 80) - 26), x + 26, ry + 4, fade(on ? Ui.WHITE : Ui.LINE, a));
+            Ui.text(g, Ui.fit(r.get(0), (cols >= 4 ? needR - 22 : w - 80) - 26), x + 26, ry + 4, fade(on ? Ui.WHITE : Ui.LINE, a));
             if (cols >= 4) {
                 Ui.right(g, r.get(1), x + needR, ry + 4, fade(Ui.LINE, a));
                 Ui.right(g, r.get(2), x + haveR, ry + 4, fade(r.get(3).equals("enough") ? Ui.GOOD : Ui.LINE, a));
                 if (r.get(3).equals("enough")) {
                     Ui.icon(g, "check", x + toL - 1, ry - 1, false, 16, a);
-                    Ui.text(g, "enough", x + toL + 14, ry + 4, fade(Ui.GOOD, a));
+                    Ui.text(g, "enough", x + toL + 15, ry + 4, fade(Ui.GOOD, a));
                 } else {
                     Ui.text(g, Ui.fit(r.get(3), w - toL - 8), x + toL, ry + 4, fade(Ui.WARN, a));
                 }

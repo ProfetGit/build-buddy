@@ -206,7 +206,7 @@ public final class Picking {
         String cancel = Ui.keyName(Keys.MAIN);
         if (set.working()) {
             Interaction.say(mc, "Looking at the build... " + Math.round(set.progress() * 100) + "%");
-            Interaction.chips(mc, new Chips.Chip("Right click", "Stop"), new Chips.Chip(cancel, "Cancel"));
+            Interaction.chips(mc, new Chips.Chip("Right click", "Stop"), new Chips.Chip(cancel, "Cancel"), Interaction.helpChip());
             return;
         }
         BlockPos cell = aimCell(mc);
@@ -243,20 +243,20 @@ public final class Picking {
     private static void aimHint(Minecraft mc, @Nullable BlockPos cell, String cancel) {
         // the same two rows whatever is aimed at: only the words of the first follow it
         if (cell == null) {
-            Interaction.chips(mc, new Chips.Chip("Click", "Aim at a build first"), new Chips.Chip(cancel, "Cancel"));
+            Interaction.chips(mc, new Chips.Chip("Click", "Aim at a build first"), new Chips.Chip(cancel, "Cancel"), Interaction.helpChip());
             return;
         }
         boolean buildable = hoverKind == Kind.BUILT || hoverHop != Long.MIN_VALUE;
         long shown = hoverKind == Kind.BUILT ? hoverCell : hoverHop;
         if (buildable) {
             outline(mc, BlockPos.of(shown), 0xCC000000 | (CYAN & 0xFFFFFF), 3.0f, 0x287FE3FF);
-            Interaction.chips(mc, new Chips.Chip("Click", "Fit a box round this build"), new Chips.Chip(cancel, "Cancel"));
+            Interaction.chips(mc, new Chips.Chip("Click", "Fit a box round this build"), new Chips.Chip(cancel, "Cancel"), Interaction.helpChip());
         } else if (hoverKind == Kind.FLUID) {
             outline(mc, cell, 0xCC000000 | (RED & 0xFFFFFF), 2.4f, 0);
-            Interaction.chips(mc, new Chips.Chip("Click", "Water is not a build"), new Chips.Chip(cancel, "Cancel"));
+            Interaction.chips(mc, new Chips.Chip("Click", "Water is not a build"), new Chips.Chip(cancel, "Cancel"), Interaction.helpChip());
         } else {
             outline(mc, cell, 0xCC000000 | (AMBER & 0xFFFFFF), 2.4f, 0);
-            Interaction.chips(mc, new Chips.Chip("Click", "Twice to pick " + describe(hoverKind)), new Chips.Chip(cancel, "Cancel"));
+            Interaction.chips(mc, new Chips.Chip("Click", "Twice to pick " + describe(hoverKind)), new Chips.Chip(cancel, "Cancel"), Interaction.helpChip());
         }
     }
 }

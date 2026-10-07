@@ -1312,21 +1312,37 @@
    "t1": 3.8,
    "rows": [
     [
-     "P",
-     "Paste it here"
+     "Scroll",
+     "Turn"
+    ],
+    [
+     "Shift+Scroll",
+     "Up / down"
+    ],
+    [
+     "M",
+     "Mirror"
     ],
     [
      "Click",
      "Lock in place"
     ],
     [
+     "P",
+     "Paste it here"
+    ],
+    [
      "V",
      "Cancel"
+    ],
+    [
+     "J",
+     "How it works"
     ]
    ],
    "lit": [
     [
-     0,
+     4,
      3.4,
      3.8
     ]

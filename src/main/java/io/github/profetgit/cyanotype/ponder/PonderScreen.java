@@ -35,6 +35,8 @@ public final class PonderScreen extends Screen {
     private final Runnable tryIt;
     private final String why;
     private final PonderView view;
+    private final @Nullable Screen parent;
+    private boolean leaving;
     private final long openedNs = System.nanoTime();
     private final Map<String, int[]> rects = new HashMap<>();
     private Snapshot snap;
@@ -44,7 +46,13 @@ public final class PonderScreen extends Screen {
 
     /** @param why the reason Try it cannot be used now, or empty */
     public PonderScreen(Scene scene, Mode mode, Runnable tryIt, String why) {
+        this(scene, mode, tryIt, why, null);
+    }
+
+    /** @param parent the screen to go back to when the lesson is closed (the Help list), or null for the game */
+    public PonderScreen(Scene scene, Mode mode, Runnable tryIt, String why, @Nullable Screen parent) {
         super(Component.literal(scene.title));
+        this.parent = parent;
         this.scene = scene;
         this.mode = mode;
         this.tryIt = tryIt;
@@ -93,6 +101,12 @@ public final class PonderScreen extends Screen {
         return false;
     }
 
+    /** Closing goes back to where the lesson was opened from (the Help list), unless a tool is being started: that goes to the game. */
+    @Override
+    public void onClose() {
+        minecraft.gui.setScreen(leaving ? null : parent);
+    }
+
     @Override
     public void extractBackground(GuiGraphicsExtractor g, int mx, int my, float a) {
         g.fillGradient(0, 0, width, height, 0x50000000, 0x90000000);
@@ -106,27 +120,40 @@ public final class PonderScreen extends Screen {
     private Lay layout() {
         boolean compact = height < 250;
         int availH = height - 8;
-        int chipRows = compact ? 0 : chipRows(Math.min(width - 16, 440) - 2 * PAD);
+        // the panel is always as wide as the screen allows, so the words wrap the same whatever the picture's size
+        int pw = Math.max(232, Math.min(width - 16, 440));
+        int textW = pw - 2 * PAD;
+        int chipRows = compact ? 0 : chipRows(textW);
         int chipsH = chipRows * 17;
-        // the parts that are not the picture: title 20, gaps, caption, chips, controls, buttons
-        int capH = compact ? 21 : 31;
+        // the caption area holds the longest caption of the lesson (a title line, and up to three of words)
+        int capH = (compact ? 0 : 11) + captionLines(textW) * 10 + 1;
         int fixed = (compact ? 8 : 20) + 6 + capH + (chipsH > 0 ? 2 + chipsH : 0) + 4 + 14 + 8 + 18 + 8;
-        int maxW = Math.min(width - 16, 440) - 2 * PAD;
-        int vh = Math.min(maxW * 9 / 16, availH - fixed);
-        vh = Math.max(40, vh);
-        int vw = Math.min(maxW, vh * 16 / 9);
-        int pw = Math.max(vw + 2 * PAD, 232);
-        int vx0 = (width - vw) / 2;
+        int vh = Math.max(40, Math.min(textW * 9 / 16, availH - fixed));
+        int vw = Math.min(textW, vh * 16 / 9);
         int top = (height - (fixed + vh)) / 2;
         int px = (width - pw) / 2;
+        int vx0 = (width - vw) / 2;
         int titleY = top + 6;
         int vy = top + (compact ? 8 : 20);
         int capY = vy + vh + 6;
         int chipY = capY + capH + 2;
-        int ctlY = chipY + chipsH + (chipsH > 0 ? 0 : 0) + 4;
+        int ctlY = chipY + chipsH + 4;
         int btnY = ctlY + 14 + 8;
         int ph = btnY + 18 + 8 - top;
         return new Lay(px, top, pw, ph, vx0, vy, vw, vh, titleY, capY, capH, chipY, chipRows, ctlY, btnY, compact);
+    }
+
+    private int capLinesWidth = -1, capLines;
+
+    /** How many lines the longest caption (or the summary, when a lesson has none) takes at a width, at most three. */
+    private int captionLines(int textW) {
+        if (capLinesWidth != textW) {
+            capLinesWidth = textW;
+            int most = Ui.wrap(scene.summary, textW, 3).size();
+            for (Scene.Caption c : scene.captions) most = Math.max(most, Ui.wrap(c.text(), textW, 3).size());
+            capLines = Math.max(2, most);
+        }
+        return capLines;
     }
 
     /** One row of chips, or two when the widest set of the lesson does not fit on one. */
@@ -201,10 +228,8 @@ public final class PonderScreen extends Screen {
         if (!l.compact && c != null && !title.isEmpty()) {
             Ui.text(g, Ui.fit(title, l.pw - 2 * PAD), l.px + PAD, y, Ui.withAlpha(Ui.CYAN, a));
         }
-        int lines = l.compact ? 2 : 2;
-        int ty = l.compact ? y : y + 11;
-        if (c == null) ty = y;
-        for (String line : Ui.wrap(text, l.pw - 2 * PAD, lines)) {
+        int ty = l.compact || c == null || title.isEmpty() ? y : y + 11;
+        for (String line : Ui.wrap(text, l.pw - 2 * PAD, 3)) {
             Ui.text(g, line, l.px + PAD, ty, Ui.withAlpha(Ui.WHITE, a));
             ty += 10;
         }
@@ -426,6 +451,7 @@ public final class PonderScreen extends Screen {
             return;
         }
         Sfx.play(Sfx.RELEASE);
+        leaving = true;
         onClose();
         tryIt.run();
     }

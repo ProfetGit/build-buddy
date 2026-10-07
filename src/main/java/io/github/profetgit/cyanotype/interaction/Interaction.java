@@ -148,6 +148,7 @@ public final class Interaction {
 
     /** Whether a scroll belongs to the mod (and should not change the hotbar). */
     public static boolean onScroll(double amount) {
+        if (io.github.profetgit.cyanotype.ponder.PonderRecorder.active) io.github.profetgit.cyanotype.ponder.PonderRecorder.onScroll(amount);
         Minecraft mc = Minecraft.getInstance();
         Placement p = Placements.active();
         if (mc.gui.screen() != null || GhostRenderer.hidden) return false;
@@ -384,6 +385,9 @@ public final class Interaction {
         while (Keys.PASTE.consumeClick()) {
             if (!screen && !GhostRenderer.hidden) pasteKey(mc);
         }
+        while (Keys.HELP.consumeClick()) {
+            if (!screen) helpKey(mc);
+        }
         while (Keys.MIRROR.consumeClick()) {
             if (!screen && !GhostRenderer.hidden) mirror(mc);
         }
@@ -415,6 +419,21 @@ public final class Interaction {
         io.github.profetgit.cyanotype.auto.AutoBuilder.tick(mc);
         GhostRenderer.tickVerifiers(mc);
         PlacementStore.tick();
+        io.github.profetgit.cyanotype.ponder.PonderRecorder.tick(mc);
+    }
+
+    /** The help key: the lesson of the tool in use, and the list of all lessons when no tool is. */
+    private static void helpKey(Minecraft mc) {
+        String id = switch (Placements.mode()) {
+            case PLACING -> "place";
+            case EDIT -> "edit";
+            case LAYERS -> "layers";
+            case SELECT -> "box";
+            case PICK -> "pick";
+            case IDLE -> io.github.profetgit.cyanotype.auto.AutoBuilder.on() ? "auto" : null;
+        };
+        if (id != null && io.github.profetgit.cyanotype.ponder.Lessons.open(mc, id)) return;
+        mc.gui.setScreen(new io.github.profetgit.cyanotype.ponder.HelpScreen(null));
     }
 
     // ---- the tool key: tap to start or end editing, hold for the wheel
@@ -601,7 +620,8 @@ public final class Interaction {
             return;
         }
         Placements.select(p);
-        io.github.profetgit.cyanotype.paste.Paste.pasteWhenReady(mc, p);
+        Placement target = p;
+        io.github.profetgit.cyanotype.ponder.Lessons.firstUse(mc, "paste", () -> io.github.profetgit.cyanotype.paste.Paste.pasteWhenReady(mc, target));
     }
 
     /** Whether the paste key does something now, for the hints: creative in a world you host. */
@@ -656,17 +676,17 @@ public final class Interaction {
             follow(mc, p, pos, look);
             if (canPasteHere(mc)) {
                 chips(mc, new Chips.Chip("Scroll", "Turn"), new Chips.Chip("Shift+Scroll", "Up / down"), new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"),
-                    new Chips.Chip("Click", "Lock in place"), new Chips.Chip(Ui.keyName(Keys.PASTE), "Paste it here"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Cancel"));
+                    new Chips.Chip("Click", "Lock in place"), new Chips.Chip(Ui.keyName(Keys.PASTE), "Paste it here"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Cancel"), helpChip());
             } else {
                 chips(mc, new Chips.Chip("Scroll", "Turn"), new Chips.Chip("Shift+Scroll", "Up / down"), new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"),
-                    new Chips.Chip("Click", "Lock in place"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Cancel"));
+                    new Chips.Chip("Click", "Lock in place"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Cancel"), helpChip());
             }
         } else if (mode == Mode.LAYERS) {
             if (p == null || !p.locked || !p.ready()) {
                 Placements.setMode(Mode.IDLE);
             } else {
                 chips(mc, new Chips.Chip("Scroll", "Move up / down"), new Chips.Chip("Shift+Scroll", "Thicker / thinner"), new Chips.Chip("Click", "Done"),
-                    new Chips.Chip("Right click", "Show all layers"));
+                    new Chips.Chip("Right click", "Show all layers"), helpChip());
             }
         } else if (mode == Mode.SELECT) {
             Selecting.frame(mc, pos, look);
@@ -688,6 +708,11 @@ public final class Interaction {
         BlockPos target = hit.getType() == HitResult.Type.BLOCK ? hit.getBlockPos().relative(hit.getDirection()) : BlockPos.containing(camera.add(look.scale(AIR_DISTANCE)));
         int[] xz = Moves.centerOn(target.getX(), target.getZ(), p.sizeX(), p.sizeZ());
         p.set(new BlockPos(xz[0], target.getY() + lift, xz[1]), p.orientation);
+    }
+
+    /** The last row of every tool's hints: where the lesson for the tool is. */
+    static Chips.Chip helpChip() {
+        return new Chips.Chip(Ui.keyName(Keys.HELP), "How it works");
     }
 
     private static void edit(Minecraft mc, Placement p, Vec3 camera, Vec3 look) {
@@ -716,11 +741,11 @@ public final class Interaction {
                 chips(mc, new Chips.Chip("Drag", first), new Chips.Chip("Scroll", "Push " + word(nudgeDir)), new Chips.Chip("Ctrl+Scroll", "Turn"),
                     new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"), new Chips.Chip(Ui.keyName(Keys.PASTE), "Paste it into the world"),
                     new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo"),
-                    new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
+                    new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"), helpChip());
             } else {
                 chips(mc, new Chips.Chip("Drag", first), new Chips.Chip("Scroll", "Push " + word(nudgeDir)), new Chips.Chip("Ctrl+Scroll", "Turn"),
                     new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"), new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo"),
-                    new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"));
+                    new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"), helpChip());
             }
         }
         handles.animate(hover, drag == null ? null : drag.handle, dt(), drag == null ? nudgeDir.getAxis() : null);
@@ -992,10 +1017,13 @@ public final class Interaction {
                     say(mc, "Nothing to edit yet. Load a blueprint with /cyanotype load <name>, then /cyanotype place.");
                     return;
                 }
-                reveal();
-                Placements.select(aimed);
-                Placements.setMode(Mode.EDIT);
-                say(mc, "Editing " + aimed.name);
+                Placement target = aimed;
+                io.github.profetgit.cyanotype.ponder.Lessons.firstUse(mc, "edit", () -> {
+                    reveal();
+                    Placements.select(target);
+                    Placements.setMode(Mode.EDIT);
+                    say(mc, "Editing " + target.name);
+                });
             }
         }
     }

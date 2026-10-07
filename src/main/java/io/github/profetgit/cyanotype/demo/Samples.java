@@ -56,6 +56,21 @@ public final class Samples {
         }
     }
 
+    /** A blueprint of one group of a lesson: the lesson's own cottage, so a recorded take shows the same blocks the lesson draws. */
+    static Blueprint fromGroup(io.github.profetgit.cyanotype.ponder.Scene scene, String groupId, String name) {
+        io.github.profetgit.cyanotype.ponder.Scene.Group grp = scene.group(groupId);
+        Grid g = new Grid(grp.sx, grp.sy, grp.sz);
+        for (int y = 0; y < grp.sy; y++) {
+            for (int z = 0; z < grp.sz; z++) {
+                for (int x = 0; x < grp.sx; x++) {
+                    int c = grp.cell[grp.index(x, y, z)];
+                    if (c != 0) g.set(x, y, z, io.github.profetgit.cyanotype.ponder.PonderLooks.INSTANCE.state(scene.palette.get(c - 1)));
+                }
+            }
+        }
+        return g.build(name);
+    }
+
     /** 11 wide (x), 9 tall (y), 13 deep (z); the front door faces north (z = 0). */
     public static Blueprint house() {
         Grid g = new Grid(11, 10, 13);

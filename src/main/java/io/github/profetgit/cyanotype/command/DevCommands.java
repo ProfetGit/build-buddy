@@ -74,11 +74,42 @@ public final class DevCommands {
                 case "verify" -> verify(arg);
                 case "clear" -> clear();
                 case "info" -> info();
+                case "ponder" -> ponder(mc, arg);
                 default -> help();
             }
         } catch (RuntimeException e) {
             Cyanotype.LOG.error("Cyanotype command failed: {}", line, e);
             say("Something went wrong: " + e.getMessage());
+        }
+    }
+
+    /** Dev: /cyanotype ponder record <id> [x y z sx sy sz] | mark <name> | stop. See PonderRecorder. */
+    private static void ponder(Minecraft mc, String arg) {
+        String[] a = arg.isEmpty() ? new String[0] : arg.split("\\s+");
+        if (a.length == 0) {
+            say("ponder record <id> [x y z sx sy sz] | mark <name> | stop");
+            return;
+        }
+        switch (a[0]) {
+            case "record" -> {
+                if (a.length < 2) {
+                    say("Which take? ponder record <id> [x y z sx sy sz]");
+                    return;
+                }
+                int[] box = a.length >= 8 ? new int[]{Integer.parseInt(a[2]), Integer.parseInt(a[3]), Integer.parseInt(a[4])} : null;
+                int[] sz = a.length >= 8 ? new int[]{Integer.parseInt(a[5]), Integer.parseInt(a[6]), Integer.parseInt(a[7])} : null;
+                io.github.profetgit.cyanotype.ponder.PonderRecorder.start(mc, a[1], box, sz);
+                say("Recording " + a[1] + ". ponder mark <name> names a moment, ponder stop ends it.");
+            }
+            case "mark" -> {
+                io.github.profetgit.cyanotype.ponder.PonderRecorder.mark(a.length > 1 ? a[1] : "mark");
+                say("Marked " + (a.length > 1 ? a[1] : "mark"));
+            }
+            case "stop" -> {
+                var file = io.github.profetgit.cyanotype.ponder.PonderRecorder.stop(mc);
+                say(file == null ? "Nothing was being recorded." : "Recording written to " + file);
+            }
+            default -> say("ponder record <id> [x y z sx sy sz] | mark <name> | stop");
         }
     }
 

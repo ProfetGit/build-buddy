@@ -128,10 +128,15 @@ public final class Lessons {
 
     /** Shows a lesson again, from a ?: Try it starts its tool, Close starts nothing. Says so on the action bar when there is no such lesson. */
     public static boolean open(Minecraft mc, String id) {
+        return open(mc, id, null);
+    }
+
+    /** As above; closing the lesson goes back to {@code parent} (the Help list) instead of the game. */
+    public static boolean open(Minecraft mc, String id, net.minecraft.client.gui.screens.@Nullable Screen parent) {
         Scene s = scene(id);
         if (s == null) return false;
         markSeen(id);
-        mc.gui.setScreen(new PonderScreen(s, PonderScreen.Mode.REPLAY, LessonActions.of(mc, s.action), LessonActions.why(mc, s.action)));
+        mc.gui.setScreen(new PonderScreen(s, PonderScreen.Mode.REPLAY, LessonActions.of(mc, s.action), LessonActions.why(mc, s.action), parent));
         return true;
     }
 

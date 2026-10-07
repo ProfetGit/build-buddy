@@ -56,7 +56,7 @@ public final class LibraryScreen extends Screen {
         public void place(Path file) {
             onClose();
             String title = file.getFileName().toString().replaceFirst("(?i)\\.(litematic|schem|schematic)$", ""), ref = BlueprintLibrary.refOf(file);
-            BlueprintLibrary.load(file, bp -> Interaction.startPlacing(title, bp, ref), why -> Interaction.say(minecraft, "Could not open " + file.getFileName() + ": " + why));
+            BlueprintLibrary.load(file, bp -> io.github.profetgit.cyanotype.ponder.Lessons.firstUse(minecraft, "place", () -> Interaction.startPlacing(title, bp, ref)), why -> Interaction.say(minecraft, "Could not open " + file.getFileName() + ": " + why));
         }
 
         @Override
@@ -330,6 +330,8 @@ public final class LibraryScreen extends Screen {
         Ui.button(g, "lib#placed", placedX(), fy, 62, 16, "Placed", "eye", mx, my, down.equals("placed"), true);
         boolean overGear = Ui.button(g, "lib#gear", gearX(), fy, 20, 16, "", "gear", mx, my, down.equals("gear"), true);
         if (overGear) Ui.tooltip(g, mx, my, "Settings");
+        boolean overHelp = Ui.button(g, "lib#help", helpX(), fy, 20, 16, "", "help", mx, my, down.equals("help"), true);
+        if (overHelp) Ui.tooltip(g, mx, my, "How it works: lessons for every tool");
         String count = model.all().size() + (model.all().size() == 1 ? " blueprint" : " blueprints") + (view.size() != model.all().size() ? "  (" + view.size() + " shown)" : "");
         Ui.text(g, count, px + 104, fy + 4, Ui.withAlpha(Ui.DIM, inner));
         if (!toast.isEmpty() && System.nanoTime() - toastNs < 3_500_000_000L) {
@@ -425,6 +427,11 @@ public final class LibraryScreen extends Screen {
             Sfx.play(Sfx.PRESS);
             return true;
         }
+        if (Ui.inside(mx, my, helpX(), fy, 20, 16)) {
+            down = "help";
+            Sfx.play(Sfx.PRESS);
+            return true;
+        }
         if (tab == Tab.COMMUNITY) return community.mouseClicked(mx, my);
         int tx = px + 10;
         for (LibraryModel.Sort s : LibraryModel.Sort.values()) {
@@ -468,6 +475,11 @@ public final class LibraryScreen extends Screen {
             minecraft.gui.setScreen(new SettingsScreen());
             return true;
         }
+        if (was.equals("help") && Ui.inside(mx, my, helpX(), fy, 20, 16)) {
+            Sfx.play(Sfx.RELEASE);
+            minecraft.gui.setScreen(new io.github.profetgit.cyanotype.ponder.HelpScreen(this));
+            return true;
+        }
         if (tab == Tab.COMMUNITY && was.isEmpty()) return community.mouseReleased(mx, my) || super.mouseReleased(event);
         if (was.equals("folder") && Ui.inside(mx, my, px + 10, fy, 86, 16)) {
             Sfx.play(Sfx.RELEASE);
@@ -499,6 +511,10 @@ public final class LibraryScreen extends Screen {
         return gearX() - 4 - 62;
     }
 
+    private int helpX() {
+        return placedX() - 4 - 20;
+    }
+
     private LibraryModel.Entry cardAt(int mx, int my) {
         int gx = gridX(), gy = gridY(), gw = gridW(), gh = gridH();
         if (!Ui.inside(mx, my, gx, gy, gw, gh)) return null;
@@ -521,7 +537,7 @@ public final class LibraryScreen extends Screen {
         Sfx.play(Sfx.RELEASE);
         onClose();
         String title = e.title(), ref = e.ref();
-        BlueprintLibrary.load(e.file, bp -> Interaction.startPlacing(title, bp, ref), why -> Interaction.say(minecraft, "Could not open " + e.fileName + ": " + why));
+        BlueprintLibrary.load(e.file, bp -> io.github.profetgit.cyanotype.ponder.Lessons.firstUse(minecraft, "place", () -> Interaction.startPlacing(title, bp, ref)), why -> Interaction.say(minecraft, "Could not open " + e.fileName + ": " + why));
     }
 
     private void say(String text) {

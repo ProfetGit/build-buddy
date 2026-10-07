@@ -115,6 +115,9 @@ public final class SettingsScreen extends Screen {
                     v -> v <= 0 ? "Off" : (int) v + " %"));
                 r.add(new Slider("wheelHold", "Wheel hold time", "Hold the tool key this long to open the wheel.", 100, 600, 25, () -> d.wheelHoldMs, v -> d.wheelHoldMs = (int) v,
                     v -> (int) v + " ms"));
+                r.add(new Toggle("lessons", "Lesson on first use", "The first time you use a tool, a short lesson shows how it works. You can skip it.", () -> d.lessons, v -> d.lessons = v));
+                r.add(new Action("lessonsOpen", "Open the lessons", "Every lesson in one list, with a search.", () -> minecraft.gui.setScreen(new io.github.profetgit.cyanotype.ponder.HelpScreen(this))));
+                r.add(new Action("lessonsAgain", "Show all again", "Each tool plays its lesson again the next time you use it.", io.github.profetgit.cyanotype.ponder.Lessons::resetSeen));
             }
             case GHOST -> {
                 r.add(new Slider("opacity", "Opacity of new ghosts", "How see-through a ghost is when you place it.", 5, 100, 5, () -> d.opacity * 100, v -> d.opacity = (float) (v / 100),

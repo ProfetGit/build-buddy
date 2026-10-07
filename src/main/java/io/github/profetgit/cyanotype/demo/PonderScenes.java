@@ -6,11 +6,16 @@ import static io.github.profetgit.cyanotype.demo.Director.shot;
 import static io.github.profetgit.cyanotype.demo.Director.until;
 import static io.github.profetgit.cyanotype.demo.Director.waitTicks;
 
+import com.mojang.blaze3d.platform.InputConstants;
+import io.github.profetgit.cyanotype.interaction.Interaction;
+import io.github.profetgit.cyanotype.placement.Placements;
+import io.github.profetgit.cyanotype.ponder.HelpScreen;
 import io.github.profetgit.cyanotype.ponder.Lessons;
 import io.github.profetgit.cyanotype.ponder.PonderScreen;
 import io.github.profetgit.cyanotype.ponder.Scene;
 import io.github.profetgit.cyanotype.ui.Settings;
 import io.github.profetgit.cyanotype.ui.Ui;
+import io.github.profetgit.cyanotype.ui.WheelScreen;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -30,14 +35,246 @@ final class PonderScenes {
     }
 
     private static void click(int[] at) {
+        click(at, InputConstants.MOUSE_BUTTON_LEFT);
+    }
+
+    private static void click(int[] at, int button) {
         Screen s = screen();
-        var info = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 0);
+        var info = new net.minecraft.client.input.MouseButtonInfo(button, 0);
         s.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info), false);
         s.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], info));
     }
 
     private static void key(int code) {
         screen().keyPressed(new net.minecraft.client.input.KeyEvent(code, 0, 0));
+    }
+
+    private static void cleanup() {
+        Minecraft mc = Minecraft.getInstance();
+        Ui.testMouse = null;
+        WheelScreen.testHeld = null;
+        Interaction.testMainDown = null;
+        mc.gui.setScreen(null);
+    }
+
+    /** Holds the tool key so that the wheel opens, and points at a segment. */
+    private static void wheelOn(int segment) {
+        act(() -> {
+            WheelScreen.testHeld = true;
+            Interaction.testMainDown = true;
+        });
+        waitTicks(8);
+        act(() -> check("ponder/the wheel opened", screen() instanceof WheelScreen, String.valueOf(screen())));
+        act(() -> Ui.testMouse = UiScenes.segmentPoint(segment));
+        waitTicks(6);
+    }
+
+    /** The flow: first use plays the lesson once, ? shows it again, Try it and Skip start the tool, Close does not, and the Help list searches. */
+    static void flow() {
+        UiScenes.setup();
+        act(() -> {
+            Settings.get().reduceMotion = false;
+            Settings.get().lessons = true;
+            Lessons.resetSeen();
+        });
+        // first use: Layers is chosen on the wheel (segment 2): its lesson plays before the tool starts, Skip starts it
+        wheelOn(2);
+        act(() -> {
+            WheelScreen.testHeld = false;
+            Interaction.testMainDown = false;
+        });
+        waitTicks(14);
+        act(() -> {
+            PonderScreen p = ponder();
+            check("ponder/first use: the Layers lesson plays before the tool", p != null && p.scene().id.equals("layers") && Placements.mode() != Placements.Mode.LAYERS, screen() + ", mode " + Placements.mode());
+            check("ponder/first use: it is marked seen at once", Lessons.seen("layers"), "seen " + Settings.get().lessonsSeen);
+            check("ponder/first use: it opens playing", p != null && p.player().playing() && p.player().time() < 3, "time " + (p == null ? -1 : p.player().time()));
+        });
+        waitTicks(30);
+        act(() -> {
+            PonderScreen p = ponder();
+            check("ponder/the lesson plays on its own (time moves)", p != null && p.player().time() > 0.4, "time " + (p == null ? -1 : p.player().time()));
+        });
+        shot("ponder_flow_firstuse");
+        act(() -> click(ponder().anchor("skip")));
+        waitTicks(6);
+        act(() -> check("ponder/first use: Skip starts the tool", screen() == null && Placements.mode() == Placements.Mode.LAYERS, screen() + ", mode " + Placements.mode()));
+        act(() -> Placements.setMode(Placements.Mode.IDLE));
+        // the second time: no lesson, the tool just starts
+        wheelOn(2);
+        act(() -> {
+            WheelScreen.testHeld = false;
+            Interaction.testMainDown = false;
+        });
+        waitTicks(14);
+        act(() -> check("ponder/the second time there is no lesson", screen() == null && Placements.mode() == Placements.Mode.LAYERS, screen() + ", mode " + Placements.mode()));
+        act(() -> Placements.setMode(Placements.Mode.IDLE));
+
+        // lessons off: nothing opens, even for a tool not seen yet
+        act(() -> {
+            Settings.get().lessons = false;
+            Lessons.resetSeen();
+        });
+        wheelOn(2);
+        act(() -> {
+            WheelScreen.testHeld = false;
+            Interaction.testMainDown = false;
+        });
+        waitTicks(14);
+        act(() -> check("ponder/with lessons switched off the tool just starts", screen() == null && Placements.mode() == Placements.Mode.LAYERS, screen() + ", mode " + Placements.mode()));
+        act(() -> {
+            Placements.setMode(Placements.Mode.IDLE);
+            Settings.get().lessons = true;
+        });
+
+        // ? : a right click on a tool of the wheel shows its lesson again; Try it starts the tool, Close does not
+        wheelOn(1);
+        shot("ponder_flow_wheel");
+        act(() -> click(UiScenes.segmentPoint(1), InputConstants.MOUSE_BUTTON_RIGHT));
+        waitTicks(8);
+        act(() -> {
+            PonderScreen p = ponder();
+            check("ponder/? : a right click on Edit shows the Edit lesson", p != null && p.scene().id.equals("edit"), screen() + "");
+            WheelScreen.testHeld = null;
+            Interaction.testMainDown = null;
+        });
+        act(() -> click(ponder().anchor("skip")));
+        waitTicks(6);
+        act(() -> check("ponder/a replayed lesson's Close starts nothing", screen() == null && Placements.mode() == Placements.Mode.IDLE, screen() + ", mode " + Placements.mode()));
+        act(() -> Lessons.open(Minecraft.getInstance(), "edit"));
+        waitTicks(8);
+        act(() -> click(ponder().anchor("try")));
+        waitTicks(6);
+        act(() -> check("ponder/Try it starts the tool", screen() == null && Placements.mode() == Placements.Mode.EDIT, screen() + ", mode " + Placements.mode()));
+        act(() -> Placements.setMode(Placements.Mode.IDLE));
+
+        // Try it cannot start a tool that is not ready: it says why and stays
+        act(() -> {
+            for (var p : java.util.List.copyOf(Placements.all())) Placements.remove(p);
+            Lessons.open(Minecraft.getInstance(), "materials");
+        });
+        waitTicks(8);
+        act(() -> {
+            PonderScreen p = ponder();
+            check("ponder/Try it waits for a placed blueprint", p != null, "screen " + screen());
+            click(ponder().anchor("try"));
+        });
+        waitTicks(4);
+        act(() -> check("ponder/and a click on it changes nothing", ponder() != null, "screen " + screen()));
+        shot("ponder_flow_try_disabled");
+        act(() -> cleanup());
+        waitTicks(4);
+        UiScenes.setup();
+
+        // the keys
+        act(() -> Lessons.open(Minecraft.getInstance(), "place"));
+        waitTicks(10);
+        act(() -> {
+            PonderScreen p = ponder();
+            p.player().seek(1.0);
+            key(InputConstants.KEY_SPACE);
+            check("ponder/Space pauses", !p.player().playing(), "playing " + p.player().playing());
+        });
+        waitTicks(6);
+        act(() -> {
+            PonderScreen p = ponder();
+            double t = p.player().time();
+            key(InputConstants.KEY_SPACE);
+            check("ponder/Space plays again", p.player().playing(), "playing " + p.player().playing() + " at " + t);
+            key(InputConstants.KEY_RIGHT);
+            check("ponder/Right goes to the next step", p.player().step() == 1 && Math.abs(p.player().time() - p.scene().stepStart(1)) < 0.1, "step " + p.player().step() + ", time " + p.player().time());
+            key(InputConstants.KEY_R);
+            check("ponder/R starts over", p.player().step() == 0 && p.player().time() < 0.3, "step " + p.player().step() + ", time " + p.player().time());
+        });
+        // a click on the scrub bar seeks, on the picture pauses
+        act(() -> click(ponder().scrubAt(0.5)));
+        act(() -> {
+            PonderScreen p = ponder();
+            check("ponder/a click on the scrub bar goes there", Math.abs(p.player().time() - p.scene().duration * 0.5) < 0.6, "time " + p.player().time() + " of " + p.scene().duration);
+            boolean was = p.player().playing();
+            click(p.anchor("view"));
+            check("ponder/a click on the picture plays or pauses", p.player().playing() != was, "was " + was + ", now " + p.player().playing());
+            click(p.anchor("speed"));
+            check("ponder/the speed button slows it to half", p.player().speed() < 0.75, "speed " + p.player().speed());
+        });
+        act(() -> {
+            key(InputConstants.KEY_ESCAPE);
+        });
+        waitTicks(4);
+        act(() -> check("ponder/Esc leaves a replay without starting a tool", screen() == null, "screen " + screen()));
+
+        // reduced motion: paused on the finished picture of the first step, steps jump from still to still
+        act(() -> {
+            Settings.get().reduceMotion = true;
+            Lessons.open(Minecraft.getInstance(), "edit");
+        });
+        waitTicks(8);
+        act(() -> {
+            PonderScreen p = ponder();
+            double still = p.player().stillTime(0);
+            check("ponder/reduced motion: opens paused on the still of step 1", !p.player().playing() && Math.abs(p.player().time() - still) < 1e-6, "playing " + p.player().playing() + ", time " + p.player().time() + ", still " + still);
+            key(InputConstants.KEY_RIGHT);
+            check("ponder/reduced motion: Next shows the still of step 2", p.player().step() == 1 && Math.abs(p.player().time() - p.player().stillTime(1)) < 1e-6, "step " + p.player().step() + ", time " + p.player().time());
+        });
+        waitTicks(6);
+        shot("ponder_flow_reduced");
+        act(() -> {
+            Settings.get().reduceMotion = false;
+            cleanup();
+        });
+        waitTicks(4);
+
+        // the Help list
+        act(() -> Minecraft.getInstance().gui.setScreen(new HelpScreen(null)));
+        waitTicks(8);
+        act(() -> {
+            HelpScreen h = (HelpScreen) screen();
+            check("ponder/the Help list shows every lesson", h.listed().size() == Lessons.ids().size() && h.listed().size() >= 9, h.listed().toString());
+        });
+        shot("ponder_help_all");
+        act(() -> ((HelpScreen) screen()).type("paste"));
+        waitTicks(4);
+        act(() -> check("ponder/searching 'paste' finds the paste lesson", ((HelpScreen) screen()).listed().equals(java.util.List.of("paste")), ((HelpScreen) screen()).listed().toString()));
+        shot("ponder_help_search");
+        act(() -> ((HelpScreen) screen()).type("zzzz"));
+        waitTicks(4);
+        act(() -> check("ponder/a search with no match lists nothing", ((HelpScreen) screen()).listed().isEmpty(), ((HelpScreen) screen()).listed().toString()));
+        shot("ponder_help_empty");
+        act(() -> ((HelpScreen) screen()).type("layer"));
+        waitTicks(4);
+        act(() -> {
+            HelpScreen h = (HelpScreen) screen();
+            check("ponder/'layer' finds the layers lesson", h.listed().contains("layers"), h.listed().toString());
+            click(h.anchor("row:layers"));
+        });
+        waitTicks(8);
+        act(() -> check("ponder/a click on a row opens that lesson", ponder() != null && ponder().scene().id.equals("layers"), "screen " + screen()));
+        act(() -> click(ponder().anchor("skip")));
+        waitTicks(4);
+        act(() -> check("ponder/closing a lesson from the list goes back to the list", screen() instanceof HelpScreen, "screen " + screen()));
+        act(() -> key(InputConstants.KEY_ESCAPE));
+        waitTicks(4);
+        act(() -> check("ponder/Esc closes the list", screen() == null, "screen " + screen()));
+
+        // the middle of the wheel opens the list too
+        act(() -> {
+            WheelScreen.testHeld = true;
+            Interaction.testMainDown = true;
+        });
+        waitTicks(8);
+        act(() -> Ui.testMouse = new int[]{screen().width / 2, screen().height / 2});
+        waitTicks(6);
+        shot("ponder_flow_hub");
+        act(() -> {
+            click(new int[]{screen().width / 2, screen().height / 2});
+            WheelScreen.testHeld = null;
+            Interaction.testMainDown = null;
+        });
+        waitTicks(8);
+        act(() -> check("ponder/a click in the middle of the wheel opens the list", screen() instanceof HelpScreen, "screen " + screen()));
+        act(() -> cleanup());
+        waitTicks(4);
+        UiScenes.teardown();
     }
 
     /** Opens each lesson (the ids in the property, or all of them), shoots stills every few seconds, and checks the picture is made. */

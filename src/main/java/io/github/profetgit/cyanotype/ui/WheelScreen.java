@@ -104,10 +104,31 @@ public final class WheelScreen extends Screen {
         return super.keyPressed(event);
     }
 
+    /** The radius of the hub (the middle of the wheel, which is not a tool). */
+    private double hubRadius() {
+        return WheelArt.hub(height >= 270 ? 160 : 88);
+    }
+
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        if (chosen >= 0) return true;
+        double dx = event.x() - width / 2.0, dy = event.y() - height / 2.0;
+        if (event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_RIGHT) {
+            // a right click on a tool shows how it works
+            if (hovered >= 0) {
+                Sfx.play(Sfx.RELEASE);
+                if (!io.github.profetgit.cyanotype.ponder.Lessons.open(minecraft, tools[hovered].lesson)) Sfx.play(Sfx.ERROR);
+            }
+            return true;
+        }
+        if (hovered < 0 && Math.hypot(dx, dy) < hubRadius()) {
+            // the middle of the wheel is the ?: the list of every lesson
+            Sfx.play(Sfx.RELEASE);
+            minecraft.gui.setScreen(new io.github.profetgit.cyanotype.ponder.HelpScreen(null));
+            return true;
+        }
         // clicking a segment chooses it too, for those who would rather not hold a key
-        if (chosen < 0 && hovered >= 0) release();
+        if (hovered >= 0) release();
         return true;
     }
 
@@ -188,12 +209,17 @@ public final class WheelScreen extends Screen {
             int hy = cy + size / 2 + 26 * scale;
             g.fill(cx - hw / 2 - 4, hy - 2, cx + hw / 2 + 4, hy + 11, Ui.withAlpha(Ui.DEEP, alpha * 0.72f));
             Ui.centered(g, hint, cx, hy, Ui.withAlpha(why.isEmpty() ? Ui.CYAN : Ui.WARN, alpha));
+            String how = "Right click: how it works";
+            Ui.centered(g, how, cx, hy + 13, Ui.withAlpha(Ui.DIM, alpha * 0.9f));
         } else {
             int hy = cy + size / 2 + 26 * scale;
-            String hint = "Move to a tool, let go to choose";
+            boolean overHub = Math.hypot(mx - cx, my - cy) < inner;
+            String hint = overHub ? "Click for the lessons: how every tool works" : "Move to a tool, let go to choose";
             int hw = Ui.font().width(hint);
             g.fill(cx - hw / 2 - 4, hy - 2, cx + hw / 2 + 4, hy + 11, Ui.withAlpha(Ui.DEEP, alpha * 0.6f));
-            Ui.centered(g, hint, cx, hy, Ui.withAlpha(Ui.DIM, alpha));
+            Ui.centered(g, hint, cx, hy, Ui.withAlpha(overHub ? Ui.CYAN : Ui.DIM, alpha));
+            // the ? in the middle
+            Ui.icon(g, "help", cx - 8, cy - 8, false, 16, alpha * (overHub ? 1f : 0.7f));
         }
         g.pose().popMatrix();
     }

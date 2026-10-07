@@ -200,6 +200,8 @@ public final class Director {
             run(mc, "gamerule advance_time false", "gamerule advance_weather false", "gamerule spawn_mobs false", "gamerule spawn_monsters false",
                 "gamerule send_command_feedback false", "time set 6000", "weather clear", "gamemode spectator " + p, "kill @e[type=!player]");
             hideHud(mc, true);
+            // the lessons that play on first use would open over every other scene: only the lesson scenes switch them on
+            io.github.profetgit.cyanotype.ui.Settings.get().lessons = false;
             mc.options.fov().set(Integer.getInteger("cyanotype.demo.fov", 70));
             return true;
         });
@@ -236,6 +238,8 @@ public final class Director {
                 case "materials" -> MaterialsScenes.materials();
                 case "settings" -> SettingsScenes.settings();
                 case "ponder-stills" -> PonderScenes.stills();
+                case "ponder-flow" -> PonderScenes.flow();
+                case "ponder-take" -> PonderTakes.takes();
                 case "look" -> PlaceScenes.look();
                 case "persist" -> PlaceScenes.persist();
                 case "persist-leave" -> PlaceScenes.persistLeave();

@@ -33,6 +33,7 @@ public abstract class OptionsMixin {
         all.add(Keys.MIRROR);
         all.add(Keys.PASTE);
         all.add(Keys.REMOVE);
+        all.add(Keys.HELP);
         keyMappings = all.toArray(KeyMapping[]::new);
     }
 }

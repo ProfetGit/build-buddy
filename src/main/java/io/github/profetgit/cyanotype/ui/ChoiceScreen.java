@@ -18,7 +18,10 @@ import net.minecraft.network.chat.Component;
  */
 public final class ChoiceScreen extends Screen {
     /** One choice. {@code selected} marks the one that is on now (a radio); a choice that is not enabled is dim and does nothing. */
-    public record Choice(String icon, String label, String desc, boolean enabled, boolean selected, Runnable run) {
+    public record Choice(String icon, String label, String desc, boolean enabled, boolean selected, Runnable run, String lesson) {
+        public Choice(String icon, String label, String desc, boolean enabled, boolean selected, Runnable run) {
+            this(icon, label, desc, enabled, selected, run, null);
+        }
     }
 
     /** A switch under the choices, changed in place without closing. */
@@ -118,13 +121,21 @@ public final class ChoiceScreen extends Screen {
             int tc = !c.enabled ? 0xFF5E7C99 : dark ? Ui.DEEP : Ui.WHITE, dc = !c.enabled ? 0xFF4A6580 : dark ? Ui.NAVY : Ui.DIM;
             Ui.text(g, c.label, x + 30, y + 8 + sink, Ui.withAlpha(tc, inner));
             int dy = y + 20 + sink;
-            for (String line : Ui.wrap(c.desc, w - 52, 2)) {
+            for (String line : Ui.wrap(c.desc, w - 52 - (c.lesson != null ? 12 : 0), 2)) {
                 Ui.text(g, line, x + 30, dy, Ui.withAlpha(dc, inner));
                 dy += 9;
             }
+            if (c.lesson != null) {
+                // a ? opens the lesson of this choice
+                int hx = helpX(i), hy = helpY(i);
+                boolean overHelp = Ui.inside(mx, my, hx, hy, 16, 16);
+                float hh = Motion.hover(key + "#help", overHelp);
+                Ui.icon(g, "help", hx, hy, false, 16, inner * (0.55f + 0.45f * hh));
+                if (overHelp) Ui.tooltip(g, mx, my, "How it works");
+            }
             if (c.selected) {
                 // the one that is on: a lit dot at the right
-                Ui.icon(g, "check", x + w - 20, y + (ROW_H - 14) / 2, dark, 14, inner);
+                Ui.icon(g, "check", x + w - 20 - (c.lesson != null ? 20 : 0), y + (ROW_H - 14) / 2, dark, 14, inner);
             }
             if (i == focus && c.enabled) Ui.marching(g, x - 2, y - 2, w + 4, ROW_H + 4, Ui.withAlpha(Ui.CYAN, inner), t);
         }
@@ -139,9 +150,24 @@ public final class ChoiceScreen extends Screen {
         }
     }
 
+    private int helpX(int i) {
+        return px() + pw() - 8 - 20;
+    }
+
+    private int helpY(int i) {
+        return rowY(i) + (ROW_H - 16) / 2;
+    }
+
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         int mx = (int) event.x(), my = (int) event.y();
+        for (int i = 0; i < choices.size(); i++) {
+            if (choices.get(i).lesson != null && Ui.inside(mx, my, helpX(i), helpY(i), 16, 16)) {
+                Sfx.play(Sfx.RELEASE);
+                if (!io.github.profetgit.cyanotype.ponder.Lessons.open(minecraft, choices.get(i).lesson, this)) Sfx.play(Sfx.ERROR);
+                return true;
+            }
+        }
         for (int i = 0; i < choices.size(); i++) {
             if (Ui.inside(mx, my, px() + 8, rowY(i), pw() - 16, ROW_H)) {
                 if (choices.get(i).enabled) {
