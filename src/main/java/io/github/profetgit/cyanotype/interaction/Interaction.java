@@ -639,6 +639,7 @@ public final class Interaction {
     /** Forgets everything in progress (the world changed). */
     public static void reset() {
         Handles.forget();
+        editSinceNs = 0;
         io.github.profetgit.cyanotype.paste.Paste.reset();
         drag = null;
         grab = null;
@@ -728,6 +729,7 @@ public final class Interaction {
         if (drag != null) {
             updateDrag(mc, camera, look);
             hover = drag.handle;
+            lastActionNs = System.nanoTime();
             chips(mc, new Chips.Chip("Release", "Drop it here"));
         } else {
             hover = handles.pick(camera, look);
@@ -737,15 +739,22 @@ public final class Interaction {
             String first = hover == null ? (onBody(p) ? "Carry the build" : "Carry (aim at the build)")
                 : hover.kind == Handles.Kind.MOVE ? (endOn(hover.to.subtract(hover.from).normalize(), look) ? "Step to the side to drag it" : "Move " + axisWords(hover.axis))
                 : "Turn in quarter turns";
-            if (canPasteHere(mc)) {
-                chips(mc, new Chips.Chip("Drag", first), new Chips.Chip("Scroll", "Push " + word(nudgeDir)), new Chips.Chip("Ctrl+Scroll", "Turn"),
-                    new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"), new Chips.Chip(Ui.keyName(Keys.PASTE), "Paste it into the world"),
-                    new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo"),
-                    new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"), helpChip());
+            // three rows to begin with; the rest of the keys come in when the player has been here a while without doing anything,
+            // and tuck away again as soon as they act
+            long now = System.nanoTime();
+            if (editSinceNs == 0 || now - editFrameNs > 1_000_000_000L) editSinceNs = now;
+            editFrameNs = now;
+            if (now - gestureNs < GESTURE_NS || grab != null) lastActionNs = now;
+            boolean all = now - Math.max(editSinceNs, lastActionNs) > REVEAL_NS;
+            Chips.Chip dragChip = new Chips.Chip("Drag", first), turn = new Chips.Chip("Ctrl+Scroll", "Turn"), done = new Chips.Chip(Ui.keyName(Keys.MAIN), "Done");
+            if (!all) {
+                chips(mc, dragChip, turn, done, new Chips.Chip(Ui.keyName(Keys.HELP), "More help", true));
             } else {
-                chips(mc, new Chips.Chip("Drag", first), new Chips.Chip("Scroll", "Push " + word(nudgeDir)), new Chips.Chip("Ctrl+Scroll", "Turn"),
-                    new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror"), new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo"),
-                    new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove"), new Chips.Chip(Ui.keyName(Keys.MAIN), "Done"), helpChip());
+                Chips.Chip push = new Chips.Chip("Scroll", "Push " + word(nudgeDir), true), mirror = new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror", true),
+                    undo = new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo", true),
+                    remove = new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove", true), help = new Chips.Chip(Ui.keyName(Keys.HELP), "How it works", true);
+                if (canPasteHere(mc)) chips(mc, dragChip, turn, push, mirror, new Chips.Chip(Ui.keyName(Keys.PASTE), "Paste it into the world", true), undo, remove, done, help);
+                else chips(mc, dragChip, turn, push, mirror, undo, remove, done, help);
             }
         }
         handles.animate(hover, drag == null ? null : drag.handle, dt(), drag == null ? nudgeDir.getAxis() : null);
@@ -760,6 +769,9 @@ public final class Interaction {
     static final int NUDGE_FAST = 5;
     private static final long GESTURE_NS = 700_000_000L, SHOW_NS = 1_800_000_000L;
     private static Direction nudgeDir = Direction.NORTH;
+    /** When Edit mode began, and when the player last did something in it (a grab or a scroll). */
+    private static long editSinceNs, lastActionNs, editFrameNs;
+    private static final long REVEAL_NS = 6_000_000_000L;
     private static Direction.Axis viewAxis = Direction.Axis.Z;
     private static Vec3 editLook = new Vec3(0, 0, -1);
     private static Placement gesturePlacement;

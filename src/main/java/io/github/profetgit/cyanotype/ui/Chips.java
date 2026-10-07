@@ -18,7 +18,11 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
  * They are the first layer of the in-game help (PRD 7.12) and can be turned off.
  */
 public final class Chips {
-    public record Chip(String key, String action) {
+    /** {@code quiet} rows are reference, not instructions: drawn smaller in weight (fainter). */
+    public record Chip(String key, String action, boolean quiet) {
+        public Chip(String key, String action) {
+            this(key, action, false);
+        }
     }
 
     private static List<Chip> current = List.of();
@@ -43,6 +47,11 @@ public final class Chips {
         }
         current = now;
         wantedNs = System.nanoTime();
+    }
+
+    /** Dev demo: how many rows are asked for now. */
+    public static int count() {
+        return current.size();
     }
 
     /** The legacy text form, for when chips are switched off: one line on the action bar. */
@@ -78,7 +87,7 @@ public final class Chips {
             Chip c = current.get(i);
             // each chip comes in a little after the one above it
             double local = Motion.reduced() ? 1 : Math.max(0, Math.min(1, (since - i * 0.04) / 0.16));
-            float a = (float) (Motion.easeOut(local) * visible);
+            float a = (float) (Motion.easeOut(local) * visible) * (c.quiet() ? 0.7f : 1f);
             if (a < 0.02f) continue;
             int slide = Motion.reduced() ? 0 : (int) Math.round((1 - Motion.easeOut(local)) * 8);
             int kw = ChipIcons.width(c.key()), aw = Ui.font().width(c.action());

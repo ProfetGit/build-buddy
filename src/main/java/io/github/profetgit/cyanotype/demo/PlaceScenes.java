@@ -461,6 +461,10 @@ final class PlaceScenes {
         act(() -> release(Minecraft.getInstance().options.keyAttack));
         waitTicks(25);
         shot("hint_edit");
+        act(() -> check("hints/edit starts with three rows and the help pointer", io.github.profetgit.cyanotype.ui.Chips.count() == 4, io.github.profetgit.cyanotype.ui.Chips.count() + " rows"));
+        waitTicks(150);
+        act(() -> check("hints/the rest of the keys come in after a quiet while", io.github.profetgit.cyanotype.ui.Chips.count() >= 8, io.github.profetgit.cyanotype.ui.Chips.count() + " rows"));
+        shot("hint_edit_all");
         act(() -> {
             Vec3 a = Interaction.handleAnchor("move+x");
             if (a != null) aim(Minecraft.getInstance(), a.x, a.y, a.z);

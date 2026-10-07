@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.66
+
+- Calmer key hints in Edit mode: three rows to begin with (drag, turn, done) and a faint "More help" row. After about six quiet seconds the rest of the keys come in as fainter rows, and they tuck away again when you grab, drag or scroll.
+
 ## 0.0.65
 
 - The turn ring has its original look back (flat band, crisp edges, the four clockwise chevrons). It still pops in and drifts.
