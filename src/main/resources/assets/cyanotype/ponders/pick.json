@@ -30,15 +30,18 @@
   "G": "minecraft:grass_block",
   "D": "minecraft:dirt",
   "c": "minecraft:cobblestone",
-  "p": "minecraft:birch_planks",
-  "l": "minecraft:dark_oak_log",
-  "g": "minecraft:glass",
+  "m": "minecraft:mossy_cobblestone",
+  "p": "minecraft:oak_planks",
+  "l": "minecraft:oak_log",
+  "g": "minecraft:glass_pane[north=true,south=true]",
+  "h": "minecraft:glass_pane[east=true,west=true]",
+  "w": "minecraft:cobblestone_wall[up=true]",
   "n": "minecraft:brick_stairs[facing=south]",
   "s": "minecraft:brick_stairs[facing=north]",
   "t": "minecraft:brick_slab[type=bottom]",
   "u": "minecraft:bricks",
-  "b": "minecraft:dark_oak_door[facing=south,half=lower]",
-  "B": "minecraft:dark_oak_door[facing=south,half=upper]",
+  "b": "minecraft:oak_door[facing=south,half=lower]",
+  "B": "minecraft:oak_door[facing=south,half=upper]",
   "f": "minecraft:oak_leaves[persistent=false]",
   "F": "minecraft:oak_fence"
  },
@@ -91,11 +94,11 @@
    ],
    "layers": [
     [
-     "ccccc",
-     "ccccc",
-     "ccccc",
-     "ccccc",
-     "ccccc"
+     "cmccc",
+     "ccccm",
+     "mcccc",
+     "ccmcc",
+     "cccmc"
     ],
     [
      "lpppl",
@@ -105,7 +108,7 @@
      "lpbpl"
     ],
     [
-     "lpgpl",
+     "lphpl",
      "p...p",
      "p...p",
      "p...p",
@@ -127,7 +130,7 @@
     ],
     [
      ".....",
-     "....c",
+     "....w",
      "ttttt",
      ".....",
      "....."

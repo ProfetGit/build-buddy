@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.60
+
+- The lessons' cottage is back to oak walls and logs, with more detail: a mossy cobblestone base, glass panes in the windows, a wall-block chimney top. The Materials lesson lists the new blocks.
+
 ## 0.0.59
 
 - The lessons' sample cottage looks better: light birch walls, dark oak corner posts and door, brick roof, stone base.

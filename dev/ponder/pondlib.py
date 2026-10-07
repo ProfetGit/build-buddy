@@ -283,24 +283,25 @@ def cells_of(layers, pred=lambda ch, x, y, z: True):
 
 
 def cottage_keys(L):
-    L.keys(c="minecraft:cobblestone", p="minecraft:birch_planks", l="minecraft:dark_oak_log", g="minecraft:glass",
+    L.keys(c="minecraft:cobblestone", m="minecraft:mossy_cobblestone", p="minecraft:oak_planks", l="minecraft:oak_log",
+           g="minecraft:glass_pane[north=true,south=true]", h="minecraft:glass_pane[east=true,west=true]", w="minecraft:cobblestone_wall[up=true]",
            n="minecraft:brick_stairs[facing=south]", s="minecraft:brick_stairs[facing=north]", t="minecraft:brick_slab[type=bottom]",
-           u="minecraft:bricks", b="minecraft:dark_oak_door[facing=south,half=lower]", B="minecraft:dark_oak_door[facing=south,half=upper]")
+           u="minecraft:bricks", b="minecraft:oak_door[facing=south,half=lower]", B="minecraft:oak_door[facing=south,half=upper]")
 
 
 # The cottage every lesson builds or moves: 5 wide, 5 deep, 6 high. Its door is in the south wall and its chimney in the north-east
 # corner, so a turn or a mirror shows. Layers go from the bottom up, rows from the north (z = 0) to the south, columns west to east.
 COTTAGE = [
     # y0: the foundation
-    ["ccccc", "ccccc", "ccccc", "ccccc", "ccccc"],
+    ["cmccc", "ccccm", "mcccc", "ccmcc", "cccmc"],
     # y1: walls, a window in each side wall, the door in the south wall
     ["lpppl", "p...p", "g...g", "p...p", "lpbpl"],
     # y2: walls, a window in the north wall, the top of the door
-    ["lpgpl", "p...p", "p...p", "p...p", "lpBpl"],
+    ["lphpl", "p...p", "p...p", "p...p", "lpBpl"],
     # y3: the lower roof (north and south) with the ceiling between
     ["nnnnn", "uuuuu", "uuuuu", "uuuuu", "sssss"],
     # y4: the upper roof, and the chimney
     [".....", "nnnnc", "uuuuu", "sssss", "....."],
     # y5: the ridge and the top of the chimney
-    [".....", "....c", "ttttt", ".....", "....."],
+    [".....", "....w", "ttttt", ".....", "....."],
 ]

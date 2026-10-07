@@ -37,15 +37,18 @@
   "G": "minecraft:grass_block",
   "D": "minecraft:dirt",
   "c": "minecraft:cobblestone",
-  "p": "minecraft:birch_planks",
-  "l": "minecraft:dark_oak_log",
-  "g": "minecraft:glass",
+  "m": "minecraft:mossy_cobblestone",
+  "p": "minecraft:oak_planks",
+  "l": "minecraft:oak_log",
+  "g": "minecraft:glass_pane[north=true,south=true]",
+  "h": "minecraft:glass_pane[east=true,west=true]",
+  "w": "minecraft:cobblestone_wall[up=true]",
   "n": "minecraft:brick_stairs[facing=south]",
   "s": "minecraft:brick_stairs[facing=north]",
   "t": "minecraft:brick_slab[type=bottom]",
   "u": "minecraft:bricks",
-  "b": "minecraft:dark_oak_door[facing=south,half=lower]",
-  "B": "minecraft:dark_oak_door[facing=south,half=upper]"
+  "b": "minecraft:oak_door[facing=south,half=lower]",
+  "B": "minecraft:oak_door[facing=south,half=upper]"
  },
  "groups": [
   {
@@ -92,11 +95,11 @@
    ],
    "layers": [
     [
-     "ccccc",
-     "ccccc",
-     "ccccc",
-     "ccccc",
-     "ccccc"
+     "cmccc",
+     "ccccm",
+     "mcccc",
+     "ccmcc",
+     "cccmc"
     ],
     [
      "lpppl",
@@ -106,7 +109,7 @@
      "lpbpl"
     ],
     [
-     "lpgpl",
+     "lphpl",
      "p...p",
      "p...p",
      "p...p",
@@ -128,7 +131,7 @@
     ],
     [
      ".....",
-     "....c",
+     "....w",
      "ttttt",
      ".....",
      "....."
@@ -296,7 +299,7 @@
     5.2,
     7.6
    ],
-   "text": "Birch planks go here",
+   "text": "Oak planks go here",
    "color": "gold",
    "fade": 0.2
   },
@@ -329,9 +332,9 @@
    "rows": [
     [
      "Cobblestone",
-     "27",
+     "21",
      "0",
-     "27"
+     "21"
     ],
     [
      "Bricks",
@@ -340,7 +343,7 @@
      "20"
     ],
     [
-     "Birch planks",
+     "Oak planks",
      "19",
      "0",
      "19"
@@ -352,7 +355,7 @@
      "19"
     ],
     [
-     "Dark oak log",
+     "Oak log",
      "8",
      "0",
      "8"
@@ -364,13 +367,19 @@
      "5"
     ],
     [
-     "Glass",
+     "Mossy cobblestone",
+     "5",
+     "0",
+     "5"
+    ],
+    [
+     "Glass pane",
      "3",
      "0",
      "3"
     ],
     [
-     "Dark oak door",
+     "Oak door",
      "1",
      "0",
      "1"
@@ -407,8 +416,8 @@
      "rows": [
       [
        "Cobblestone",
-       "27",
-       "27",
+       "21",
+       "21",
        "enough"
       ],
       [
@@ -418,7 +427,7 @@
        "20"
       ],
       [
-       "Birch planks",
+       "Oak planks",
        "19",
        "0",
        "19"
@@ -430,7 +439,7 @@
        "19"
       ],
       [
-       "Dark oak log",
+       "Oak log",
        "8",
        "0",
        "8"
@@ -442,13 +451,19 @@
        "5"
       ],
       [
-       "Glass",
+       "Mossy cobblestone",
+       "5",
+       "0",
+       "5"
+      ],
+      [
+       "Glass pane",
        "3",
        "0",
        "3"
       ],
       [
-       "Dark oak door",
+       "Oak door",
        "1",
        "0",
        "1"
@@ -460,8 +475,8 @@
      "rows": [
       [
        "Cobblestone",
-       "27",
-       "27",
+       "21",
+       "21",
        "enough"
       ],
       [
@@ -471,7 +486,7 @@
        "20"
       ],
       [
-       "Birch planks",
+       "Oak planks",
        "19",
        "19",
        "enough"
@@ -483,7 +498,7 @@
        "19"
       ],
       [
-       "Dark oak log",
+       "Oak log",
        "8",
        "0",
        "8"
@@ -495,13 +510,19 @@
        "5"
       ],
       [
-       "Glass",
+       "Mossy cobblestone",
+       "5",
+       "0",
+       "5"
+      ],
+      [
+       "Glass pane",
        "3",
        "0",
        "3"
       ],
       [
-       "Dark oak door",
+       "Oak door",
        "1",
        "0",
        "1"
@@ -513,8 +534,8 @@
      "rows": [
       [
        "Cobblestone",
-       "27",
-       "27",
+       "21",
+       "21",
        "enough"
       ],
       [
@@ -524,7 +545,7 @@
        "20"
       ],
       [
-       "Birch planks",
+       "Oak planks",
        "19",
        "19",
        "enough"
@@ -536,7 +557,7 @@
        "19"
       ],
       [
-       "Dark oak log",
+       "Oak log",
        "8",
        "8",
        "enough"
@@ -548,13 +569,19 @@
        "5"
       ],
       [
-       "Glass",
+       "Mossy cobblestone",
+       "5",
+       "0",
+       "5"
+      ],
+      [
+       "Glass pane",
        "3",
        "3",
        "enough"
       ],
       [
-       "Dark oak door",
+       "Oak door",
        "1",
        "0",
        "1"
@@ -574,9 +601,9 @@
      "rows": [
       [
        "Cobblestone",
-       "27",
+       "21",
        "0",
-       "27"
+       "21"
       ],
       [
        "Bricks",
@@ -585,7 +612,7 @@
        "20"
       ],
       [
-       "Birch planks",
+       "Oak planks",
        "19",
        "0",
        "19"
@@ -597,7 +624,7 @@
        "19"
       ],
       [
-       "Dark oak log",
+       "Oak log",
        "8",
        "0",
        "8"
@@ -609,13 +636,19 @@
        "5"
       ],
       [
-       "Glass",
+       "Mossy cobblestone",
+       "5",
+       "0",
+       "5"
+      ],
+      [
+       "Glass pane",
        "3",
        "0",
        "3"
       ],
       [
-       "Dark oak door",
+       "Oak door",
        "1",
        "0",
        "1"

@@ -380,31 +380,35 @@ def materials():
     L.cam(8, ease="inOut", yaw=0.9)
     L.cam(16.5, ease="inOut", yaw=0.785)
     header = ["Material", "Need", "Have", "To get"]
-    rows0 = [["Cobblestone", "27", "0", "27"], ["Bricks", "20", "0", "20"], ["Birch planks", "19", "0", "19"], ["Brick stairs", "19", "0", "19"], ["Dark oak log", "8", "0", "8"],
-             ["Brick slab", "5", "0", "5"], ["Glass", "3", "0", "3"], ["Dark oak door", "1", "0", "1"]]
+    names = {"c": "Cobblestone", "u": "Bricks", "p": "Oak planks", "ns": "Brick stairs", "l": "Oak log", "t": "Brick slab", "m": "Mossy cobblestone", "gh": "Glass pane", "b": "Oak door"}
+    flat = [ch for layer in COTTAGE for row in layer for ch in row]
+    need = {name: sum(1 for ch in flat if ch in keys) for keys, name in names.items()}
+    order = sorted(need, key=lambda n: -need[n])
+    rows0 = [[n, str(need[n]), "0", str(need[n])] for n in order]
+    ix = {r[0]: k for k, r in enumerate(rows0)}
     rows1 = [list(r) for r in rows0]
-    rows1[0][2], rows1[0][3] = "27", "enough"
+    rows1[ix["Cobblestone"]][2], rows1[ix["Cobblestone"]][3] = rows1[ix["Cobblestone"]][1], "enough"
     rows2 = [list(r) for r in rows1]
-    rows2[2][2], rows2[2][3] = "19", "enough"
+    rows2[ix["Oak planks"]][2], rows2[ix["Oak planks"]][3] = rows2[ix["Oak planks"]][1], "enough"
     rows3 = [list(r) for r in rows2]
-    rows3[4][2], rows3[4][3] = "8", "enough"
-    rows3[6][2], rows3[6][3] = "3", "enough"
+    rows3[ix["Oak log"]][2], rows3[ix["Oak log"]][3] = rows3[ix["Oak log"]][1], "enough"
+    rows3[ix["Glass pane"]][2], rows3[ix["Glass pane"]][3] = rows3[ix["Glass pane"]][1], "enough"
     L.panel("list", 0.5, 16.0, title="Materials  Cottage", header=header, rows=rows0, hot=-1, rect=[0.34, 0.03, 0.65, 0.92], buttons=["Copy list", "Save file"], lit=-1,
-            states=[{"t": 5.6, "hot": 2}, {"t": 7.6, "hot": 0}, {"t": 9.4, "hot": -1}, {"t": 10.2, "rows": rows1}, {"t": 11.4, "rows": rows2}, {"t": 12.4, "rows": rows3},
+            states=[{"t": 5.6, "hot": ix["Oak planks"]}, {"t": 7.6, "hot": ix["Cobblestone"]}, {"t": 9.4, "hot": -1}, {"t": 10.2, "rows": rows1}, {"t": 11.4, "rows": rows2}, {"t": 12.4, "rows": rows3},
                     {"t": 14.6, "lit": 0}, {"t": 15.2, "lit": -1}, {"t": 15.6, "rows": rows0}], fade=0.4)
     L.overlay("tint", 5.8, 7.6, group="ghost", key="p", color="gold", alpha=0.7, pulse=True, fade=0.15)
     L.overlay("tint", 7.8, 9.4, group="ghost", key="c", color="gold", alpha=0.7, pulse=True, fade=0.15)
     L.cursor(0, screen=[0.9, 0.8], alpha=0)
     L.cursor(4.4, ease="out", alpha=1)
-    L.cursor(5.3, ease="inOut", panel=["list", 2])
+    L.cursor(5.3, ease="inOut", panel=["list", ix["Oak planks"]])
     L.click(5.6)
-    L.cursor(7.3, ease="inOut", panel=["list", 0])
+    L.cursor(7.3, ease="inOut", panel=["list", ix["Cobblestone"]])
     L.click(7.6)
     L.cursor(14.0, ease="inOut", screen=[0.75, 0.86])
     L.cursor(14.4, ease="inOut", screen=[0.55, 0.86])
     L.click(14.6, hold=0.5)
     L.cursor(15.6, ease="inOut", alpha=0)
-    L.overlay("label", 6.0, 7.6, at=[C[0] + 2.5, C[1] + 3.2, C[2] + 5.6], text="Birch planks go here", color="gold", fade=0.2)
+    L.overlay("label", 6.0, 7.6, at=[C[0] + 2.5, C[1] + 3.2, C[2] + 5.6], text="Oak planks go here", color="gold", fade=0.2)
     L.overlay("label", 8.0, 9.4, at=[C[0] + 2.5, C[1] + 0.4, C[2] + 5.6], text="Cobblestone goes here", color="gold", fade=0.2)
 
     L.caption(0.0, 4.6, "Materials counts what the build still needs and what you carry. The biggest shortage comes first.", "1  The list")
