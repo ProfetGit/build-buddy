@@ -166,6 +166,32 @@ final class PonderScenes {
         act(() -> check("ponder/Try it starts the tool", screen() == null && Placements.mode() == Placements.Mode.EDIT, screen() + ", mode " + Placements.mode()));
         act(() -> Placements.setMode(Placements.Mode.IDLE));
 
+        // the ? of a choice of the Build panel opens that choice's lesson, and closing it comes back to the panel
+        act(() -> {
+            Lessons.markSeen("build");
+            Lessons.markSeen("auto");
+        });
+        wheelOn(3);
+        act(() -> {
+            WheelScreen.testHeld = false;
+            Interaction.testMainDown = false;
+        });
+        waitTicks(14);
+        act(() -> check("ponder/the Build panel opens (its lesson was seen)", screen() instanceof io.github.profetgit.cyanotype.ui.ChoiceScreen, String.valueOf(screen())));
+        shot("ponder_flow_build_panel");
+        act(() -> {
+            var cs = (io.github.profetgit.cyanotype.ui.ChoiceScreen) screen();
+            click(cs.helpAnchor(1));
+        });
+        waitTicks(8);
+        act(() -> check("ponder/the ? of 'Place what I look at' opens the auto lesson", ponder() != null && ponder().scene().id.equals("auto"), "screen " + screen()));
+        act(() -> click(ponder().anchor("skip")));
+        waitTicks(6);
+        act(() -> check("ponder/closing it goes back to the Build panel", screen() instanceof io.github.profetgit.cyanotype.ui.ChoiceScreen, "screen " + screen()));
+        act(() -> key(InputConstants.KEY_ESCAPE));
+        waitTicks(4);
+        act(() -> Placements.setMode(Placements.Mode.IDLE));
+
         // Try it cannot start a tool that is not ready: it says why and stays
         act(() -> {
             for (var p : java.util.List.copyOf(Placements.all())) Placements.remove(p);
@@ -325,7 +351,12 @@ final class PonderScenes {
         });
         waitTicks(8);
         act(() -> check("ponder/a click in the middle of the wheel opens the list", screen() instanceof HelpScreen, "screen " + screen()));
-        act(() -> cleanup());
+        act(() -> {
+            cleanup();
+            // the other scenes run without lessons popping up over them
+            Settings.get().lessons = false;
+            Settings.get().reduceMotion = false;
+        });
         waitTicks(4);
         UiScenes.teardown();
     }

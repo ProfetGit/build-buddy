@@ -207,6 +207,8 @@ public final class Director {
         });
         waitTicks(40);
         for (String scene : SCENES) {
+            // a scene before this one (Settings' "Reset all") may have switched the lessons back on, and they would open over the test
+            if (!scene.startsWith("ponder")) act(() -> io.github.profetgit.cyanotype.ui.Settings.get().lessons = false);
             switch (scene) {
                 case "house" -> houseScene();
                 case "shaderswap" -> ShaderScenes.swap();

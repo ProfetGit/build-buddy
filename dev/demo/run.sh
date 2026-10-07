@@ -32,7 +32,7 @@ args=(26.3 fabric "$OUT" --game "$HERE/.work/game${WORK_TAG:+-$WORK_TAG}" --jar 
 # the mod needs Fabric API (its resource loader serves the art and sounds), so every run has it unless FABRIC_API=0
 [ "${FABRIC_API:-1}" != "0" ] && args+=(--fabric-api)
 if [ -n "${MODS:-}" ]; then IFS=: read -ra extra <<< "$MODS"; for m in "${extra[@]}"; do args+=(--mod "$m"); done; fi
-if [ -n "${SHADERS:-}" ]; then args+=(--shaders "$HOME/.local/share/ModrinthApp/profiles/Fabric 26.3/shaderpacks/ComplementaryReimagined_r5.8.1.zip"); fi
+if [ -n "${SHADERS:-}" ]; then args+=(--shaders "$(ls -t "$HOME"/.local/share/ModrinthApp/profiles/"Fabric 26.3"/shaderpacks/ComplementaryReimagined_*.zip | sed -n 1p)"); fi
 if [ -n "${PROFILE:-}" ]; then
   P="$HOME/.local/share/ModrinthApp/profiles/Fabric 26.3/mods"
   for m in "$P"/*.jar; do

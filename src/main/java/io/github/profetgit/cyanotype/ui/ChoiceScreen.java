@@ -253,6 +253,11 @@ public final class ChoiceScreen extends Screen {
         return choices.size();
     }
 
+    /** Dev demo: the middle of the ? of a choice row, or null when the row has no lesson. */
+    public int @org.jspecify.annotations.Nullable [] helpAnchor(int i) {
+        return choices.get(i).lesson == null ? null : new int[]{helpX(i) + 8, helpY(i) + 8};
+    }
+
     public String heading() {
         return title;
     }
