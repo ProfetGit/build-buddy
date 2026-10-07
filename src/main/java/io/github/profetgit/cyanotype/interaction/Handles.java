@@ -286,28 +286,20 @@ final class Handles {
         return ((int) Math.max(0, Math.min(255, a * 255)) << 24) | (argb & 0xFFFFFF);
     }
 
+    /** Where the sun is for the soft shading of the round shapes (a fixed direction in the world, so they read as lit solids). */
+    private static final Vec3 SUN = new Vec3(0.35, 0.8, 0.5).normalize();
+    /** The arrow's outline from its base to its tip: (how far along 0..1 of the arrow, radius in units). A ball at the base, a fat shaft, a round shoulder, a blunt head and a dome. */
+    private static final double[][] PROFILE = {
+        {0.00, 0.00}, {0.025, 0.17}, {0.07, 0.26}, {0.14, 0.30}, {0.56, 0.30},
+        {0.58, 0.52}, {0.62, 0.70}, {0.70, 0.66}, {0.84, 0.36}, {0.92, 0.24}, {0.975, 0.12}, {1.00, 0.00}};
+
     /**
-     * A solid arrow: a square shaft and a pyramid head, translucent fill under a crisp outline. {@code length} is the
-     * whole arrow from {@code from} along the axis-aligned {@code dir}; {@code k} scales its thickness (the swell on hover).
+     * A round, chunky arrow: a lathe turned from {@link #PROFILE}, filled with soft translucent colour, shaded as if lit from
+     * above. {@code length} is the whole arrow from {@code from} along the axis-aligned {@code dir}; {@code k} scales its
+     * thickness (the swell on hover).
      */
     private void arrow(Vec3 from, Vec3 dir, double length, double k, int color, float hover, float visible, double scale) {
         double unit = scale * k;
-        double w = 0.15 * unit, headHalf = 0.46 * unit, headLen = Math.min(1.2 * unit, length * 0.45);
-        Vec3 headBase = from.add(dir.scale(length - headLen));
-        Vec3 apex = from.add(dir.scale(length));
-        int stroke = mix(color, WHITE, 0.35f + 0.65f * hover);
-        float sw = 2.4f + 1.8f * hover;
-        stroke = alpha(stroke, visible);
-        int fill = alpha(color, (0.5 + 0.38 * hover) * visible);
-        int dim = alpha(color, (0.32 + 0.3 * hover) * visible);
-
-        // shaft
-        AABB shaft = new AABB(
-            Math.min(from.x, headBase.x) - (dir.x == 0 ? w : 0), Math.min(from.y, headBase.y) - (dir.y == 0 ? w : 0), Math.min(from.z, headBase.z) - (dir.z == 0 ? w : 0),
-            Math.max(from.x, headBase.x) + (dir.x == 0 ? w : 0), Math.max(from.y, headBase.y) + (dir.y == 0 ? w : 0), Math.max(from.z, headBase.z) + (dir.z == 0 ? w : 0));
-        Gizmos.cuboid(shaft, GizmoStyle.strokeAndFill(stroke, sw * 0.7f, fill)).setAlwaysOnTop();
-
-        // head: the two axes across the arrow
         Vec3 u, v;
         if (dir.x != 0) {
             u = new Vec3(0, 1, 0);
@@ -319,29 +311,40 @@ final class Handles {
             u = new Vec3(1, 0, 0);
             v = new Vec3(0, 1, 0);
         }
-        Vec3 c0 = headBase.add(u.scale(headHalf)).add(v.scale(headHalf));
-        Vec3 c1 = headBase.add(u.scale(headHalf)).add(v.scale(-headHalf));
-        Vec3 c2 = headBase.add(u.scale(-headHalf)).add(v.scale(-headHalf));
-        Vec3 c3 = headBase.add(u.scale(-headHalf)).add(v.scale(headHalf));
-        GizmoStyle side = GizmoStyle.strokeAndFill(stroke, sw, fill);
-        Gizmos.rect(c0, c1, apex, apex, side).setAlwaysOnTop();
-        Gizmos.rect(c1, c2, apex, apex, side).setAlwaysOnTop();
-        Gizmos.rect(c2, c3, apex, apex, side).setAlwaysOnTop();
-        Gizmos.rect(c3, c0, apex, apex, side).setAlwaysOnTop();
-        Gizmos.rect(c0, c1, c2, c3, GizmoStyle.strokeAndFill(stroke, sw, dim)).setAlwaysOnTop();
+        // far away the sides are fewer: a distant arrow is a few pixels wide
+        int n = distance > 48 ? 7 : 10;
+        // the profile's radii are for an arrow 2.8 units long; the head keeps its size when the arrow is short
+        double radiusUnit = unit * (length / (2.8 * scale) < 0.6 ? 0.8 : 1.0) * 0.82;
+        Vec3[][] rings = new Vec3[PROFILE.length][n];
+        for (int i = 0; i < PROFILE.length; i++) {
+            Vec3 centre = from.add(dir.scale(length * PROFILE[i][0]));
+            double r = PROFILE[i][1] * radiusUnit;
+            for (int j = 0; j < n; j++) {
+                double a = j * 2 * Math.PI / n;
+                rings[i][j] = centre.add(u.scale(Math.cos(a) * r)).add(v.scale(Math.sin(a) * r));
+            }
+        }
+        int body = mix(color, WHITE, 0.15f + 0.35f * hover);
+        double opacity = (0.62 + 0.3 * hover) * visible;
+        for (int i = 0; i + 1 < PROFILE.length; i++) {
+            for (int j = 0; j < n; j++) {
+                int j2 = (j + 1) % n;
+                double a = (j + 0.5) * 2 * Math.PI / n;
+                Vec3 normal = u.scale(Math.cos(a)).add(v.scale(Math.sin(a)));
+                double light = 0.5 + 0.5 * normal.dot(SUN);
+                int shaded = light >= 0.5f ? mix(body, WHITE, (float) ((light - 0.5) * 0.7)) : mix(body, 0xFF3B4A66, (float) ((0.5 - light) * 0.5));
+                Gizmos.rect(rings[i][j], rings[i][j2], rings[i + 1][j2], rings[i + 1][j], GizmoStyle.fill(alpha(shaded, opacity))).setAlwaysOnTop();
+            }
+        }
     }
 
-    /** The turn ring: a flat translucent band at the base with a crisp edge on both sides and four chevrons showing clockwise. */
-    private static double phase(Handle h) {
-        return (h.id.hashCode() & 0xFFFF) / 65535.0 * Math.PI * 2;
-    }
-
+    /** The turn ring: a soft translucent band at the base with four rounded arrows showing clockwise. */
     private void ring(float hover, float press, float visible, double drift) {
-        double band = 0.5 * ring.unit * (1 + 0.25 * hover - 0.1 * press);
+        double band = 0.62 * ring.unit * (1 + 0.25 * hover - 0.1 * press);
         double r0 = ring.radius - band / 2, r1 = ring.radius + band / 2;
-        int stroke = alpha(mix(RING_COLOR, WHITE, 0.2f + 0.8f * hover), visible);
-        float sw = 2.2f + 2.0f * hover;
-        int fill = alpha(RING_COLOR, (0.28 + 0.35 * hover) * visible);
+        int stroke = alpha(mix(RING_COLOR, WHITE, 0.2f + 0.8f * hover), visible * (0.45 + 0.5 * hover));
+        float sw = 1.6f + 1.6f * hover;
+        int fill = alpha(RING_COLOR, (0.26 + 0.35 * hover) * visible);
         int n = 72;
         Vec3[] in = new Vec3[n + 1], out = new Vec3[n + 1];
         for (int i = 0; i <= n; i++) {
@@ -356,15 +359,28 @@ final class Handles {
             Gizmos.line(in[i], in[i + 1], stroke, sw).setAlwaysOnTop();
             Gizmos.line(out[i], out[i + 1], stroke, sw).setAlwaysOnTop();
         }
-        // chevrons pointing clockwise (toward +z from +x, as seen from above)
-        double w = 0.55 * ring.unit * (1 + 0.2 * hover), tipAngle = 0.8 * ring.unit / ring.radius;
+        // four round-nosed arrowheads pointing clockwise (toward +z from +x, as seen from above): a fan of small steps whose
+        // width shrinks along the way, so the tip is blunt
+        double w = 0.62 * ring.unit * (1 + 0.2 * hover), len = 1.5 * ring.unit / ring.radius;
+        int steps = 6;
+        GizmoStyle head = GizmoStyle.fill(alpha(WHITE, (0.7 + 0.25 * hover) * visible));
         for (int k = 0; k < 4; k++) {
             double a = k * Math.PI / 2 + Math.PI / 4 + drift;
-            Vec3 tip = new Vec3(ring.cx + Math.cos(a + tipAngle) * ring.radius, ring.y, ring.cz + Math.sin(a + tipAngle) * ring.radius);
-            Vec3 l = new Vec3(ring.cx + Math.cos(a) * (ring.radius - w), ring.y, ring.cz + Math.sin(a) * (ring.radius - w));
-            Vec3 r = new Vec3(ring.cx + Math.cos(a) * (ring.radius + w), ring.y, ring.cz + Math.sin(a) * (ring.radius + w));
-            Gizmos.rect(l, tip, tip, r, GizmoStyle.strokeAndFill(stroke, sw, alpha(WHITE, (0.55 + 0.35 * hover) * visible))).setAlwaysOnTop();
+            for (int i = 0; i < steps; i++) {
+                double t0 = (double) i / steps, t1 = (double) (i + 1) / steps;
+                double w0 = w * Math.sqrt(Math.max(0, 1 - t0 * t0)), w1 = w * Math.sqrt(Math.max(0, 1 - t1 * t1));
+                double a0 = a + len * t0, a1 = a + len * t1;
+                Gizmos.rect(
+                    new Vec3(ring.cx + Math.cos(a0) * (ring.radius - w0), ring.y, ring.cz + Math.sin(a0) * (ring.radius - w0)),
+                    new Vec3(ring.cx + Math.cos(a0) * (ring.radius + w0), ring.y, ring.cz + Math.sin(a0) * (ring.radius + w0)),
+                    new Vec3(ring.cx + Math.cos(a1) * (ring.radius + w1), ring.y, ring.cz + Math.sin(a1) * (ring.radius + w1)),
+                    new Vec3(ring.cx + Math.cos(a1) * (ring.radius - w1), ring.y, ring.cz + Math.sin(a1) * (ring.radius - w1)), head).setAlwaysOnTop();
+            }
         }
+    }
+
+    private static double phase(Handle h) {
+        return (h.id.hashCode() & 0xFFFF) / 65535.0 * Math.PI * 2;
     }
 
     // ---- drag guides

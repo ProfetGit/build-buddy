@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.63
+
+- Round, chunky arrows: a ball at the base, a fat shaft, a blunt head with a rounded tip, shaded softly as if lit from above, with no hard outlines. The turn ring is a softer, wider band with four rounded arrowheads. Distant arrows use fewer sides.
+
 ## 0.0.62
 
 - Friendlier arrows and turn ring: soft pastel colours (pink, mint, sky), and they move. When you start editing they pop out one after another with a little overshoot, they breathe gently along their axis, hover swells them with a jelly spring, grabbing squeezes them, and the ring's arrows drift slowly round. Reduce motion turns it all off.
