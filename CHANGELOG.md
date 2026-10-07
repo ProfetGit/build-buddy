@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.58
+
+- The sample cottage in the lessons has its roof stairs the right way round (they sloped the wrong way).
+
 ## 0.0.57
 
 - Redrawn icons: the check mark (even arms, one glint), the help question mark (bold, on a white disc) and the restart arrow (a clean clockwise arrow). They are drawn like the rest of the icons: flat colours and hand-placed pixels.

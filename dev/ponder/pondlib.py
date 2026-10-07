@@ -284,7 +284,7 @@ def cells_of(layers, pred=lambda ch, x, y, z: True):
 
 def cottage_keys(L):
     L.keys(c="minecraft:cobblestone", p="minecraft:oak_planks", l="minecraft:oak_log", g="minecraft:glass",
-           n="minecraft:brick_stairs[facing=north]", s="minecraft:brick_stairs[facing=south]", t="minecraft:brick_slab[type=bottom]",
+           n="minecraft:brick_stairs[facing=south]", s="minecraft:brick_stairs[facing=north]", t="minecraft:brick_slab[type=bottom]",
            u="minecraft:bricks", b="minecraft:oak_door[facing=south,half=lower]", B="minecraft:oak_door[facing=south,half=upper]")
 
 
