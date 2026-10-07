@@ -549,12 +549,20 @@ public final class Interaction {
 
     /** Reverts the last change (a move, turn, flip or removal) and says what it was. */
     public static void undo(Minecraft mc) {
+        if (Placements.mode() == Mode.SELECT && Selecting.ownsUndo()) {
+            Selecting.undo(mc);
+            return;
+        }
         Placements.Change c = Placements.undo();
         report(mc, c, "undo", "Undid");
     }
 
     /** Does again what the last undo reverted. */
     public static void redo(Minecraft mc) {
+        if (Placements.mode() == Mode.SELECT && Selecting.ownsUndo()) {
+            Selecting.redo(mc);
+            return;
+        }
         Placements.Change c = Placements.redo();
         report(mc, c, "redo", "Redid");
     }

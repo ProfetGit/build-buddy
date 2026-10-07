@@ -32,7 +32,8 @@ final class BoxHighlight {
     /** How far a lit face stands off the block, so it never fights the block's own face for the same depth. */
     private static final double LIFT = 0.012;
 
-    private record Quad(Vec3 a, Vec3 b, Vec3 c, Vec3 d) {
+    /** One lit rectangle and the way it faces (a unit step along one axis), so faces turned away from the camera are not drawn. */
+    private record Quad(Vec3 a, Vec3 b, Vec3 c, Vec3 d, int axis, int sign) {
     }
 
     /** What is lit for one kind of change. */
@@ -192,7 +193,7 @@ final class BoxHighlight {
                         for (int jj = 0; jj < h; jj++) for (int ii = 0; ii < w; ii++) mask[(j + jj) * n[u] + i + ii] = false;
                         if (lit.quads.size() >= MAX_QUADS) return;
                         double u0 = o[u] + i, u1 = o[u] + i + w, v0 = o[v] + j, v1 = o[v] + j + h;
-                        lit.quads.add(new Quad(point(a, u, v, at, u0, v0), point(a, u, v, at, u1, v0), point(a, u, v, at, u1, v1), point(a, u, v, at, u0, v1)));
+                        lit.quads.add(new Quad(point(a, u, v, at, u0, v0), point(a, u, v, at, u1, v0), point(a, u, v, at, u1, v1), point(a, u, v, at, u0, v1), a, sign));
                     }
                 }
             }
@@ -207,11 +208,37 @@ final class BoxHighlight {
         return new Vec3(p[0], p[1], p[2]);
     }
 
-    static void draw() {
+    /**
+     * Drawn on top of everything (the game's depth buffer is not the one these shapes meet under a shader pack, where depth-tested
+     * shapes vanish), so each face that points away from the camera is left out instead: what is behind a lit block is not lit through it.
+     */
+    static void draw(Vec3 camera) {
         for (Lit l : List.of(added, removed)) {
             GizmoStyle style = GizmoStyle.fill(((l == added ? 0x52 : 0x66) << 24) | (l.color & 0xFFFFFF));
-            for (Quad q : l.quads) Gizmos.rect(q.a, q.b, q.c, q.d, style);
-            for (AABB a : l.shapes) Gizmos.cuboid(a, style);
+            for (Quad q : l.quads) {
+                double toCamera = (axisOf(camera, q.axis) - axisOf(q.a, q.axis)) * q.sign;
+                if (toCamera <= 0) continue;
+                Gizmos.rect(q.a, q.b, q.c, q.d, style).setAlwaysOnTop();
+            }
+            for (AABB a : l.shapes) box(a, camera, style);
         }
+    }
+
+    private static double axisOf(Vec3 v, int axis) {
+        return axis == 0 ? v.x : axis == 1 ? v.y : v.z;
+    }
+
+    /** The faces of a shape that look toward the camera, as flat rectangles. */
+    private static void box(AABB a, Vec3 c, GizmoStyle style) {
+        if (c.x > a.maxX) face(new Vec3(a.maxX, a.minY, a.minZ), new Vec3(a.maxX, a.maxY, a.minZ), new Vec3(a.maxX, a.maxY, a.maxZ), new Vec3(a.maxX, a.minY, a.maxZ), style);
+        if (c.x < a.minX) face(new Vec3(a.minX, a.minY, a.minZ), new Vec3(a.minX, a.maxY, a.minZ), new Vec3(a.minX, a.maxY, a.maxZ), new Vec3(a.minX, a.minY, a.maxZ), style);
+        if (c.y > a.maxY) face(new Vec3(a.minX, a.maxY, a.minZ), new Vec3(a.maxX, a.maxY, a.minZ), new Vec3(a.maxX, a.maxY, a.maxZ), new Vec3(a.minX, a.maxY, a.maxZ), style);
+        if (c.y < a.minY) face(new Vec3(a.minX, a.minY, a.minZ), new Vec3(a.maxX, a.minY, a.minZ), new Vec3(a.maxX, a.minY, a.maxZ), new Vec3(a.minX, a.minY, a.maxZ), style);
+        if (c.z > a.maxZ) face(new Vec3(a.minX, a.minY, a.maxZ), new Vec3(a.maxX, a.minY, a.maxZ), new Vec3(a.maxX, a.maxY, a.maxZ), new Vec3(a.minX, a.maxY, a.maxZ), style);
+        if (c.z < a.minZ) face(new Vec3(a.minX, a.minY, a.minZ), new Vec3(a.maxX, a.minY, a.minZ), new Vec3(a.maxX, a.maxY, a.minZ), new Vec3(a.minX, a.maxY, a.minZ), style);
+    }
+
+    private static void face(Vec3 a, Vec3 b, Vec3 c, Vec3 d, GizmoStyle style) {
+        Gizmos.rect(a, b, c, d, style).setAlwaysOnTop();
     }
 }

@@ -53,6 +53,9 @@ public final class Selecting {
     private static long scrollNs;
     /** The box as it was when the current run of scroll notches began: what the highlight compares with. */
     private static SelectionBox scrollStart;
+    /** The boxes before each change (a drag, a run of scroll notches), newest first, and the ones undone: Ctrl+Z and Ctrl+Y walk them. */
+    private static final java.util.ArrayDeque<SelectionBox> history = new java.util.ArrayDeque<>(), future = new java.util.ArrayDeque<>();
+    private static final int HISTORY_LIMIT = 64;
     /** Where the last frame was seen from: a click picks what the frame showed. */
     private static Vec3 camPos = Vec3.ZERO, camLook = new Vec3(0, 0, 1);
 
@@ -131,6 +134,8 @@ public final class Selecting {
         dragHandle = null;
         dragStart = null;
         scrollStart = null;
+        history.clear();
+        future.clear();
         BoxHighlight.clear();
         scrollNs = 0;
     }
@@ -161,6 +166,7 @@ public final class Selecting {
     /** Moves the side the player is facing: out for a positive count, in for a negative one. The same side for a run of notches. */
     private static void growFacing(Minecraft mc, int steps) {
         long now = System.nanoTime();
+        boolean newRun = now - scrollNs > 1_200_000_000L;
         if (now - scrollNs > 1_200_000_000L) {
             scrollFace = Direction.getApproximateNearest(camLook.x, camLook.y, camLook.z);
             scrollStart = box;
@@ -176,9 +182,54 @@ public final class Selecting {
             Interaction.say(mc, "That box is too big (at most " + String.format(Locale.ROOT, "%,d", Capture.MAX_VOLUME) + " blocks)");
             return;
         }
+        if (newRun) remember(box);
         box = moved;
         dragSteps = steps;
         Sfx.play(Sfx.SNAP, 1.0f + 0.04f * Math.min(12, Math.abs(steps)) * Math.signum(steps));
+    }
+
+    private static void remember(SelectionBox before) {
+        history.push(before);
+        future.clear();
+        while (history.size() > HISTORY_LIMIT) history.removeLast();
+    }
+
+    /** Whether Ctrl+Z / Ctrl+Y belong to the box now (its sides can be moved). */
+    public static boolean ownsUndo() {
+        return stage == Stage.ADJUST && box != null && dragHandle == null;
+    }
+
+    /** Takes the last change of the box back. */
+    public static void undo(Minecraft mc) {
+        if (history.isEmpty()) {
+            Sfx.play(Sfx.ERROR);
+            Interaction.say(mc, "Nothing to undo");
+            return;
+        }
+        future.push(box);
+        box = history.pop();
+        afterHistory();
+        Interaction.say(mc, "Undid the last change to the box: " + box.sizeText());
+    }
+
+    /** Does the last undone change of the box again. */
+    public static void redo(Minecraft mc) {
+        if (future.isEmpty()) {
+            Sfx.play(Sfx.ERROR);
+            Interaction.say(mc, "Nothing to redo");
+            return;
+        }
+        history.push(box);
+        box = future.pop();
+        afterHistory();
+        Interaction.say(mc, "Did the change to the box again: " + box.sizeText());
+    }
+
+    private static void afterHistory() {
+        scrollNs = 0;
+        scrollStart = null;
+        BoxHighlight.clear();
+        Sfx.play(Sfx.SNAP, 0.9f);
     }
 
     /** A left click. */
@@ -239,6 +290,7 @@ public final class Selecting {
     }
 
     public static void endDrag() {
+        if (dragStart != null && box != null && !box.equals(dragStart)) remember(dragStart);
         dragHandle = null;
         dragStart = null;
     }
@@ -289,12 +341,13 @@ public final class Selecting {
             hover = handles.pick(camera, look);
             Interaction.chips(mc, new Chips.Chip("Drag", hover == null ? "An arrow resizes the box" : "Move the " + face(hover.dir) + " side"),
                 new Chips.Chip("Scroll", "Grow / shrink the box"),
-                new Chips.Chip("Right click", "Save it..."), new Chips.Chip(cancel, "Cancel"), Interaction.helpChip());
+                new Chips.Chip("Right click", "Save it..."), new Chips.Chip(cancel, "Cancel"),
+                new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo", true), Interaction.helpChip());
         }
         handles.animate(hover, dragHandle == null ? null : hover, Interaction.dt());
         Direction pointed = hover != null ? hover.dir : (now - scrollNs < 1_200_000_000L ? scrollFace : null);
         drawBox(box, camera, false, pointed, dragHandle != null);
-        if (moving) BoxHighlight.draw();
+        if (moving) BoxHighlight.draw(camera);
         else BoxHighlight.clear();
         handles.emit();
     }

@@ -505,6 +505,31 @@ final class PickScenes {
         shot("pick_9_scroll_in");
         act(() -> scroll(mc(), 2));
         waitTicks(40);
+        // Ctrl+Z and Ctrl+Y walk the box's own history while its sides can be moved
+        SelectionBox[] before = new SelectionBox[1];
+        act(() -> {
+            before[0] = io.github.profetgit.cyanotype.interaction.Selecting.box();
+            scroll(mc(), 3);
+        });
+        waitTicks(40);
+        act(() -> check("pick/the box grew by three notches", io.github.profetgit.cyanotype.interaction.Selecting.box().z0() == before[0].z0() - 3, String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.box())));
+        PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, false);
+        waitTicks(4);
+        act(() -> check("pick/Ctrl+Z takes the whole run of notches back at once", before[0].equals(io.github.profetgit.cyanotype.interaction.Selecting.box()), String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.box())));
+        PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.REDO, false);
+        waitTicks(4);
+        act(() -> check("pick/Ctrl+Y does it again", io.github.profetgit.cyanotype.interaction.Selecting.box().z0() == before[0].z0() - 3, String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.box())));
+        PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, false);
+        waitTicks(4);
+        // a drag is one step too
+        grabSide("top");
+        dragBy("top", -1.2);
+        letGo();
+        act(() -> check("pick/dragging the top side in made the box one lower", io.github.profetgit.cyanotype.interaction.Selecting.box().y1() == before[0].y1() - 1, String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.box())));
+        PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, false);
+        waitTicks(4);
+        act(() -> check("pick/Ctrl+Z puts the dragged side back", before[0].equals(io.github.profetgit.cyanotype.interaction.Selecting.box()), String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.box())));
+        act(() -> check("pick/and the ghosts' own history was left alone", io.github.profetgit.cyanotype.placement.Placements.mode() == io.github.profetgit.cyanotype.placement.Placements.Mode.SELECT, String.valueOf(io.github.profetgit.cyanotype.placement.Placements.mode())));
 
         // a roof of stairs and slabs lights by its shapes too
         act(() -> {

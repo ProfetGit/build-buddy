@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.0.70
+
+- The Save box highlight now shows with shader packs. Under Iris the lit blocks were drawn behind the world's depth and never appeared; they are now drawn on top, and only the faces that look toward you are drawn, so nothing lights through a wall.
+- Ctrl+Z and Ctrl+Y now undo and redo changes to the Save box (a drag of a side, or a run of scroll notches), while you are adjusting it. The hints list them.
+
 ## 0.0.69
 
 - Moving a side of the Save box now lights only what the move changes: blocks the box takes in are cyan, blocks it lets go of are red. The rest of your build is no longer tinted while you drag, and it is much cheaper on big boxes. Works for dragging an arrow and for scrolling.
