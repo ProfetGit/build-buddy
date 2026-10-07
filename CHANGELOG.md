@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.69
+
+- Moving a side of the Save box now lights only what the move changes: blocks the box takes in are cyan, blocks it lets go of are red. The rest of your build is no longer tinted while you drag, and it is much cheaper on big boxes. Works for dragging an arrow and for scrolling.
+
 ## 0.0.68
 
 - The block highlight while you move a side of the Save box is rebuilt. Full blocks are lit as a skin (only the faces you can see, joined into big rectangles), blocks like slabs, stairs and fences by their own shape. Before, a big box lit only every n-th block, so the highlight looked broken and patchy; now nothing is skipped, big boxes (up to 400,000 cells) look like small ones, and it needs far fewer shapes to draw.

@@ -51,6 +51,8 @@ public final class Selecting {
     /** The side the scroll wheel is moving, and when it last moved: the same side for a whole run of notches, then the one you face again. */
     private static Direction scrollFace = Direction.NORTH;
     private static long scrollNs;
+    /** The box as it was when the current run of scroll notches began: what the highlight compares with. */
+    private static SelectionBox scrollStart;
     /** Where the last frame was seen from: a click picks what the frame showed. */
     private static Vec3 camPos = Vec3.ZERO, camLook = new Vec3(0, 0, 1);
 
@@ -128,6 +130,7 @@ public final class Selecting {
         hover = null;
         dragHandle = null;
         dragStart = null;
+        scrollStart = null;
         BoxHighlight.clear();
         scrollNs = 0;
     }
@@ -158,7 +161,10 @@ public final class Selecting {
     /** Moves the side the player is facing: out for a positive count, in for a negative one. The same side for a run of notches. */
     private static void growFacing(Minecraft mc, int steps) {
         long now = System.nanoTime();
-        if (now - scrollNs > 1_200_000_000L) scrollFace = Direction.getApproximateNearest(camLook.x, camLook.y, camLook.z);
+        if (now - scrollNs > 1_200_000_000L) {
+            scrollFace = Direction.getApproximateNearest(camLook.x, camLook.y, camLook.z);
+            scrollStart = box;
+        }
         SelectionBox moved = box.moved(scrollFace, steps);
         scrollNs = now;
         if (moved.equals(box)) {
@@ -272,7 +278,8 @@ public final class Selecting {
         handles = new Handles(box.x0(), box.y0(), box.z0(), box.sizeX(), box.sizeY(), box.sizeZ(), camera, look, true);
         long now = System.nanoTime();
         boolean moving = dragHandle != null || now - scrollNs < 1_200_000_000L;
-        if (moving && mc.level != null) BoxHighlight.refresh(mc.level, box, camera);
+        SelectionBox from = dragHandle != null ? dragStart : scrollStart;
+        if (moving && mc.level != null && from != null) BoxHighlight.refresh(mc.level, box, from, camera);
         if (dragHandle != null) updateDrag(camera, look);
         handles = new Handles(box.x0(), box.y0(), box.z0(), box.sizeX(), box.sizeY(), box.sizeZ(), camera, look, true);
         if (dragHandle != null) {
@@ -293,6 +300,11 @@ public final class Selecting {
     }
 
     /** Dev demo: the shapes lit now. */
+    /** Dev demo: how many lit shapes are for what the box lost. */
+    public static int highlightedRemoved() {
+        return BoxHighlight.removedCount();
+    }
+
     public static java.util.List<AABB> highlighted() {
         return BoxHighlight.shapes();
     }

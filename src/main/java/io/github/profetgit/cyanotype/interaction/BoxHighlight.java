@@ -13,15 +13,14 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Lights up the blocks that are inside the Save area box, so it is plain what the box holds and what it leaves out. Shown only
- * while a side of the box is being moved. Full blocks are lit as a skin: only the faces that can be seen (not the ones against
- * another full block), joined into big rectangles, so a whole wall is a handful of shapes however many blocks it has. Blocks
- * that are not full (slabs, stairs, torches, fences) are lit by their own shape. Nothing is dropped or sampled: a big box looks
- * the same as a small one, only the far parts (beyond {@link #RANGE}) are left out. The list is made once for a box, not every
- * frame.
+ * Lights up what a side of the Save area box has just gained or lost, so it is plain what moving it did: blocks the box now
+ * holds that it did not hold when the move began are lit cyan, blocks it let go of are lit red. Nothing is lit while no side
+ * is being moved. Full blocks are lit as a skin (only the faces that can be seen, joined into big rectangles); blocks that are
+ * not full (slabs, stairs, torches, fences) by their own shape. Nothing is dropped or sampled, only what is farther than
+ * {@link #RANGE} from the camera. The lists are made once per box change, from the cells of the change alone.
  */
 final class BoxHighlight {
-    /** Boxes with more cells than this are not lit (reading them would stall the game while a side is dragged). */
+    /** Changes with more cells than this are not lit (reading them would stall the game while a side is dragged). */
     static final long MAX_CELLS = 400_000L;
     /** The most shapes of blocks that are not full: the nearest ones win. */
     static final int MAX_SHAPES = 4000;
@@ -29,81 +28,127 @@ final class BoxHighlight {
     static final int MAX_QUADS = 20_000;
     /** Blocks farther than this from the camera are not lit. */
     private static final double RANGE = 112;
-    private static final int COLOR = 0xFF7FE3FF;
+    private static final int ADDED = 0xFF7FE3FF, REMOVED = 0xFFFF8A9A;
     /** How far a lit face stands off the block, so it never fights the block's own face for the same depth. */
     private static final double LIFT = 0.012;
 
     private record Quad(Vec3 a, Vec3 b, Vec3 c, Vec3 d) {
     }
 
-    private static final List<AABB> shapes = new ArrayList<>();
-    private static final List<Quad> quads = new ArrayList<>();
-    private static @Nullable SelectionBox builtFor;
+    /** What is lit for one kind of change. */
+    private static final class Lit {
+        final int color;
+        final List<AABB> shapes = new ArrayList<>();
+        final List<Quad> quads = new ArrayList<>();
+
+        Lit(int color) {
+            this.color = color;
+        }
+    }
+
+    private static final Lit added = new Lit(ADDED), removed = new Lit(REMOVED);
+    private static @Nullable SelectionBox builtFor, builtFrom;
     private static boolean tooBig;
 
     private BoxHighlight() {
     }
 
     static void clear() {
-        shapes.clear();
-        quads.clear();
+        for (Lit l : List.of(added, removed)) {
+            l.shapes.clear();
+            l.quads.clear();
+        }
         builtFor = null;
+        builtFrom = null;
         tooBig = false;
     }
 
     /** What is lit now, as boxes (for the demo): the shapes of the blocks that are not full, and each face rectangle as a thin slab. */
     static List<AABB> shapes() {
-        List<AABB> all = new ArrayList<>(shapes);
-        for (Quad q : quads) {
-            double x0 = Math.min(Math.min(q.a.x, q.b.x), Math.min(q.c.x, q.d.x)), x1 = Math.max(Math.max(q.a.x, q.b.x), Math.max(q.c.x, q.d.x));
-            double y0 = Math.min(Math.min(q.a.y, q.b.y), Math.min(q.c.y, q.d.y)), y1 = Math.max(Math.max(q.a.y, q.b.y), Math.max(q.c.y, q.d.y));
-            double z0 = Math.min(Math.min(q.a.z, q.b.z), Math.min(q.c.z, q.d.z)), z1 = Math.max(Math.max(q.a.z, q.b.z), Math.max(q.c.z, q.d.z));
-            all.add(new AABB(x0, y0, z0, x1, y1, z1));
+        List<AABB> all = new ArrayList<>();
+        for (Lit l : List.of(added, removed)) {
+            all.addAll(l.shapes);
+            for (Quad q : l.quads) {
+                double x0 = Math.min(Math.min(q.a.x, q.b.x), Math.min(q.c.x, q.d.x)), x1 = Math.max(Math.max(q.a.x, q.b.x), Math.max(q.c.x, q.d.x));
+                double y0 = Math.min(Math.min(q.a.y, q.b.y), Math.min(q.c.y, q.d.y)), y1 = Math.max(Math.max(q.a.y, q.b.y), Math.max(q.c.y, q.d.y));
+                double z0 = Math.min(Math.min(q.a.z, q.b.z), Math.min(q.c.z, q.d.z)), z1 = Math.max(Math.max(q.a.z, q.b.z), Math.max(q.c.z, q.d.z));
+                all.add(new AABB(x0, y0, z0, x1, y1, z1));
+            }
         }
         return all;
+    }
+
+    /** Dev demo: how many of the shapes are for what the box lost. */
+    static int removedCount() {
+        return removed.shapes.size() + removed.quads.size();
     }
 
     static boolean tooBig() {
         return tooBig;
     }
 
-    /** Makes the list for a box, when it is not already made for this one. */
-    static void refresh(ClientLevel level, SelectionBox box, Vec3 camera) {
-        if (box.equals(builtFor)) return;
+    private static boolean in(SelectionBox b, int x, int y, int z) {
+        return x >= b.x0() && x <= b.x1() && y >= b.y0() && y <= b.y1() && z >= b.z0() && z <= b.z1();
+    }
+
+    /** Makes the lists for a box that moved from {@code from}, when they are not already made for this pair. */
+    static void refresh(ClientLevel level, SelectionBox box, SelectionBox from, Vec3 camera) {
+        if (box.equals(builtFor) && from.equals(builtFrom)) return;
         builtFor = box;
-        shapes.clear();
-        quads.clear();
-        tooBig = box.volume() > MAX_CELLS;
+        builtFrom = from;
+        clear2();
+        int x0 = Math.min(box.x0(), from.x0()), y0 = Math.min(box.y0(), from.y0()), z0 = Math.min(box.z0(), from.z0());
+        int x1 = Math.max(box.x1(), from.x1()), y1 = Math.max(box.y1(), from.y1()), z1 = Math.max(box.z1(), from.z1());
+        int[] n = {x1 - x0 + 1, y1 - y0 + 1, z1 - z0 + 1};
+        int[] o = {x0, y0, z0};
+        tooBig = (long) n[0] * n[1] * n[2] > MAX_CELLS;
         if (tooBig) return;
-        int[] n = {box.x1() - box.x0() + 1, box.y1() - box.y0() + 1, box.z1() - box.z0() + 1};
-        int[] o = {box.x0(), box.y0(), box.z0()};
-        boolean[] full = new boolean[n[0] * n[1] * n[2]];
-        List<AABB> partial = new ArrayList<>();
+        // what the world is made of here, one read per cell: full blocks (a face against one cannot be seen) and the changed cells' kinds
+        boolean[] solid = new boolean[n[0] * n[1] * n[2]];
+        boolean[] fullAdded = new boolean[solid.length], fullRemoved = new boolean[solid.length];
+        List<AABB> partAdded = new ArrayList<>(), partRemoved = new ArrayList<>();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (int y = 0; y < n[1]; y++) for (int z = 0; z < n[2]; z++) for (int x = 0; x < n[0]; x++) {
             int wx = o[0] + x, wy = o[1] + y, wz = o[2] + z;
-            if (camera.distanceToSqr(wx + 0.5, wy + 0.5, wz + 0.5) > RANGE * RANGE) continue;
+            boolean now = in(box, wx, wy, wz), was = in(from, wx, wy, wz);
+            int i = (y * n[2] + z) * n[0] + x;
             pos.set(wx, wy, wz);
             BlockState s = level.getBlockState(pos);
+            solid[i] = s.isSolidRender();
+            if (now == was) continue;
+            if (camera.distanceToSqr(wx + 0.5, wy + 0.5, wz + 0.5) > RANGE * RANGE) continue;
             if (s.isAir() || s.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock) continue;
-            if (s.isSolidRender()) {
-                full[(y * n[2] + z) * n[0] + x] = true;
+            if (solid[i]) {
+                (now ? fullAdded : fullRemoved)[i] = true;
                 continue;
             }
             VoxelShape shape = s.getShape(level, pos);
             if (shape.isEmpty()) shape = net.minecraft.world.phys.shapes.Shapes.block();
-            for (AABB part : shape.toAabbs()) partial.add(part.move(pos).inflate(LIFT));
+            for (AABB part : shape.toAabbs()) (now ? partAdded : partRemoved).add(part.move(pos).inflate(LIFT));
         }
+        fill(added, partAdded, fullAdded, solid, level, n, o, camera);
+        fill(removed, partRemoved, fullRemoved, solid, level, n, o, camera);
+    }
+
+    private static void clear2() {
+        for (Lit l : List.of(added, removed)) {
+            l.shapes.clear();
+            l.quads.clear();
+        }
+        tooBig = false;
+    }
+
+    private static void fill(Lit lit, List<AABB> partial, boolean[] full, boolean[] solid, ClientLevel level, int[] n, int[] o, Vec3 camera) {
         if (partial.size() > MAX_SHAPES) {
             partial.sort((p, q) -> Double.compare(p.getCenter().distanceToSqr(camera), q.getCenter().distanceToSqr(camera)));
             partial = partial.subList(0, MAX_SHAPES);
         }
-        shapes.addAll(partial);
-        skin(level, full, n, o);
+        lit.shapes.addAll(partial);
+        skin(lit, full, solid, level, n, o);
     }
 
-    /** The seen faces of the full blocks, joined into rectangles one plane at a time. */
-    private static void skin(ClientLevel level, boolean[] full, int[] n, int[] o) {
+    /** The seen faces of the full blocks, joined into rectangles one plane at a time. A face against any full block of the world is not seen. */
+    private static void skin(Lit lit, boolean[] full, boolean[] solid, ClientLevel level, int[] n, int[] o) {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (int a = 0; a < 3; a++) {
             int u = (a + 1) % 3, v = (a + 2) % 3;
@@ -122,7 +167,7 @@ final class BoxHighlight {
                         if (nb >= 0 && nb < n[a]) {
                             int[] d = c.clone();
                             d[a] = nb;
-                            hidden = full[(d[1] * n[2] + d[2]) * n[0] + d[0]];
+                            hidden = solid[(d[1] * n[2] + d[2]) * n[0] + d[0]];
                         } else {
                             pos.set(o[0] + c[0], o[1] + c[1], o[2] + c[2]).move(a == 0 ? sign : 0, a == 1 ? sign : 0, a == 2 ? sign : 0);
                             hidden = level.getBlockState(pos).isSolidRender();
@@ -145,9 +190,9 @@ final class BoxHighlight {
                             h++;
                         }
                         for (int jj = 0; jj < h; jj++) for (int ii = 0; ii < w; ii++) mask[(j + jj) * n[u] + i + ii] = false;
-                        if (quads.size() >= MAX_QUADS) return;
+                        if (lit.quads.size() >= MAX_QUADS) return;
                         double u0 = o[u] + i, u1 = o[u] + i + w, v0 = o[v] + j, v1 = o[v] + j + h;
-                        quads.add(new Quad(point(a, u, v, at, u0, v0), point(a, u, v, at, u1, v0), point(a, u, v, at, u1, v1), point(a, u, v, at, u0, v1)));
+                        lit.quads.add(new Quad(point(a, u, v, at, u0, v0), point(a, u, v, at, u1, v0), point(a, u, v, at, u1, v1), point(a, u, v, at, u0, v1)));
                     }
                 }
             }
@@ -163,9 +208,10 @@ final class BoxHighlight {
     }
 
     static void draw() {
-        int fill = (0x4A << 24) | (COLOR & 0xFFFFFF);
-        GizmoStyle style = GizmoStyle.fill(fill);
-        for (Quad q : quads) Gizmos.rect(q.a, q.b, q.c, q.d, style);
-        for (AABB a : shapes) Gizmos.cuboid(a, style);
+        for (Lit l : List.of(added, removed)) {
+            GizmoStyle style = GizmoStyle.fill(((l == added ? 0x52 : 0x66) << 24) | (l.color & 0xFFFFFF));
+            for (Quad q : l.quads) Gizmos.rect(q.a, q.b, q.c, q.d, style);
+            for (AABB a : l.shapes) Gizmos.cuboid(a, style);
+        }
     }
 }

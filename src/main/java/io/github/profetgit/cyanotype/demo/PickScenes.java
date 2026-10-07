@@ -454,14 +454,19 @@ final class PickScenes {
         act(() -> check("pick/with no side being moved no block is lit", io.github.profetgit.cyanotype.interaction.Selecting.highlighted().isEmpty(), String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size())));
         shot("pick_9_idle_box");
         grabSide("top");
+        act(() -> check("pick/just holding a side lights nothing yet", io.github.profetgit.cyanotype.interaction.Selecting.highlighted().isEmpty(), "lit"));
+        dragBy("top", -1.2);
         act(() -> {
             var lit = io.github.profetgit.cyanotype.interaction.Selecting.highlighted();
             boolean half = false;
             for (var a : lit) if (a.maxY - a.minY < 0.6) half = true;
-            check("pick/dragging a side lights the blocks inside, the roof slabs by their half-block shape", lit.size() > 20 && half, lit.size() + " shapes, half-height " + half);
+            check("pick/pulling a side in lights what it lets go of, the roof slabs by their half-block shape", lit.size() >= 5 && half, lit.size() + " shapes, half-height " + half);
+            check("pick/and what a side lets go of is the red kind", io.github.profetgit.cyanotype.interaction.Selecting.highlightedRemoved() == lit.size(), io.github.profetgit.cyanotype.interaction.Selecting.highlightedRemoved() + " red of " + lit.size());
         });
         shot("pick_9_lit");
         letGo();
+        act(() -> io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(AX, G + 1, Z0, AX + 6, G + 4, Z1)));
+        waitTicks(4);
         act(() -> check("pick/letting go puts the light out", io.github.profetgit.cyanotype.interaction.Selecting.highlighted().isEmpty(), String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size())));
 
         // scroll: the side you look at grows (up) or shrinks (down); looking north here
@@ -470,7 +475,6 @@ final class PickScenes {
         act(() -> {
             var b = io.github.profetgit.cyanotype.interaction.Selecting.box();
             check("pick/scroll up grows the side the player faces (north) by one", b != null && b.z0() == Z0 - 1 && b.z1() == Z1 && b.x0() == AX && b.y1() == G + 4, String.valueOf(b));
-            check("pick/and the blocks light up while it moves", !io.github.profetgit.cyanotype.interaction.Selecting.highlighted().isEmpty(), "none lit");
         });
         shot("pick_9_scrolled");
         act(() -> scroll(mc(), -1));
@@ -495,6 +499,12 @@ final class PickScenes {
         });
         waitTicks(40);
         act(() -> check("pick/the light goes out a moment after the last notch", io.github.profetgit.cyanotype.interaction.Selecting.highlighted().isEmpty(), String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size())));
+        act(() -> scroll(mc(), -2));
+        waitTicks(4);
+        act(() -> check("pick/scrolling a side in lights what it let go of in red", io.github.profetgit.cyanotype.interaction.Selecting.highlightedRemoved() > 0, io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size() + " lit, " + io.github.profetgit.cyanotype.interaction.Selecting.highlightedRemoved() + " red"));
+        shot("pick_9_scroll_in");
+        act(() -> scroll(mc(), 2));
+        waitTicks(40);
 
         // a roof of stairs and slabs lights by its shapes too
         act(() -> {
@@ -509,11 +519,13 @@ final class PickScenes {
         act(() -> io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(42, G + 1, 26, 45, G + 8, 28)));
         waitTicks(16);
         grabSide("east");
+        dragBy("east", 3.2);
         act(() -> {
             var lit = io.github.profetgit.cyanotype.interaction.Selecting.highlighted();
             int slabs = 0;
             for (var a : lit) if (a.maxY - a.minY < 0.6 && a.maxY - a.minY > 0.4) slabs++;
-            check("pick/stairs and slabs in the box are lit by their shapes", lit.size() >= 12 && slabs >= 3, lit.size() + " shapes, " + slabs + " half-height");
+            check("pick/stairs and slabs the box grows over are lit by their shapes", lit.size() >= 4 && slabs >= 1, lit.size() + " shapes, " + slabs + " half-height");
+            check("pick/and what a side takes in is the cyan kind", io.github.profetgit.cyanotype.interaction.Selecting.highlightedRemoved() == 0, io.github.profetgit.cyanotype.interaction.Selecting.highlightedRemoved() + " red");
         });
         shot("pick_9_stairs");
         letGo();
@@ -528,17 +540,19 @@ final class PickScenes {
         act(() -> io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(3000, G + 1, 3000, 3005, G + 3, 3005)));
         waitTicks(16);
         grabSide("top");
-        act(() -> check("pick/far from the origin the blocks inside are lit", io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size() >= 3, String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size())));
+        dragBy("top", 1.2);
+        act(() -> check("pick/far from the origin the blocks the box takes in are lit", io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size() >= 3, String.valueOf(io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size())));
         letGo();
         // a big, solid box: every seen face is lit (nothing skipped), as a few big rectangles
         act(() -> {
             io.github.profetgit.cyanotype.interaction.Selecting.cancel(mc());
-            Director.run(mc(), "fill 3000 " + (G + 1) + " 3010 3031 " + (G + 20) + " 3041 minecraft:stone_bricks");
+            Director.run(mc(), "fill 3000 " + (G + 1) + " 3010 3031 " + (G + 21) + " 3041 minecraft:stone_bricks");
         });
         waitTicks(40);
         act(() -> io.github.profetgit.cyanotype.interaction.Selecting.testSet(SelectionBox.of(3000, G + 1, 3010, 3031, G + 20, 3041)));
         waitTicks(16);
         grabSide("top");
+        dragBy("top", 1.2);
         act(() -> {
             int lit = io.github.profetgit.cyanotype.interaction.Selecting.highlighted().size();
             check("pick/a big solid box lights its whole skin as a few rectangles", lit >= 4 && lit <= 20, lit + " shapes");
@@ -547,7 +561,7 @@ final class PickScenes {
         letGo();
         act(() -> {
             io.github.profetgit.cyanotype.interaction.Selecting.cancel(mc());
-            Director.run(mc(), "fill 3000 " + (G + 1) + " 3010 3031 " + (G + 20) + " 3041 minecraft:air");
+            Director.run(mc(), "fill 3000 " + (G + 1) + " 3010 3031 " + (G + 21) + " 3041 minecraft:air");
             Director.hideHud(mc(), true);
             Director.run(mc(), "fill 3000 " + (G + 1) + " 3000 3005 " + (G + 6) + " 3005 minecraft:air");
         });
@@ -569,6 +583,18 @@ final class PickScenes {
         act(() -> hold(mc().options.keyAttack));
         waitTicks(5);
         act(() -> check("pick/the " + face + " side is being dragged", io.github.profetgit.cyanotype.interaction.Selecting.dragging(), "dragging " + io.github.profetgit.cyanotype.interaction.Selecting.dragging()));
+    }
+
+    /** Moves the held side along its axis by this many blocks (the mouse follows the arrow), the way a player drags. */
+    private static void dragBy(String face, double blocks) {
+        act(() -> {
+            var a = io.github.profetgit.cyanotype.interaction.Selecting.faceAnchor(face);
+            if (a == null) return;
+            boolean vertical = face.equals("top") || face.equals("bottom");
+            boolean east = face.equals("east") || face.equals("west");
+            aim(mc(), a.x + (east ? blocks : 0), a.y + (vertical ? blocks : 0), a.z + (!vertical && !east ? blocks : 0));
+        });
+        waitTicks(6);
     }
 
     private static void letGo() {
