@@ -20,7 +20,7 @@ import net.minecraft.network.chat.Component;
  */
 public final class SettingsScreen extends Screen {
     private enum Group {
-        APPEARANCE("Appearance"), GHOST("Ghost"), MATERIALS("Materials"), COMMUNITY("Community"), AUTO("Auto-place"), SERVERS("Servers"), ADVANCED("Advanced");
+        APPEARANCE("Appearance"), GHOST("Ghost"), MATERIALS("Materials"), COMMUNITY("Community"), AUTO("Auto-place"), SERVERS("Servers"), LESSONS("Lessons"), ADVANCED("Advanced");
 
         final String label;
 
@@ -115,9 +115,6 @@ public final class SettingsScreen extends Screen {
                     v -> v <= 0 ? "Off" : (int) v + " %"));
                 r.add(new Slider("wheelHold", "Wheel hold time", "Hold the tool key this long to open the wheel.", 100, 600, 25, () -> d.wheelHoldMs, v -> d.wheelHoldMs = (int) v,
                     v -> (int) v + " ms"));
-                r.add(new Toggle("lessons", "Lesson on first use", "The first time you use a tool, a short lesson shows how it works. You can skip it.", () -> d.lessons, v -> d.lessons = v));
-                r.add(new Action("lessonsOpen", "Open the lessons", "Every lesson in one list, with a search.", () -> minecraft.gui.setScreen(new io.github.profetgit.cyanotype.ponder.HelpScreen(this))));
-                r.add(new Action("lessonsAgain", "Show all again", "Each tool plays its lesson again the next time you use it.", io.github.profetgit.cyanotype.ponder.Lessons::resetSeen));
             }
             case GHOST -> {
                 r.add(new Slider("opacity", "Opacity of new ghosts", "How see-through a ghost is when you place it.", 5, 100, 5, () -> d.opacity * 100, v -> d.opacity = (float) (v / 100),
@@ -146,6 +143,12 @@ public final class SettingsScreen extends Screen {
                     + "It stops when you are hurt, open any screen (Esc too) or run out of the blocks. On a multiplayer server it stays off until you say yes for that server."));
             }
             case SERVERS -> serverRows(r);
+            case LESSONS -> {
+                r.add(new Toggle("lessons", "Lesson on first use", "The first time you use a tool, a short lesson shows how it works. You can skip it.", () -> d.lessons, v -> d.lessons = v));
+                r.add(new Action("lessonsOpen", "Open the lessons", "Every lesson in one list, with a search.", () -> minecraft.gui.setScreen(new io.github.profetgit.cyanotype.ponder.HelpScreen(this))));
+                r.add(new Action("lessonsAgain", "Show all again", "Each tool plays its lesson again the next time you use it.", io.github.profetgit.cyanotype.ponder.Lessons::resetSeen));
+                r.add(new Note("lessonsHow", "Where they are", "Right click a tool on the wheel, the ? on the Build and Save choices and in the Library, or the J key (the lesson of the tool you are in, or the list)."));
+            }
             case ADVANCED -> {
                 r.add(new Toggle("saveToSchematics", "Save into the schematics folder", "New builds go in the game's schematics folder, where Litematica finds them too. Off: config/cyanotype/blueprints. Both folders always show in the Library.", () -> d.saveToSchematics, v -> d.saveToSchematics = v));
                 r.add(new Toggle("showNames", "Names over ghosts", "Show each placement's name above its ghost.", () -> d.showNames, v -> d.showNames = v));

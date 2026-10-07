@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
  * A designer's tool, not a test: draws the lessons in {@code src/main/resources/assets/cyanotype/ponders} as stills (map colours
  * instead of textures, a plain arrow for the cursor, the caption as text) into build/ponder-stills, so a lesson can be judged
  * without starting the game. Run: {@code ./gradlew test --offline --tests '*PonderStillsTool*' -Dponder.stills=place,edit}
- * (a list of ids, or "all"); {@code -Dponder.step=1.0} sets the seconds between stills.
+ * (a list of ids, or "all"); {@code -Dponder.step=1.0} sets the seconds between stills, {@code -Dponder.times=10.5,11.2} picks the moments.
  */
 class PonderStillsTool {
     @Test
@@ -52,8 +52,13 @@ class PonderStillsTool {
     static void sheet(Scene sc, double step, Path file) throws IOException {
         int fw = 640, fh = 360, cols = 3;
         List<Double> times = new ArrayList<>();
-        for (double t = 0; t < sc.duration - 0.01; t += step) times.add(t);
-        times.add(sc.duration - 0.02);
+        String at = System.getProperty("ponder.times", System.getenv("PONDER_TIMES"));
+        if (at != null && !at.isBlank()) {
+            for (String t : at.split(",")) times.add(Double.parseDouble(t));
+        } else {
+            for (double t = 0; t < sc.duration - 0.01; t += step) times.add(t);
+            times.add(sc.duration - 0.02);
+        }
         int rows = (times.size() + cols - 1) / cols;
         BufferedImage sheet = new BufferedImage(cols * fw, rows * fh, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = sheet.createGraphics();

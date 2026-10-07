@@ -134,7 +134,10 @@ public final class Lessons {
     /** As above; closing the lesson goes back to {@code parent} (the Help list) instead of the game. */
     public static boolean open(Minecraft mc, String id, net.minecraft.client.gui.screens.@Nullable Screen parent) {
         Scene s = scene(id);
-        if (s == null) return false;
+        if (s == null) {
+            io.github.profetgit.cyanotype.interaction.Interaction.say(mc, "That lesson cannot be shown (the log says why).");
+            return false;
+        }
         markSeen(id);
         mc.gui.setScreen(new PonderScreen(s, PonderScreen.Mode.REPLAY, LessonActions.of(mc, s.action), LessonActions.why(mc, s.action), parent));
         return true;

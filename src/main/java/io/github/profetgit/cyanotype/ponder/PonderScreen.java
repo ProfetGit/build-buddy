@@ -20,7 +20,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * "How it works": one lesson playing in a panel. The picture is {@link PonderView}; under it the caption of the step, the cursor
  * chips of that moment (the same pictures as in the game), a scrub bar with a tick at every step, and the buttons. Space plays and
- * pauses, Left and Right go to the step before and after, R starts over, Enter is Try it, Esc leaves. Opened the first time a tool
+ * pauses, Left and Right (or the mouse wheel) go to the step before and after, R starts over, Enter is Try it, Esc leaves. Opened the first time a tool
  * is used it ends in Try it or Skip, and both start the tool (it was asked for); opened again from a ? it ends in Try it or Close,
  * and Close starts nothing.
  */
@@ -454,6 +454,14 @@ public final class PonderScreen extends Screen {
         leaving = true;
         onClose();
         tryIt.run();
+    }
+
+    /** The wheel steps through the lesson: up goes back a step, down goes on. */
+    @Override
+    public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {
+        if (scrollY > 0) player.previous();
+        else if (scrollY < 0) player.next();
+        return true;
     }
 
     @Override

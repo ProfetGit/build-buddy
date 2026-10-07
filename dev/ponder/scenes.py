@@ -235,10 +235,10 @@ def build():
     L.key("x", "minecraft:stone")
     C = [3, 2, 3]
     real_layers = [list(l) for l in COTTAGE]
-    real_layers[1][0] = "lpxpl"          # a stone where the planks belong: this one will be wrong
+    real_layers[1][4] = "lxbpl"          # a stone where the planks belong, in the south wall where it can be seen: this one will be wrong
     L.group("ghost", COTTAGE, pos=C, mode="ghost", match=["real", "fix"])
     L.group("real", real_layers, pos=C, start="empty")
-    L.group("fix", [["p"]], pos=[C[0] + 2, C[1] + 1, C[2]], start="empty")
+    L.group("fix", [["p"]], pos=[C[0] + 1, C[1] + 1, C[2] + 4], start="empty")
     L.cam(0, yaw=0.785, pitch=0.55, zoom=1.65, focus=[5.5, 3.4, 5.5])
     L.cam(11, ease="inOut", yaw=0.95)
     L.cam(22, ease="inOut", yaw=0.785)
@@ -249,9 +249,9 @@ def build():
     t = B.go(6.9, cells_of(COTTAGE, lambda ch, x, y, z: y == 0), 0.05)
     # layer 1, with the wrong block in it
     B.go(9.6, [c for c in cells_of(real_layers, lambda ch, x, y, z: y == 1)], 0.045)
-    L.clear("real", 11.8, anim="fade", dur=0.3, cells=[[2, 1, 0]])
+    L.clear("real", 11.8, anim="fade", dur=0.3, cells=[[1, 1, 4]])
     L.reveal("fix", 12.4, anim="drop", all=True)
-    L.overlay("label", 10.5, 12.0, at=[C[0] + 2.5, C[1] + 3.0, C[2] + 0.5], text="Wrong block", color="red", fade=0.2)
+    L.overlay("label", 10.5, 12.0, at=[C[0] + 1.5, C[1] + 3.0, C[2] + 5.3], text="Wrong block", color="red", fade=0.2)
     # the next block: the marker walks along the first row of layer 2 as the blocks go down
     nxt = cells_of(COTTAGE, lambda ch, x, y, z: y == 2)[:4]
     times = [14.4, 15.2, 16.0, 16.8]
@@ -270,12 +270,12 @@ def build():
     L.panel("bar", 0.4, 21.0, label="Cottage", value=0, done=True, keys=[
         {"t": 4.6, "value": 0}, {"t": 6.4, "value": 0.05}, {"t": 8.2, "value": 0.24}, {"t": 9.6, "value": 0.24}, {"t": 10.8, "value": 0.38}, {"t": 12.2, "value": 0.37},
         {"t": 12.9, "value": 0.40}, {"t": 17.6, "value": 0.46}, {"t": 20.6, "value": 1.0}], fade=0.4)
-    L.panel("stamp", 20.7, 21.0, text="DONE", color="green", size=2, fade=0.1)
+    L.panel("stamp", 20.6, 21.4, text="DONE", color="green", size=2, fade=0.1)
 
     L.caption(0.0, 4.4, "The ghost shows what is still missing. The bar counts what you have built.", "1  Check")
     L.caption(4.4, 9.4, "Place a block where the ghost is and the ghost lets go of it.", "2  Build")
     L.caption(9.4, 13.2, "A block that does not match shows the ghost in red. Swap it for the right one.", "3  Wrong blocks go red")
-    L.caption(13.2, 17.6, "Turn on Mark the next block in Build: a marker shows where to build next.", "4  The next block")
+    L.caption(13.2, 17.6, "In Build, turn on Mark the next block to build: a marker shows where to build next.", "4  The next block")
     L.caption(17.6, 22.0, "When everything matches the bar is full and a chime plays.", "5  Done")
     return L
 
@@ -347,8 +347,8 @@ def auto():
     L.cursor(18.6, ease="inOut", alpha=0)
     L.clear("real", 20.3, anim="fade", dur=0.6, all=True)
 
-    L.caption(0.0, 5.4, "Assist: hold use on a ghost block and it goes down at once. Nothing else can be placed.", "1  Assist")
-    L.caption(5.4, 13.8, "Sweep builds what is in reach, lowest layer first, while you walk. It is sped up here: the real pace is four blocks a second.", "2  Sweep")
+    L.caption(0.0, 5.4, "In Build choose Place what I look at, then hold use on a ghost block: it goes down at once. Nothing else can be placed.", "1  Assist")
+    L.caption(5.4, 13.8, "Place everything in reach builds what is near you, lowest layer first, while you walk. Sped up here: four blocks a second in the game.", "2  Sweep")
     L.caption(13.8, 21.0, "On a server it asks first. Enable stays dim for three seconds so the warning gets read.", "3  Servers")
     return L
 
@@ -526,7 +526,7 @@ def paste():
     L.move("ghost", 0, visible=1)
     L.move("ghost", 6.6, ease="step", visible=0)
     L.move("ghost", 8.4, ease="step", visible=1)
-    L.panel("bar", 4.0, 6.8, label="Pasting into the world", value=0, keys=[{"t": 4.2, "value": 0}, {"t": 6.3, "ease": "linear", "value": 1.0}], fade=0.2)
+    L.panel("bar", 4.0, 6.8, label="Pasting into the world", value=0, rect=[0.2, 0.03, 0.6, 0.12], keys=[{"t": 4.2, "value": 0}, {"t": 6.3, "ease": "linear", "value": 1.0}], fade=0.2)
     L.clear("real", 8.4, anim="fade", dur=0.3, stagger=0.015, order="given", cells=list(reversed(cells)))
     L.caption(0.0, 3.8, "In creative, in a world you host, aim the ghost where it should go and press P.", "1  Press P")
     L.caption(3.8, 7.6, "The whole build goes into the world at once, and the ghost steps aside.", "2  It is there")

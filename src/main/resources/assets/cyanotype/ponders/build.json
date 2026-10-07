@@ -156,11 +156,11 @@
      "ccccc"
     ],
     [
-     "lpxpl",
+     "lpppl",
      "p...p",
      "g...g",
      "p...p",
-     "lpbpl"
+     "lxbpl"
     ],
     [
      "lpgpl",
@@ -197,9 +197,9 @@
    "id": "fix",
    "mode": "solid",
    "pos": [
-    5,
+    4,
     3,
-    3
+    7
    ],
    "layers": [
     [
@@ -452,9 +452,9 @@
    "anim": "fade",
    "cells": [
     [
-     2,
      1,
-     0
+     1,
+     4
     ]
    ],
    "dur": 0.3
@@ -886,7 +886,7 @@
   {
    "t0": 13.2,
    "t1": 17.6,
-   "text": "Turn on Mark the next block in Build: a marker shows where to build next.",
+   "text": "In Build, turn on Mark the next block to build: a marker shows where to build next.",
    "title": "4  The next block"
   },
   {
@@ -902,9 +902,9 @@
    "t0": 10.5,
    "t1": 12.0,
    "at": [
-    5.5,
+    4.5,
     5.0,
-    3.5
+    8.3
    ],
    "text": "Wrong block",
    "color": "red",
@@ -1023,8 +1023,8 @@
   },
   {
    "type": "stamp",
-   "t0": 20.7,
-   "t1": 21.0,
+   "t0": 20.6,
+   "t1": 21.4,
    "text": "DONE",
    "color": "green",
    "size": 2,

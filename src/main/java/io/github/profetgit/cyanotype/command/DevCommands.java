@@ -85,6 +85,10 @@ public final class DevCommands {
 
     /** Dev: /cyanotype ponder record <id> [x y z sx sy sz] | mark <name> | stop. See PonderRecorder. */
     private static void ponder(Minecraft mc, String arg) {
+        if (!io.github.profetgit.cyanotype.demo.Director.ACTIVE && !Boolean.getBoolean("cyanotype.dev")) {
+            say("The lesson recorder is for development: start the game with -Dcyanotype.dev=true.");
+            return;
+        }
         String[] a = arg.isEmpty() ? new String[0] : arg.split("\\s+");
         if (a.length == 0) {
             say("ponder record <id> [x y z sx sy sz] | mark <name> | stop");

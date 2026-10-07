@@ -69,6 +69,24 @@ final class PonderScenes {
         waitTicks(6);
     }
 
+    /** What the open lesson screen costs: frame times of the world alone, then with each of a light and a heavy lesson playing. */
+    static void perf() {
+        act(() -> Settings.get().reduceMotion = false);
+        waitTicks(20);
+        Director.measure("ponder/baseline, no screen");
+        for (String id : new String[]{"place", "build", "edit"}) {
+            act(() -> Lessons.open(Minecraft.getInstance(), id));
+            waitTicks(30);
+            Director.measure("ponder/" + id + " playing");
+            act(() -> {
+                PonderScreen p = ponder();
+                if (p != null) check("ponder/" + id + ": pictures were made while it played", p.view().picturesMade() > 20, p.view().picturesMade() + " pictures, " + String.format(java.util.Locale.ROOT, "%.1f", p.view().averageMs()) + " ms each on the worker");
+                Minecraft.getInstance().gui.setScreen(null);
+            });
+            waitTicks(10);
+        }
+    }
+
     /** The flow: first use plays the lesson once, ? shows it again, Try it and Skip start the tool, Close does not, and the Help list searches. */
     static void flow() {
         UiScenes.setup();
@@ -186,6 +204,14 @@ final class PonderScenes {
             key(InputConstants.KEY_R);
             check("ponder/R starts over", p.player().step() == 0 && p.player().time() < 0.3, "step " + p.player().step() + ", time " + p.player().time());
         });
+        act(() -> {
+            PonderScreen p = ponder();
+            int before = p.player().step();
+            p.mouseScrolled(100, 100, 0, -1);
+            check("ponder/the mouse wheel steps on", p.player().step() == (before + 1) % p.scene().steps(), "step " + before + " -> " + p.player().step());
+            p.mouseScrolled(100, 100, 0, 1);
+            check("ponder/and back", p.player().step() == before, "step " + p.player().step());
+        });
         // a click on the scrub bar seeks, on the picture pauses
         act(() -> click(ponder().scrubAt(0.5)));
         act(() -> {
@@ -255,6 +281,33 @@ final class PonderScenes {
         act(() -> key(InputConstants.KEY_ESCAPE));
         waitTicks(4);
         act(() -> check("ponder/Esc closes the list", screen() == null, "screen " + screen()));
+
+        // Settings: the switch, start over, and the list
+        act(() -> Minecraft.getInstance().gui.setScreen(new io.github.profetgit.cyanotype.ui.SettingsScreen()));
+        waitTicks(10);
+        act(() -> click(((io.github.profetgit.cyanotype.ui.SettingsScreen) screen()).anchor("tab:LESSONS")));
+        waitTicks(6);
+        act(() -> {
+            var st = (io.github.profetgit.cyanotype.ui.SettingsScreen) screen();
+            boolean before = Settings.get().lessons;
+            click(st.anchor("lessons"));
+            check("ponder/Settings: the lesson switch turns lessons off", Settings.get().lessons != before, "lessons " + Settings.get().lessons);
+            click(st.anchor("lessons"));
+            check("ponder/and on again", Settings.get().lessons == before, "lessons " + Settings.get().lessons);
+            Lessons.markSeen("place");
+            check("ponder/a lesson is marked seen", Lessons.seen("place"), "seen " + Settings.get().lessonsSeen);
+            click(st.anchor("lessonsAgain"));
+            check("ponder/Settings: Show all again clears what was seen", Settings.get().lessonsSeen.isEmpty(), "seen " + Settings.get().lessonsSeen);
+        });
+        shot("ponder_settings");
+        act(() -> click(((io.github.profetgit.cyanotype.ui.SettingsScreen) screen()).anchor("lessonsOpen")));
+        waitTicks(8);
+        act(() -> check("ponder/Settings: Open the lessons shows the list", screen() instanceof HelpScreen, "screen " + screen()));
+        act(() -> key(InputConstants.KEY_ESCAPE));
+        waitTicks(4);
+        act(() -> check("ponder/and Esc comes back to Settings", screen() instanceof io.github.profetgit.cyanotype.ui.SettingsScreen, "screen " + screen()));
+        act(() -> cleanup());
+        waitTicks(4);
 
         // the middle of the wheel opens the list too
         act(() -> {

@@ -1373,6 +1373,12 @@
    "t1": 6.8,
    "label": "Pasting into the world",
    "value": 0,
+   "rect": [
+    0.2,
+    0.03,
+    0.6,
+    0.12
+   ],
    "fade": 0.2,
    "keys": [
     {

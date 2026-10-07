@@ -82,7 +82,7 @@ public final class PonderRecorder {
 
     // ---- control
 
-    /** Where recordings go: the demo's output folder when a demo runs, else the game folder. */
+    /** Where recordings go: the demo's output folder when a demo runs, else the game folder (the command that starts a take needs -Dcyanotype.dev=true). */
     public static Path dir() {
         return Director.ACTIVE ? Path.of(System.getProperty("cyanotype.demo")).resolve("rec") : FabricLoader.getInstance().getGameDir().resolve("ponder-rec");
     }

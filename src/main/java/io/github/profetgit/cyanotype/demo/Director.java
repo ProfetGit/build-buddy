@@ -240,6 +240,7 @@ public final class Director {
                 case "ponder-stills" -> PonderScenes.stills();
                 case "ponder-flow" -> PonderScenes.flow();
                 case "ponder-take" -> PonderTakes.takes();
+                case "ponder-perf" -> PonderScenes.perf();
                 case "look" -> PlaceScenes.look();
                 case "persist" -> PlaceScenes.persist();
                 case "persist-leave" -> PlaceScenes.persistLeave();

@@ -1000,13 +1000,13 @@
   {
    "t0": 0.0,
    "t1": 5.4,
-   "text": "Assist: hold use on a ghost block and it goes down at once. Nothing else can be placed.",
+   "text": "In Build choose Place what I look at, then hold use on a ghost block: it goes down at once. Nothing else can be placed.",
    "title": "1  Assist"
   },
   {
    "t0": 5.4,
    "t1": 13.8,
-   "text": "Sweep builds what is in reach, lowest layer first, while you walk. It is sped up here: the real pace is four blocks a second.",
+   "text": "Place everything in reach builds what is near you, lowest layer first, while you walk. Sped up here: four blocks a second in the game.",
    "title": "2  Sweep"
   },
   {
