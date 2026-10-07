@@ -1,6 +1,6 @@
 {
   "key.category.cyanotype.cyanotype": "Cyanotype",
-  "key.cyanotype.main": "Edit placement (tool key)",
+  "key.cyanotype.main": "Tool wheel (hold) / start or stop editing (tap)",
   "key.cyanotype.toggle": "Show or hide ghosts",
   "key.cyanotype.undo": "Undo (hold Ctrl)",
   "key.cyanotype.redo": "Redo (hold Ctrl)",

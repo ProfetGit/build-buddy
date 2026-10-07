@@ -42,6 +42,8 @@ public final class Settings {
         // Lessons ("How it works"): shown the first time a tool is used; the ids already seen
         public boolean lessons = true;
         public java.util.List<String> lessonsSeen = new java.util.ArrayList<>();
+        /** The first-run hello has been shown (or the player already used the tool key). */
+        public boolean welcomed = false;
         // Advanced
         public boolean showNames = true;
         /** The author last typed on the Save screen; empty = the player's name. */

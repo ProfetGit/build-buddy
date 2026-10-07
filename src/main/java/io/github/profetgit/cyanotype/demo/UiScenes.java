@@ -13,6 +13,7 @@ import io.github.profetgit.cyanotype.ghost.GhostRenderer;
 import io.github.profetgit.cyanotype.interaction.Interaction;
 import io.github.profetgit.cyanotype.placement.Placement;
 import io.github.profetgit.cyanotype.placement.Placements;
+import io.github.profetgit.cyanotype.ui.Settings;
 import io.github.profetgit.cyanotype.ui.Ui;
 import io.github.profetgit.cyanotype.ui.WheelScreen;
 import net.minecraft.client.Minecraft;
@@ -64,6 +65,50 @@ final class UiScenes {
         int n = ((io.github.profetgit.cyanotype.ui.WheelScreen) s).toolCount();
         double[] at = io.github.profetgit.cyanotype.ui.WheelGeometry.pointAt(i, n, 40);
         return new int[]{(int) Math.round(s.width / 2.0 + at[0]), (int) Math.round(s.height / 2.0 + at[1])};
+    }
+
+    static void firstRun() {
+        Director.clean();
+        act(() -> {
+            try {
+                for (java.nio.file.Path dir : java.util.List.of(io.github.profetgit.cyanotype.placement.BlueprintLibrary.ownDir(), io.github.profetgit.cyanotype.placement.BlueprintLibrary.litematicaDir())) {
+                    java.nio.file.Files.createDirectories(dir);
+                    try (var files = java.nio.file.Files.list(dir)) {
+                        for (java.nio.file.Path f : (Iterable<java.nio.file.Path>) files::iterator) if (java.nio.file.Files.isRegularFile(f)) java.nio.file.Files.deleteIfExists(f);
+                    }
+                }
+            } catch (java.io.IOException e) {
+                check("firstrun/library emptied", false, e.toString());
+            }
+            Settings.get().welcomed = false;
+            io.github.profetgit.cyanotype.ui.Welcome.restart();
+            Director.hideHud(Minecraft.getInstance(), false);
+        });
+        waitTicks(100);
+        act(() -> check("firstrun/the hello is on screen once the world is up", io.github.profetgit.cyanotype.ui.Welcome.showing(), "welcome"));
+        waitTicks(6);
+        shot("firstrun_0_welcome");
+        act(() -> Minecraft.getInstance().gui.setScreen(new io.github.profetgit.cyanotype.ui.LibraryScreen()));
+        waitTicks(25);
+        act(() -> {
+            io.github.profetgit.cyanotype.ui.LibraryScreen ls = (io.github.profetgit.cyanotype.ui.LibraryScreen) screen();
+            check("firstrun/an empty Library offers the sample house", ls.sampleCenter() != null, "button");
+            Ui.testMouse = ls.sampleCenter();
+        });
+        waitTicks(8);
+        shot("firstrun_1_empty");
+        act(() -> {
+            io.github.profetgit.cyanotype.ui.LibraryScreen ls = (io.github.profetgit.cyanotype.ui.LibraryScreen) screen();
+            int[] c = ls.sampleCenter();
+            var down = new net.minecraft.client.input.MouseButtonEvent(c[0], c[1], new net.minecraft.client.input.MouseButtonInfo(0, 0));
+            ls.mouseClicked(down, false);
+            ls.mouseReleased(down);
+            Ui.testMouse = new int[]{0, 0};
+        });
+        until("firstrun/the sample is listed", 200, () -> screen() instanceof io.github.profetgit.cyanotype.ui.LibraryScreen ls && ls.entries().size() == 1 && ls.entries().get(0).loaded());
+        waitTicks(10);
+        shot("firstrun_2_sample");
+        act(() -> Settings.get().welcomed = true);
     }
 
     static void library() {

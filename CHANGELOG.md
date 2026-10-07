@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.61
+
+- First-run hello: the first time you stand in a world, a small card says "Hold V for the tool wheel, press J for lessons". It leaves by itself, or as soon as you press either key.
+- An empty Library now has an "Add a sample house" button, so there is something to try straight away.
+- The Community tab and its settings page stay hidden until the community website has a public address (they led nowhere).
+- "Nothing to edit yet" tells you to open the Library instead of naming chat commands.
+- The tool key is named "Tool wheel (hold) / start or stop editing (tap)" in Controls. The Materials "All layers" tab has room for its text.
+
 ## 0.0.60
 
 - The lessons' cottage is back to oak walls and logs, with more detail: a mossy cobblestone base, glass panes in the windows, a wall-block chimney top. The Materials lesson lists the new blocks.

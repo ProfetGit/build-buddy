@@ -43,6 +43,8 @@ public final class LibraryScreen extends Screen {
     private long openedNs = System.nanoTime(), toastNs;
     private String toast = "";
     private String down = "";
+    private int[] sampleBtn;
+    private int lastMx, lastMy;
     private LibraryModel.Entry downCard;
     private enum Tab {
         MINE, COMMUNITY
@@ -80,6 +82,11 @@ public final class LibraryScreen extends Screen {
             minecraft.gui.setScreen(new SettingsScreen());
         }
     });
+
+    /** Community only shows once the site has an address; until then Library is one plain list with no tab strip. */
+    private static Tab[] tabs() {
+        return io.github.profetgit.cyanotype.community.Community.base() != null ? Tab.values() : new Tab[0];
+    }
 
     private static int tabWidth(Tab t) {
         return t == Tab.MINE ? 40 : 66;
@@ -241,6 +248,8 @@ public final class LibraryScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor g, int rawX, int rawY, float partial) {
         Motion.frame();
         int mx = Ui.mx(rawX), my = Ui.my(rawY);
+        lastMx = mx;
+        lastMy = my;
         refresh();
         double open = Motion.reduced() ? 1 : Math.min(1, (System.nanoTime() - openedNs) / 1e9 / 0.25);
         int pw = panelW(), ph = panelH(), px = px(), py = py();
@@ -251,7 +260,7 @@ public final class LibraryScreen extends Screen {
         // header
         Ui.text(g, "Library", px + 10, py + 8, Ui.withAlpha(Ui.LINE, inner));
         int mainX = px + 56;
-        for (Tab tb : Tab.values()) {
+        for (Tab tb : tabs()) {
             Ui.tab(g, "lib#main" + tb, mainX, py + 5, tabWidth(tb), tabLabel(tb), tab == tb, mx, my);
             mainX += tabWidth(tb) + 2;
         }
@@ -391,7 +400,10 @@ public final class LibraryScreen extends Screen {
             Ui.centered(g, "No blueprints yet", cx, cy, Ui.withAlpha(Ui.LINE, a));
             Ui.centered(g, "Drop a schematic file (.litematic, .schem) onto the window,", cx, cy + 14, Ui.withAlpha(Ui.DIM, a));
             Ui.centered(g, "or put one in the blueprints folder.", cx, cy + 25, Ui.withAlpha(Ui.DIM, a));
+            sampleBtn = new int[]{cx - 62, cy + 42, 124, 16};
+            Ui.button(g, "lib#sample", sampleBtn[0], sampleBtn[1], sampleBtn[2], sampleBtn[3], "Add a sample house", null, lastMx, lastMy, down.equals("sample"), true);
         } else {
+            sampleBtn = null;
             Ui.centered(g, "Nothing matches that", cx, cy, Ui.withAlpha(Ui.LINE, a));
             Ui.centered(g, "Clear the search to see everything.", cx, cy + 14, Ui.withAlpha(Ui.DIM, a));
         }
@@ -405,7 +417,7 @@ public final class LibraryScreen extends Screen {
         int mx = (int) event.x(), my = (int) event.y();
         int pw = panelW(), px = px(), py = py(), fy = py + panelH() - 24;
         int hx = px + 56;
-        for (Tab tb : Tab.values()) {
+        for (Tab tb : tabs()) {
             if (Ui.inside(mx, my, hx, py + 5, tabWidth(tb), 13)) {
                 switchTab(tb);
                 return true;
@@ -441,6 +453,11 @@ public final class LibraryScreen extends Screen {
                 return true;
             }
             tx += 46;
+        }
+        if (sampleBtn != null && model.all().isEmpty() && Ui.inside(mx, my, sampleBtn[0], sampleBtn[1], sampleBtn[2], sampleBtn[3])) {
+            down = "sample";
+            Sfx.play(Sfx.PRESS);
+            return true;
         }
         if (Ui.inside(mx, my, px + 10, fy, 86, 16)) {
             down = "folder";
@@ -481,6 +498,16 @@ public final class LibraryScreen extends Screen {
             return true;
         }
         if (tab == Tab.COMMUNITY && was.isEmpty()) return community.mouseReleased(mx, my) || super.mouseReleased(event);
+        if (was.equals("sample") && sampleBtn != null && Ui.inside(mx, my, sampleBtn[0], sampleBtn[1], sampleBtn[2], sampleBtn[3])) {
+            Sfx.play(Sfx.RELEASE);
+            try {
+                Files.createDirectories(BlueprintLibrary.saveDir());
+                io.github.profetgit.cyanotype.blueprint.LitematicWriter.write(io.github.profetgit.cyanotype.demo.Samples.house(), BlueprintLibrary.saveDir().resolve("sample-house.litematic"));
+            } catch (Exception e) {
+                io.github.profetgit.cyanotype.interaction.Interaction.say(minecraft, "Could not add the sample: " + e.getMessage());
+            }
+            return true;
+        }
         if (was.equals("folder") && Ui.inside(mx, my, px + 10, fy, 86, 16)) {
             Sfx.play(Sfx.RELEASE);
             try {
@@ -614,11 +641,16 @@ public final class LibraryScreen extends Screen {
     /** Dev demo: where a header tab is on screen. */
     public int[] tabCenter(String name) {
         int x = px() + 56;
-        for (Tab tb : Tab.values()) {
+        for (Tab tb : tabs()) {
             if (tb.name().equals(name)) return new int[]{x + tabWidth(tb) / 2, py() + 5 + 6};
             x += tabWidth(tb) + 2;
         }
         return null;
+    }
+
+    /** Dev demo: where the "Add a sample house" button is (null when the Library is not empty). */
+    public int[] sampleCenter() {
+        return sampleBtn == null || !model.all().isEmpty() ? null : new int[]{sampleBtn[0] + sampleBtn[2] / 2, sampleBtn[1] + sampleBtn[3] / 2};
     }
 
     /** Dev demo: where the Close button is. */

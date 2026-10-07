@@ -29,6 +29,7 @@ public final class CyanotypeHud {
         autoBadge(mc, g);
         pasteBadge(mc, g);
         Chips.draw(g);
+        Welcome.draw(mc, g);
     }
 
     /** "AUTO: ON" while auto-placing is running: always visible then, amber on a multiplayer server (PRD 7.8), with what it is doing. */

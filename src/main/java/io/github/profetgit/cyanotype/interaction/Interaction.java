@@ -473,7 +473,7 @@ public final class Interaction {
         if (aimed == null) aimed = Placements.active();
         if (aimed == null || !aimed.ready() || !aimed.locked) {
             Sfx.play(Sfx.ERROR);
-            say(mc, "Nothing to edit yet. Load a blueprint with /cyanotype load <name>, then /cyanotype place.");
+            say(mc, "Nothing to edit yet. Open the Library (hold V, pick Library) and click a blueprint to put it down.");
             return false;
         }
         reveal();
@@ -1014,7 +1014,7 @@ public final class Interaction {
                 if (aimed == null) aimed = Placements.active();
                 if (aimed == null || !aimed.ready() || !aimed.locked) {
                     Sfx.play(Sfx.ERROR);
-                    say(mc, "Nothing to edit yet. Load a blueprint with /cyanotype load <name>, then /cyanotype place.");
+                    say(mc, "Nothing to edit yet. Open the Library (hold V, pick Library) and click a blueprint to put it down.");
                     return;
                 }
                 Placement target = aimed;

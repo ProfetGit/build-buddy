@@ -53,6 +53,12 @@ public final class SettingsScreen extends Screen {
     private record Laid(Row row, int x, int y, int w, int h) {
     }
 
+    /** The Community page only exists once the site has an address. */
+    private static Group[] groups() {
+        return io.github.profetgit.cyanotype.community.Community.base() != null ? Group.values()
+            : java.util.Arrays.stream(Group.values()).filter(g -> g != Group.COMMUNITY).toArray(Group[]::new);
+    }
+
     private static final int PANEL_W = 400, TAB_W = 86, SIDE = 106, TRACK_H = 9;
 
     private Group group = Group.APPEARANCE;
@@ -260,7 +266,7 @@ public final class SettingsScreen extends Screen {
         g.fill(px + 8, py + 21, px + pw - 8, py + 22, Ui.withAlpha(Ui.DIM, inner * 0.35f));
 
         int ty = py + 30;
-        for (Group gr : Group.values()) {
+        for (Group gr : groups()) {
             Ui.tab(g, "set#tab" + gr, px + 10, ty, TAB_W, gr.label, gr == group, mx, my);
             ty += 15;
         }
@@ -344,7 +350,7 @@ public final class SettingsScreen extends Screen {
         int mx = (int) event.x(), my = (int) event.y();
         int px = px(), py = py(), ph = panelH(), pw = panelW();
         int ty = py + 30;
-        for (Group gr : Group.values()) {
+        for (Group gr : groups()) {
             if (Ui.inside(mx, my, px + 10, ty, TAB_W, 13)) {
                 if (gr != group) {
                     group = gr;
@@ -475,7 +481,7 @@ public final class SettingsScreen extends Screen {
     /** Dev demo: the middle of a control on screen ("tab:GHOST", a toggle's id, "reset", "done"), or null. */
     public int[] anchor(String id) {
         if (id.startsWith("tab:")) {
-            int i = Group.valueOf(id.substring(4)).ordinal();
+            int i = java.util.Arrays.asList(groups()).indexOf(Group.valueOf(id.substring(4)));
             return new int[]{px() + 10 + TAB_W / 2, py() + 30 + i * 15 + 6};
         }
         if (id.equals("done")) return new int[]{px() + panelW() - 10 - 26, py() + panelH() - 16};

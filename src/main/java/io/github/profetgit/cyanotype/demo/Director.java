@@ -202,13 +202,14 @@ public final class Director {
             hideHud(mc, true);
             // the lessons that play on first use would open over every other scene: only the lesson scenes switch them on
             io.github.profetgit.cyanotype.ui.Settings.get().lessons = false;
+            io.github.profetgit.cyanotype.ui.Settings.get().welcomed = true;
             mc.options.fov().set(Integer.getInteger("cyanotype.demo.fov", 70));
             return true;
         });
         waitTicks(40);
         for (String scene : SCENES) {
             // a scene before this one (Settings' "Reset all") may have switched the lessons back on, and they would open over the test
-            if (!scene.startsWith("ponder")) act(() -> io.github.profetgit.cyanotype.ui.Settings.get().lessons = false);
+            if (!scene.startsWith("ponder")) act(() -> { io.github.profetgit.cyanotype.ui.Settings.get().lessons = false; io.github.profetgit.cyanotype.ui.Settings.get().welcomed = true; });
             switch (scene) {
                 case "house" -> houseScene();
                 case "shaderswap" -> ShaderScenes.swap();
@@ -230,6 +231,7 @@ public final class Director {
                 case "layer-caps" -> UiScenes.layerCaps();
                 case "shapes" -> UiScenes.shapes();
                 case "library" -> UiScenes.library();
+                case "firstrun" -> UiScenes.firstRun();
                 case "community" -> CommunityScenes.community();
                 case "save" -> SaveScenes.save();
                 case "pick" -> PickScenes.pick();

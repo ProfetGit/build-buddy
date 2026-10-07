@@ -201,7 +201,7 @@ public final class MaterialsScreen extends Screen {
     // ---- layout of the header
 
     private int tabAllW() {
-        return 52;
+        return 62;
     }
 
     private int tabLayerW() {
