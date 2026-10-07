@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.64
+
+- The pointed arrow shape is back (square shaft, pyramid head), now chunkier and better looking: every face is shaded softly as if lit from above, in pastel colour, with a thin light edge that keeps it clear over any background. The soft turn ring stays.
+
 ## 0.0.63
 
 - Round, chunky arrows: a ball at the base, a fat shaft, a blunt head with a rounded tip, shaded softly as if lit from above, with no hard outlines. The turn ring is a softer, wider band with four rounded arrowheads. Distant arrows use fewer sides.

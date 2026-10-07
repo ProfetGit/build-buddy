@@ -288,18 +288,16 @@ final class Handles {
 
     /** Where the sun is for the soft shading of the round shapes (a fixed direction in the world, so they read as lit solids). */
     private static final Vec3 SUN = new Vec3(0.35, 0.8, 0.5).normalize();
-    /** The arrow's outline from its base to its tip: (how far along 0..1 of the arrow, radius in units). A ball at the base, a fat shaft, a round shoulder, a blunt head and a dome. */
-    private static final double[][] PROFILE = {
-        {0.00, 0.00}, {0.025, 0.17}, {0.07, 0.26}, {0.14, 0.30}, {0.56, 0.30},
-        {0.58, 0.52}, {0.62, 0.70}, {0.70, 0.66}, {0.84, 0.36}, {0.92, 0.24}, {0.975, 0.12}, {1.00, 0.00}};
-
     /**
-     * A round, chunky arrow: a lathe turned from {@link #PROFILE}, filled with soft translucent colour, shaded as if lit from
-     * above. {@code length} is the whole arrow from {@code from} along the axis-aligned {@code dir}; {@code k} scales its
-     * thickness (the swell on hover).
+     * A solid arrow: a square shaft and a pyramid head, each face filled with soft translucent colour and shaded as if lit
+     * from above, with a thin light edge so the shape stays crisp over any background. {@code length} is the whole arrow
+     * from {@code from} along the axis-aligned {@code dir}; {@code k} scales its thickness (the swell on hover).
      */
     private void arrow(Vec3 from, Vec3 dir, double length, double k, int color, float hover, float visible, double scale) {
         double unit = scale * k;
+        double w = 0.21 * unit, headHalf = 0.58 * unit, headLen = Math.min(1.25 * unit, length * 0.45);
+        Vec3 headBase = from.add(dir.scale(length - headLen));
+        Vec3 apex = from.add(dir.scale(length));
         Vec3 u, v;
         if (dir.x != 0) {
             u = new Vec3(0, 1, 0);
@@ -311,31 +309,38 @@ final class Handles {
             u = new Vec3(1, 0, 0);
             v = new Vec3(0, 1, 0);
         }
-        // far away the sides are fewer: a distant arrow is a few pixels wide
-        int n = distance > 48 ? 7 : 10;
-        // the profile's radii are for an arrow 2.8 units long; the head keeps its size when the arrow is short
-        double radiusUnit = unit * (length / (2.8 * scale) < 0.6 ? 0.8 : 1.0) * 0.82;
-        Vec3[][] rings = new Vec3[PROFILE.length][n];
-        for (int i = 0; i < PROFILE.length; i++) {
-            Vec3 centre = from.add(dir.scale(length * PROFILE[i][0]));
-            double r = PROFILE[i][1] * radiusUnit;
-            for (int j = 0; j < n; j++) {
-                double a = j * 2 * Math.PI / n;
-                rings[i][j] = centre.add(u.scale(Math.cos(a) * r)).add(v.scale(Math.sin(a) * r));
-            }
+        int body = mix(color, WHITE, 0.12f + 0.35f * hover);
+        double opacity = (0.66 + 0.26 * hover) * visible;
+        int edge = alpha(mix(color, WHITE, 0.6f + 0.4f * hover), (0.55 + 0.4 * hover) * visible);
+        float ew = 1.5f + 1.2f * hover;
+        // shaft: four corners at the base and at the head
+        Vec3[] sb = square(from, u, v, w), sh = square(headBase, u, v, w);
+        Vec3[] sideNormal = {u, v, u.scale(-1), v.scale(-1)};
+        for (int i = 0; i < 4; i++) {
+            int j = (i + 1) % 4;
+            face(sb[i], sb[j], sh[j], sh[i], sideNormal[i].add(sideNormal[j]).normalize(), body, opacity, edge, ew);
         }
-        int body = mix(color, WHITE, 0.15f + 0.35f * hover);
-        double opacity = (0.62 + 0.3 * hover) * visible;
-        for (int i = 0; i + 1 < PROFILE.length; i++) {
-            for (int j = 0; j < n; j++) {
-                int j2 = (j + 1) % n;
-                double a = (j + 0.5) * 2 * Math.PI / n;
-                Vec3 normal = u.scale(Math.cos(a)).add(v.scale(Math.sin(a)));
-                double light = 0.5 + 0.5 * normal.dot(SUN);
-                int shaded = light >= 0.5f ? mix(body, WHITE, (float) ((light - 0.5) * 0.7)) : mix(body, 0xFF3B4A66, (float) ((0.5 - light) * 0.5));
-                Gizmos.rect(rings[i][j], rings[i][j2], rings[i + 1][j2], rings[i + 1][j], GizmoStyle.fill(alpha(shaded, opacity))).setAlwaysOnTop();
-            }
+        face(sb[0], sb[1], sb[2], sb[3], dir.scale(-1), body, opacity, edge, ew);
+        // head: a flat shoulder under a four-sided point
+        Vec3[] hb = square(headBase, u, v, headHalf);
+        face(hb[0], hb[1], hb[2], hb[3], dir.scale(-1), body, opacity * 0.85, edge, ew);
+        for (int i = 0; i < 4; i++) {
+            int j = (i + 1) % 4;
+            Vec3 out = sideNormal[i].add(sideNormal[j]).normalize();
+            face(hb[i], hb[j], apex, apex, out.scale(headLen).add(dir.scale(headHalf * 1.4)).normalize(), body, opacity, edge, ew);
         }
+    }
+
+    /** The four corners of a square of half-width {@code r} round {@code c}, in the plane across the arrow. */
+    private static Vec3[] square(Vec3 c, Vec3 u, Vec3 v, double r) {
+        return new Vec3[]{c.add(u.scale(r)).add(v.scale(r)), c.add(u.scale(-r)).add(v.scale(r)), c.add(u.scale(-r)).add(v.scale(-r)), c.add(u.scale(r)).add(v.scale(-r))};
+    }
+
+    /** One filled face, lit by {@link #SUN} from its outward {@code normal}, with a thin light edge. */
+    private static void face(Vec3 a, Vec3 b, Vec3 c, Vec3 d, Vec3 normal, int body, double opacity, int edge, float edgeWidth) {
+        double light = 0.5 + 0.5 * normal.dot(SUN);
+        int shaded = light >= 0.5 ? mix(body, WHITE, (float) ((light - 0.5) * 0.7)) : mix(body, 0xFF3B4A66, (float) ((0.5 - light) * 0.5));
+        Gizmos.rect(a, b, c, d, GizmoStyle.strokeAndFill(edge, edgeWidth, alpha(shaded, opacity))).setAlwaysOnTop();
     }
 
     /** The turn ring: a soft translucent band at the base with four rounded arrows showing clockwise. */
