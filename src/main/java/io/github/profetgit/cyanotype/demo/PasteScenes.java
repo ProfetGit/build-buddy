@@ -127,6 +127,42 @@ final class PasteScenes {
         System.out.println("[cydemo] PERF " + line);
     }
 
+    /** A paste that puts water in, undone: the water that ran out of the build's own cells must drain too. */
+    static void pasteWater() {
+        UiScenes.setup();
+        var bp = Samples.waterPillar();
+        int ox = 40, oz = 40;
+        var holder = new Object[1];
+        act(() -> {
+            var level = mc().getSingleplayerServer().overworld();
+            var part = PasteJob.Part.of(io.github.profetgit.cyanotype.ghost.OrientedRegion.of(bp, bp.regions.get(0), io.github.profetgit.cyanotype.placement.Orientation.NONE), ox, Director.G + 1, oz);
+            holder[0] = new PasteJob(level, java.util.List.of(part));
+        });
+        until("pastewater/the pillar is in", 400, () -> {
+            PasteJob j = (PasteJob) holder[0];
+            j.work(5_000_000L, 10_000);
+            return j.state() == PasteJob.State.DONE;
+        });
+        waitTicks(120);
+        act(() -> check("pastewater/the water ran out over the pillar", waterAround(ox, oz) > 1, waterAround(ox, oz) + " water blocks"));
+        act(() -> ((PasteJob) holder[0]).beginUndo());
+        until("pastewater/the undo is done", 400, () -> {
+            PasteJob j = (PasteJob) holder[0];
+            j.work(5_000_000L, 10_000);
+            return j.state() == PasteJob.State.UNDONE;
+        });
+        waitTicks(250);
+        act(() -> check("pastewater/no water is left behind after the undo", waterAround(ox, oz) == 0, waterAround(ox, oz) + " water blocks"));
+    }
+
+    private static int waterAround(int ox, int oz) {
+        int n = 0;
+        for (int y = Director.G - 2; y <= Director.G + 8; y++) for (int z = oz - 8; z <= oz + 8; z++) for (int x = ox - 8; x <= ox + 8; x++) {
+            if (!mc().level.getFluidState(new BlockPos(x, y, z)).isEmpty()) n++;
+        }
+        return n;
+    }
+
     static void paste() {
         UiScenes.setup();
         mode("creative");

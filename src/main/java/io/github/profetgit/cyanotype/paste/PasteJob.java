@@ -263,8 +263,10 @@ public final class PasteJob {
             BlockPos at = BlockPos.of(undoPos.getLong(i));
             BlockState old = undoPalette.get(undoState.getShort(i));
             if (level.hasChunk(at.getX() >> 4, at.getZ() >> 4)) {
+                boolean hadFluid = !level.getBlockState(at).getFluidState().isEmpty();
                 if (level.getBlockEntity(at) != null) level.setBlock(at, Blocks.BARRIER.defaultBlockState(), QUIET);
                 level.setBlock(at, old, FLAGS);
+                if (hadFluid) wakeFluids(at);
                 CompoundTag data = undoEntities.get(at.asLong());
                 if (data != null) {
                     BlockEntity made = level.getBlockEntity(at);
@@ -275,6 +277,19 @@ public final class PasteJob {
         }
         state = State.UNDONE;
         return true;
+    }
+
+    /**
+     * A block that held water or lava has gone, and the blocks go back without telling their neighbours (the flags above), so
+     * water that was flowing from it would never notice and would stay for good. Each fluid next to the cell gets a tick of its
+     * own: a flowing block then works out where it is fed from, drains if it is not, and wakes its own neighbours in turn.
+     */
+    private void wakeFluids(BlockPos at) {
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+            BlockPos n = at.relative(d);
+            net.minecraft.world.level.material.FluidState fluid = level.getFluidState(n);
+            if (!fluid.isEmpty()) level.scheduleTick(n, fluid.getType(), fluid.getType().getTickDelay(level));
+        }
     }
 
     /** Blocks that went in and can be taken out again. */

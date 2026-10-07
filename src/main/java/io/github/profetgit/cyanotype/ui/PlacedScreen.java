@@ -214,8 +214,10 @@ public final class PlacedScreen extends Screen {
                         onClose();
                         Interaction.enterEdit(minecraft);
                     } else if (was.equals("trash" + i) && Ui.inside(mx, my, trashX(), by, BTN, BTN)) {
-                        Placements.select(p);
-                        minecraft.gui.setScreen(new RemoveScreen(p));
+                        Placements.removeUndoable(p);
+                        Sfx.play(Sfx.CLOSE, 0.8f);
+                        Interaction.say(minecraft, "Removed " + p.name + ". Undo brings it back.");
+                        break;
                     }
                 }
             }

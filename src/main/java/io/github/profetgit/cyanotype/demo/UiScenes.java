@@ -449,10 +449,7 @@ final class UiScenes {
         PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, false);
 
         // a removal can be undone and redone
-        act(() -> Minecraft.getInstance().gui.setScreen(new io.github.profetgit.cyanotype.ui.RemoveScreen(house)));
-        waitTicks(4);
-        act(() -> key(com.mojang.blaze3d.platform.InputConstants.KEY_RIGHT));
-        act(() -> key(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN));
+        act(() -> Placements.removeUndoable(house));
         waitTicks(6);
         act(() -> check("undo/removed", Placements.all().isEmpty(), "placements " + Placements.all().size()));
         PlaceScenes.ctrlTap(io.github.profetgit.cyanotype.interaction.Keys.UNDO, false);
@@ -482,7 +479,7 @@ final class UiScenes {
         teardown();
     }
 
-    /** Removing a placement: the wheel's Remove tool, the question, Keep, and Remove with the keyboard. */
+    /** Removing a placement: the Delete key and the Placed list's trash button, both at once and both undoable. */
     static void remove() {
         setup();
         // the same place and aim whatever scene came before
@@ -526,28 +523,7 @@ final class UiScenes {
         shot("remove_0_placed");
         act(() -> click(((io.github.profetgit.cyanotype.ui.PlacedScreen) screen()).anchor("trash:0")));
         waitTicks(8);
-        act(() -> check("remove/the trash button in the Placed list opens the question for the placement", screen() instanceof io.github.profetgit.cyanotype.ui.RemoveScreen rs && rs.asks().get(0) == house, String.valueOf(screen())));
-        waitTicks(6);
-        shot("remove_1_confirm");
-        // Keep it: by mouse, nothing changes
-        act(() -> click(((io.github.profetgit.cyanotype.ui.RemoveScreen) screen()).anchor("keep")));
-        waitTicks(4);
-        act(() -> check("remove/Keep it leaves the placement alone", screen() == null && Placements.all().contains(house), "screen " + screen() + ", placements " + Placements.all().size()));
-        // Enter with the first focus is Keep too
-        act(() -> Minecraft.getInstance().gui.setScreen(new io.github.profetgit.cyanotype.ui.RemoveScreen(house)));
-        waitTicks(4);
-        act(() -> key(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN));
-        waitTicks(3);
-        act(() -> check("remove/Enter on the first focus keeps it", screen() == null && Placements.all().contains(house), "screen " + screen()));
-        // arrow right moves to Remove, Enter removes
-        act(() -> Minecraft.getInstance().gui.setScreen(new io.github.profetgit.cyanotype.ui.RemoveScreen(house)));
-        waitTicks(8);
-        act(() -> key(com.mojang.blaze3d.platform.InputConstants.KEY_RIGHT));
-        waitTicks(8);
-        shot("remove_2_focus_remove");
-        act(() -> key(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN));
-        waitTicks(6);
-        act(() -> check("remove/Remove takes the placement away", screen() == null && Placements.all().isEmpty() && Placements.mode() == Placements.Mode.IDLE, "screen " + screen() + ", placements " + Placements.all().size()));
+        act(() -> check("remove/the trash button in the Placed list removes the placement at once, no question", screen() instanceof io.github.profetgit.cyanotype.ui.PlacedScreen && Placements.all().isEmpty() && Placements.mode() == Placements.Mode.IDLE, "screen " + screen() + ", placements " + Placements.all().size()));
         act(() -> check("remove/its material highlight goes with it", io.github.profetgit.cyanotype.interaction.CellHighlight.shown() == 0, "cells " + io.github.profetgit.cyanotype.interaction.CellHighlight.shown()));
         waitTicks(10);
         act(() -> check("remove/its ghost is gone", GhostRenderer.ghosts().isEmpty(), "ghosts " + GhostRenderer.ghosts().size()));

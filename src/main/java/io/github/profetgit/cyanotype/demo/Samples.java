@@ -203,6 +203,14 @@ public final class Samples {
     }
 
     /** A square tower with a door, windows and battlements. */
+    /** A stone pillar with a water source on top: the water runs over the edges and down the sides, outside the blueprint's own cells. */
+    static Blueprint waterPillar() {
+        Grid g = new Grid(1, 5, 1);
+        g.fill(0, 0, 0, 0, 3, 0, Blocks.STONE.defaultBlockState());
+        g.set(0, 4, 0, Blocks.WATER.defaultBlockState());
+        return g.build("Cyanotype water pillar");
+    }
+
     static Blueprint tower() {
         Grid g = new Grid(9, 24, 9);
         BlockState brick = Blocks.STONE_BRICKS.defaultBlockState(), mossy = Blocks.MOSSY_STONE_BRICKS.defaultBlockState();

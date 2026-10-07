@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.0.67
+
+- The trash button in the Placed list removes a placement at once, with no question. Undo (Ctrl+Z or the Undo button) brings it back.
+- Undoing a paste now drains water that had flowed out of the pasted build. Before, the pasted water sources went away but the water that had run out of them stayed behind for good.
+
 ## 0.0.66
 
 - Calmer key hints in Edit mode: three rows to begin with (drag, turn, done) and a faint "More help" row. After about six quiet seconds the rest of the keys come in as fainter rows, and they tuck away again when you grab, drag or scroll.
