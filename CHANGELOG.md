@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.62
+
+- Friendlier arrows and turn ring: soft pastel colours (pink, mint, sky), and they move. When you start editing they pop out one after another with a little overshoot, they breathe gently along their axis, hover swells them with a jelly spring, grabbing squeezes them, and the ring's arrows drift slowly round. Reduce motion turns it all off.
+
 ## 0.0.61
 
 - First-run hello: the first time you stand in a world, a small card says "Hold V for the tool wheel, press J for lessons". It leaves by itself, or as soon as you press either key.

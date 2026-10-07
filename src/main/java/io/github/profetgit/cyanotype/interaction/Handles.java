@@ -22,7 +22,7 @@ final class Handles {
         MOVE, RING
     }
 
-    static final int X_COLOR = 0xFFFF6B6B, Y_COLOR = 0xFF6BE58F, Z_COLOR = 0xFF6BB8FF, RING_COLOR = 0xFFE8F6FF, WHITE = 0xFFFFFFFF;
+    static final int X_COLOR = 0xFFFF93A8, Y_COLOR = 0xFF93EBB4, Z_COLOR = 0xFF93C9FF, RING_COLOR = 0xFFF2F9FF, WHITE = 0xFFFFFFFF;
 
     /** One handle: what it does, where it is drawn, and the boxes a ray is tested against. */
     static final class Handle {
@@ -56,6 +56,11 @@ final class Handles {
     /** How strongly each handle is hovered, 0 to 1, eased between frames so hover grows in and out instead of switching. */
     private static final Map<String, Float> HOVER = new HashMap<>(), PRESS = new HashMap<>();
     private static final double HOVER_SECONDS = 0.07;
+    /** The jelly: each handle's size as a spring (position, speed) that overshoots a little and settles, and when it first showed. */
+    private static final Map<String, double[]> SPRING = new HashMap<>();
+    private static final Map<String, Double> BORN = new HashMap<>();
+    private static final double STIFFNESS = 240, DAMPING = 13, POP_STAGGER = 0.07;
+    private static double clock;
 
     final List<Handle> handles = new ArrayList<>();
     Ring ring;
@@ -179,7 +184,27 @@ final class Handles {
     /** As above; the arrows of {@code emphasis} glow a little (the axis the scroll wheel moves along). */
     void animate(Handle hovered, Handle grabbed, double dt, Direction.Axis emphasis) {
         double k = 1 - Math.exp(-dt / HOVER_SECONDS);
+        clock += dt;
+        boolean still = io.github.profetgit.cyanotype.ui.Motion.reduced();
+        int index = 0;
         for (Handle h : handles) {
+            double born = BORN.computeIfAbsent(h.id, id -> clock);
+            double[] sp = SPRING.computeIfAbsent(h.id, id -> new double[]{still ? 1 : 0, 0});
+            boolean up = h == hovered || h == grabbed;
+            double target = clock - born < index * POP_STAGGER && !still ? 0 : 1 + (up ? 0.22 : 0) - (h == grabbed ? 0.1 : 0);
+            index++;
+            if (still) {
+                sp[0] = target;
+                sp[1] = 0;
+            } else {
+                double left = Math.min(dt, 0.1);
+                while (left > 0) {
+                    double step = Math.min(left, 1 / 240.0);
+                    sp[1] += (STIFFNESS * (target - sp[0]) - DAMPING * sp[1]) * step;
+                    sp[0] += sp[1] * step;
+                    left -= step;
+                }
+            }
             float hv = HOVER.getOrDefault(h.id, 0f), pr = PRESS.getOrDefault(h.id, 0f);
             float glow = emphasis != null && h.kind == Kind.MOVE && h.axis == emphasis ? 0.5f : 0f;
             float ht = h == hovered || h == grabbed ? 1f : glow, pt = h == grabbed ? 1f : 0f;
@@ -195,20 +220,29 @@ final class Handles {
     static void forget() {
         HOVER.clear();
         PRESS.clear();
+        SPRING.clear();
+        BORN.clear();
     }
 
     /** Draws every handle. */
     void emit() {
         for (Handle h : handles) {
             float e = HOVER.getOrDefault(h.id, 0f), p = PRESS.getOrDefault(h.id, 0f);
-            // hover swells it, grabbing presses it back in a little
-            double k = 1 + 0.22 * e - 0.1 * p;
+            // the spring is the size: it pops out when editing starts, swells on hover and gives a little when grabbed
+            double[] sp = SPRING.get(h.id);
+            double k = sp == null ? 1 + 0.22 * e - 0.1 * p : sp[0];
+            if (k < 0.04) continue;
+            boolean still = io.github.profetgit.cyanotype.ui.Motion.reduced();
             switch (h.kind) {
                 case MOVE -> {
-                            Vec3 dir = h.to.subtract(h.from).normalize();
-                    arrow(h.from, dir, h.from.distanceTo(h.to), k, h.color, e, 1f, h.scale);
+                    Vec3 dir = h.to.subtract(h.from).normalize();
+                    double len = h.from.distanceTo(h.to);
+                    // it breathes along its axis, each arrow in its own time
+                    double bob = still ? 0 : 0.1 * h.scale * Math.sin(clock * 2.4 + phase(h)) * (1 - 0.7 * Math.min(1, e + p));
+                    double grow = Math.min(1, k);
+                    arrow(h.from.add(dir.scale(bob + len * (1 - grow) * 0.4)), dir, len * grow, Math.max(k, 0.2), h.color, e, (float) Math.min(1, k * 1.4), h.scale);
                 }
-                case RING -> ring(e, p);
+                case RING -> ring(e, p, (float) Math.min(1, k * 1.4), still ? 0 : clock * 0.18);
             }
         }
     }
@@ -298,12 +332,16 @@ final class Handles {
     }
 
     /** The turn ring: a flat translucent band at the base with a crisp edge on both sides and four chevrons showing clockwise. */
-    private void ring(float hover, float press) {
+    private static double phase(Handle h) {
+        return (h.id.hashCode() & 0xFFFF) / 65535.0 * Math.PI * 2;
+    }
+
+    private void ring(float hover, float press, float visible, double drift) {
         double band = 0.5 * ring.unit * (1 + 0.25 * hover - 0.1 * press);
         double r0 = ring.radius - band / 2, r1 = ring.radius + band / 2;
-        int stroke = mix(RING_COLOR, WHITE, 0.2f + 0.8f * hover);
+        int stroke = alpha(mix(RING_COLOR, WHITE, 0.2f + 0.8f * hover), visible);
         float sw = 2.2f + 2.0f * hover;
-        int fill = alpha(RING_COLOR, 0.28 + 0.35 * hover);
+        int fill = alpha(RING_COLOR, (0.28 + 0.35 * hover) * visible);
         int n = 72;
         Vec3[] in = new Vec3[n + 1], out = new Vec3[n + 1];
         for (int i = 0; i <= n; i++) {
@@ -321,11 +359,11 @@ final class Handles {
         // chevrons pointing clockwise (toward +z from +x, as seen from above)
         double w = 0.55 * ring.unit * (1 + 0.2 * hover), tipAngle = 0.8 * ring.unit / ring.radius;
         for (int k = 0; k < 4; k++) {
-            double a = k * Math.PI / 2 + Math.PI / 4;
+            double a = k * Math.PI / 2 + Math.PI / 4 + drift;
             Vec3 tip = new Vec3(ring.cx + Math.cos(a + tipAngle) * ring.radius, ring.y, ring.cz + Math.sin(a + tipAngle) * ring.radius);
             Vec3 l = new Vec3(ring.cx + Math.cos(a) * (ring.radius - w), ring.y, ring.cz + Math.sin(a) * (ring.radius - w));
             Vec3 r = new Vec3(ring.cx + Math.cos(a) * (ring.radius + w), ring.y, ring.cz + Math.sin(a) * (ring.radius + w));
-            Gizmos.rect(l, tip, tip, r, GizmoStyle.strokeAndFill(stroke, sw, alpha(WHITE, 0.55 + 0.35 * hover))).setAlwaysOnTop();
+            Gizmos.rect(l, tip, tip, r, GizmoStyle.strokeAndFill(stroke, sw, alpha(WHITE, (0.55 + 0.35 * hover) * visible))).setAlwaysOnTop();
         }
     }
 
