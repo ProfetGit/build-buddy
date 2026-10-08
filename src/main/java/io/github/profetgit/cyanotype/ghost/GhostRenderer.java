@@ -82,7 +82,9 @@ public final class GhostRenderer {
 
     /** Dev counters, read by the demo and the perf lab. */
     public static final class Stats {
-        public static volatile int sections, uploaded, drawn, quadsDrawn;
+        public static volatile int sections, uploaded, drawn, quadsDrawn, capsDrawn;
+        /** Dev: when set, every rendered frame adds {nanoTime, quadsDrawn, sections drawn, caps drawn}. */
+        public static volatile java.util.List<long[]> record;
         public static final LongAdder bytesUploaded = new LongAdder(), bakeNanos = new LongAdder(), bakedSections = new LongAdder();
         public static volatile long cpuNanos, frames;
     }
@@ -221,6 +223,8 @@ public final class GhostRenderer {
                 }
             }
         } finally {
+            java.util.List<long[]> rec = Stats.record;
+            if (rec != null) rec.add(new long[]{t0, Stats.quadsDrawn, Stats.drawn, Stats.capsDrawn});
             if (!SLOTS.isEmpty()) {
                 Stats.cpuNanos += System.nanoTime() - t0;
                 Stats.frames++;
@@ -333,11 +337,12 @@ public final class GhostRenderer {
 
         if (hidden) {
             Stats.drawn = 0;
+            Stats.capsDrawn = 0;
             Stats.quadsDrawn = 0;
             return;
         }
         List<DrawItem> draw = new ArrayList<>();
-        int sectionsDrawn = 0;
+        int sectionsDrawn = 0, capsDrawn = 0;
         double fadeStart = range * FADE_FROM;
         for (int i : order) {
             Ghost.Section sec = candidates.get(i);
@@ -366,10 +371,14 @@ public final class GhostRenderer {
             }
             // the faces the cut layers would have covered
             for (Ghost.Cap c : sec.caps.values()) {
-                if (c.exact && c.buffer != null && c.quads > 0 && (c.meshFormat == null || sameFormat(c.meshFormat, live))) draw.add(new DrawItem(sec, c.buffer, c.indexCount, m, 0, c.quads, fade));
+                if (c.exact && c.buffer != null && c.quads > 0 && (c.meshFormat == null || sameFormat(c.meshFormat, live))) {
+                    draw.add(new DrawItem(sec, c.buffer, c.indexCount, m, 0, c.quads, fade));
+                    capsDrawn++;
+                }
             }
         }
         Stats.drawn = sectionsDrawn;
+        Stats.capsDrawn = capsDrawn;
         if (draw.isEmpty()) {
             Stats.quadsDrawn = 0;
             return;
@@ -386,13 +395,15 @@ public final class GhostRenderer {
     /** Decides which cap meshes a section needs for its placement's layer window, makes them, and drops the rest. */
     private static void syncCaps(Ghost.Section sec) {
         Placement pl = sec.ghost.placement;
-        if (!pl.layered() || sec.state != Ghost.Section.UPLOADED) {
+        if (!pl.layered()) {
             if (!sec.caps.isEmpty()) {
                 for (Ghost.Cap c : sec.caps.values()) c.release();
                 sec.caps.clear();
             }
             return;
         }
+        // a section that is being baked again (the world changed under it) keeps its caps: they draw until their own new mesh is up
+        if (sec.state != Ghost.Section.UPLOADED && sec.bakedVersion < 0) return;
         int base = sec.region.oy + sec.y;
         java.util.Set<Integer> keep = new java.util.HashSet<>();
         if (pl.layerHi >= 0) wantCap(sec, true, pl.layerHi - base, keep);

@@ -1,15 +1,15 @@
 {
   "key.category.cyanotype.cyanotype": "Cyanotype",
-  "key.cyanotype.main": "Tool wheel (hold) / start or stop editing (tap)",
-  "key.cyanotype.toggle": "Show or hide ghosts",
-  "key.cyanotype.undo": "Undo (hold Ctrl)",
-  "key.cyanotype.redo": "Redo (hold Ctrl)",
-  "key.cyanotype.mirror": "Mirror the build (left and right as you see it)",
-  "key.cyanotype.paste": "Paste the build into the world (creative, your own world)",
-  "key.cyanotype.remove": "Remove the selected placement",
-  "key.cyanotype.pick": "Smart pick: save a build",
-  "key.cyanotype.help": "How it works (the lesson of the tool you are using, or the list of lessons)",
-  "key.cyanotype.auto": "Auto-placing on or off (comes back in the mode you used last)",
-  "key.cyanotype.layer_up": "Layers: move the window up one layer (past the top shows all)",
-  "key.cyanotype.layer_down": "Layers: move the window down one layer"
+  "key.cyanotype.main": "Tool wheel / edit",
+  "key.cyanotype.toggle": "Show / hide ghosts",
+  "key.cyanotype.undo": "Undo (with Ctrl)",
+  "key.cyanotype.redo": "Redo (with Ctrl)",
+  "key.cyanotype.mirror": "Mirror build",
+  "key.cyanotype.paste": "Paste build (creative)",
+  "key.cyanotype.remove": "Remove placement",
+  "key.cyanotype.pick": "Smart pick",
+  "key.cyanotype.help": "How it works",
+  "key.cyanotype.auto": "Auto-place on / off",
+  "key.cyanotype.layer_up": "Layer up",
+  "key.cyanotype.layer_down": "Layer down"
 }

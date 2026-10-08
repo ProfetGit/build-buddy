@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.0.75
+
+- No more flicker while auto-placing with one layer shown: the top and bottom faces of the shown layer used to vanish and come back after every placed block. They now stay until their new picture is ready.
+- Shorter key names in Controls ("Auto-place on / off", "Layer up", "Smart pick", "How it works"...).
+
 ## 0.0.74
 
 - Slabs auto-place properly: double (full block) slabs go down in two steps, top slabs come out on top, and on servers a block can be built on a slab or stair (the click now lands on the block's real shape).
