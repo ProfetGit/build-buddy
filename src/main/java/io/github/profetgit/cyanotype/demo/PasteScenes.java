@@ -111,6 +111,7 @@ final class PasteScenes {
             });
             waitTicks(60);
         }
+        mode("spectator");
         act(() -> Director.hideHud(mc(), true));
     }
 
@@ -285,6 +286,7 @@ final class PasteScenes {
             check("pasteops/the cottage is gone again", m[0] < m[1] / 4, m[0] + " of " + m[1] + " still there");
             Paste.testServerOps = null;
             cheats(false);
+            Director.run(mc(), "gamemode spectator " + mc().player.getName().getString());
             Paste.reset();
             for (Placement p : java.util.List.copyOf(Placements.all())) Placements.remove(p);
             Director.hideHud(mc(), true);
@@ -400,7 +402,7 @@ final class PasteScenes {
         shot("paste_4_survival");
         act(() -> mc().gui.setScreen(null));
         waitTicks(3);
-        mode("creative");
+        mode("spectator");
         act(() -> {
             for (Placement p : java.util.List.copyOf(Placements.all())) Placements.remove(p);
             Director.hideHud(mc(), true);

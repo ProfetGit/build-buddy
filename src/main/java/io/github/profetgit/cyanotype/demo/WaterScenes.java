@@ -46,6 +46,7 @@ final class WaterScenes {
     }
 
     static void water() {
+        Director.cmd("gamemode spectator Builder");
         pool();
         run("classic", "water");
         act(() -> Minecraft.getInstance().options.improvedTransparency().set(true));
