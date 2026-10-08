@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.77
+
+- Paste on a server, for operators: in creative, an op can paste a placed build on a multiplayer server (P or the Build panel). The build goes in as /fill and /setblock commands (runs of the same block are joined into boxes, signs keep their text), paced so the server keeps up, bottom up, supports first. Ctrl+Z puts back what was there, except items inside chests (the client cannot see them; the message says so). Players who are not op get "Pasting on a server needs operator permission."
+
 ## 0.0.76
 
 - A ghost that is partly under water now shows its underwater part from the air, through the water like real blocks, with and without shader packs. Before, it only appeared once you were in the water.
