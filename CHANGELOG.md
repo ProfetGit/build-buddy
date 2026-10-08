@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.73
+
+- A finished build's ghost now goes away by itself, two seconds after the DONE moment. Ctrl+Z brings it back. A ghost you lock over a build that is already complete stays.
+- "Place what I look at" only ever places ghost blocks now. With it on, a use press puts the ghost block under your crosshair (always the ghost's own block, whatever you hold) and nothing anywhere else, in every tool and with either hand. Hold use and sweep the crosshair over the ghost to place it all. Before, a block in hand could still be placed anywhere while you were editing, with the off hand, or with no ghost put down.
+- New key K (rebindable): Smart pick, to save a build quickly. Press it again to cancel. The Save panel shows the key.
+
 ## 0.0.72
 
 - In a world you host (singleplayer or your LAN world), auto-placing now places a ghost block whenever it is in reach: blocks with nothing to lean on go straight into the air, stairs, doors and other blocks with a facing come out right without your view turning, and there is no line-of-sight rule. In creative it takes the blocks it needs from the creative inventory, so you do not have to carry them. On other servers the rules are unchanged: only what a player could place from where they stand and the way they look.

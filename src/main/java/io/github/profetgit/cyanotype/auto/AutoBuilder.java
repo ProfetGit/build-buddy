@@ -542,9 +542,8 @@ public final class AutoBuilder {
         if (mode == Mode.OFF || mc.gui.screen() != null || GhostRenderer.hidden || mc.player == null || mc.level == null) return false;
         Placement pl = Placements.active();
         Verifier v = pl == null || !pl.locked || !pl.ready() ? null : GhostRenderer.verifierOf(pl);
-        if (v == null) return false;
-        if (findAssist(mc, mc.player, v) != null) return true;
-        if (!(mc.player.getMainHandItem().getItem() instanceof BlockItem)) return false;
+        if (v != null && findAssist(mc, mc.player, v) != null) return true;
+        if (!(mc.player.getMainHandItem().getItem() instanceof BlockItem) && !(mc.player.getOffhandItem().getItem() instanceof BlockItem)) return false;
         Vec3 eye = mc.player.getEyePosition();
         BlockHitResult real = mc.level.clip(new ClipContext(eye, eye.add(mc.player.getLookAngle().scale(PlacePlanner.reach(mc.player) + 0.5)), ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, mc.player));
         if (real.getType() == HitResult.Type.BLOCK && !mc.player.isShiftKeyDown() && PlacePlanner.interactive(mc.level, real.getBlockPos(), mc.level.getBlockState(real.getBlockPos()))) return false;
@@ -556,8 +555,8 @@ public final class AutoBuilder {
         if (!claimsUse(mc)) return false;
         LocalPlayer p = mc.player;
         Placement pl = Placements.active();
-        Verifier v = GhostRenderer.verifierOf(pl);
-        Assist a = findAssist(mc, p, v);
+        Verifier v = pl == null || !pl.locked || !pl.ready() ? null : GhostRenderer.verifierOf(pl);
+        Assist a = v == null ? null : findAssist(mc, p, v);
         if (a != null) {
             assist = a;
             assistPlace(mc, p, a);

@@ -176,6 +176,11 @@ public final class Verifier {
         return Math.max(0, 1.0 - todo / (double) Math.max(peakTodo, todo));
     }
 
+    /** Whether there was something to build at some point since the first full look (a build put over an identical one never had). */
+    public boolean hadWork() {
+        return peakTodo > 0;
+    }
+
     /** One line about how it stands, for labels and lists: "checking 40%", "done", "12% 5000 to go". */
     public String summary() {
         Counts c = counts();

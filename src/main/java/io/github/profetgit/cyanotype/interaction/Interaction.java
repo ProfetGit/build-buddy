@@ -362,8 +362,8 @@ public final class Interaction {
             suppressAttack = true;
             return true;
         }
-        if (Placements.mode() == Mode.IDLE && io.github.profetgit.cyanotype.auto.AutoBuilder.onUse(Minecraft.getInstance())) return true;
-        return Placements.mode() == Mode.EDIT && hover != null;
+        if (Placements.mode() == Mode.EDIT && hover != null) return true;
+        return io.github.profetgit.cyanotype.auto.AutoBuilder.onUse(Minecraft.getInstance());
     }
 
     /** Whether holding the attack button should do nothing (it was used for a click or a drag, until it is let go). */
@@ -384,6 +384,9 @@ public final class Interaction {
         }
         while (Keys.PASTE.consumeClick()) {
             if (!screen && !GhostRenderer.hidden) pasteKey(mc);
+        }
+        while (Keys.PICK.consumeClick()) {
+            if (!screen && !GhostRenderer.hidden) pickKey(mc);
         }
         while (Keys.HELP.consumeClick()) {
             if (!screen) helpKey(mc);
@@ -415,6 +418,7 @@ public final class Interaction {
         if (Selecting.dragging() && (!down || screen)) Selecting.endDrag();
         if (suppressAttack && !down) suppressAttack = false;
         Picking.tick(mc);
+        finishedTick(mc);
         io.github.profetgit.cyanotype.paste.Paste.tick(mc);
         io.github.profetgit.cyanotype.auto.AutoBuilder.tick(mc);
         GhostRenderer.tickVerifiers(mc);
@@ -1012,6 +1016,43 @@ public final class Interaction {
         Placement p = Placements.active();
         if (Placements.mode() == Mode.PLACING && p != null && !p.locked) Placements.remove(p);
         Placements.setMode(Mode.IDLE);
+    }
+
+    private static final int FINISHED_TICKS = 40;
+    /** Dev demo only: scenes that look at a finished build afterwards keep its ghost. */
+    public static boolean keepFinished;
+    private static @Nullable Placement finishing;
+    private static int finishingTicks;
+
+    /** A finished build's ghost goes away two seconds after the DONE moment, the undoable way (Ctrl+Z brings it back); a build that never had anything to do stays. */
+    private static void finishedTick(Minecraft mc) {
+        Placement p = Placements.active();
+        io.github.profetgit.cyanotype.verify.Verifier v = keepFinished || p == null || !p.locked || !p.ready() ? null : GhostRenderer.verifierOf(p);
+        if (v == null || !v.hadWork() || v.phase() != io.github.profetgit.cyanotype.verify.Verifier.Phase.DONE) {
+            finishing = null;
+            return;
+        }
+        if (finishing != p) {
+            finishing = p;
+            finishingTicks = 0;
+            return;
+        }
+        if (++finishingTicks < FINISHED_TICKS) return;
+        finishing = null;
+        endDragSafely();
+        io.github.profetgit.cyanotype.auto.AutoBuilder.stop(mc, "Build finished");
+        Placements.removeUndoable(p);
+        say(mc, "Finished " + p.name + ". Ctrl+Z brings the ghost back.");
+    }
+
+    /** The Smart Pick key: starts it as the Save panel's "Pick a build" does, and cancels it when it is already going. */
+    private static void pickKey(Minecraft mc) {
+        switch (Placements.mode()) {
+            case PICK -> Picking.cancel(mc);
+            case IDLE, EDIT, SELECT -> io.github.profetgit.cyanotype.ponder.Lessons.firstUse(mc, "pick", () -> Picking.start(mc));
+            default -> {
+            }
+        }
     }
 
     private static void onMainKey(Minecraft mc) {

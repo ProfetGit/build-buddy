@@ -7,5 +7,6 @@
   "key.cyanotype.mirror": "Mirror the build (left and right as you see it)",
   "key.cyanotype.paste": "Paste the build into the world (creative, your own world)",
   "key.cyanotype.remove": "Remove the selected placement",
+  "key.cyanotype.pick": "Smart pick: save a build",
   "key.cyanotype.help": "How it works (the lesson of the tool you are using, or the list of lessons)"
 }

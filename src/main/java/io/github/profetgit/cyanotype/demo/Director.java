@@ -209,7 +209,7 @@ public final class Director {
         waitTicks(40);
         for (String scene : SCENES) {
             // a scene before this one (Settings' "Reset all") may have switched the lessons back on, and they would open over the test
-            if (!scene.startsWith("ponder")) act(() -> { io.github.profetgit.cyanotype.ui.Settings.get().lessons = false; io.github.profetgit.cyanotype.ui.Settings.get().welcomed = true; });
+            if (!scene.startsWith("ponder")) act(() -> { io.github.profetgit.cyanotype.interaction.Interaction.keepFinished = true; io.github.profetgit.cyanotype.ui.Settings.get().lessons = false; io.github.profetgit.cyanotype.ui.Settings.get().welcomed = true; });
             switch (scene) {
                 case "house" -> houseScene();
                 case "shaderswap" -> ShaderScenes.swap();
@@ -238,6 +238,9 @@ public final class Director {
                 case "pick" -> PickScenes.pick();
                 case "auto" -> AutoScenes.auto();
                 case "auto-own" -> AutoScenes.own();
+                case "finish" -> StrictScenes.finish();
+                case "assist-strict" -> StrictScenes.assistStrict();
+                case "pick-key" -> StrictScenes.pickKey();
                 case "nudge" -> NudgeScenes.nudge();
                 case "mega" -> NudgeScenes.mega();
                 case "carry" -> NudgeScenes.carry();
