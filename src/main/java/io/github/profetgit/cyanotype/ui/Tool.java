@@ -142,7 +142,7 @@ public enum Tool {
             Interaction.guide = v;
             Interaction.say(mc, v ? "Showing the next block to build." : "Next-block marker off.");
         });
-        return new ChoiceScreen("Build", need + "It stops when you are hurt or open a screen.", choices, ready ? next : null);
+        return new ChoiceScreen("Build", need + "It stops when you are hurt or open a screen.  " + Ui.keyName(io.github.profetgit.cyanotype.interaction.Keys.AUTO) + " switches it on or off.", choices, ready ? next : null);
     }
 
     /** The Build panel's creative row: paste the whole build into the world; dim, with the reason, when it cannot be done. */

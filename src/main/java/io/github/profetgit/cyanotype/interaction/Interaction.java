@@ -391,6 +391,16 @@ public final class Interaction {
         while (Keys.MIRROR.consumeClick()) {
             if (!screen && !GhostRenderer.hidden) mirror(mc);
         }
+        if (io.github.profetgit.cyanotype.auto.AutoBuilder.on()) autoLast = io.github.profetgit.cyanotype.auto.AutoBuilder.mode();
+        while (Keys.AUTO.consumeClick()) {
+            if (!screen && !GhostRenderer.hidden) autoKey(mc);
+        }
+        while (Keys.LAYER_UP.consumeClick()) {
+            if (!screen && !GhostRenderer.hidden) layerKey(mc, true);
+        }
+        while (Keys.LAYER_DOWN.consumeClick()) {
+            if (!screen && !GhostRenderer.hidden) layerKey(mc, false);
+        }
         while (Keys.REMOVE.consumeClick()) {
             if (!screen && !GhostRenderer.hidden) askRemove(mc);
         }
@@ -492,18 +502,7 @@ public final class Interaction {
             return false;
         }
         if (!p.layered()) {
-            // start at the lowest layer that is not finished
-            int start = 0;
-            Verifier v = GhostRenderer.verifierOf(p);
-            if (v != null) {
-                for (int l = 0; l < v.height; l++) {
-                    if (v.layerCount(l, Verifier.MISSING) + v.layerCount(l, Verifier.WRONG) > 0) {
-                        start = l;
-                        break;
-                    }
-                }
-            }
-            p.layerLo = p.layerHi = start;
+            p.layerLo = p.layerHi = lowestUnfinishedLayer(p);
         }
         reveal();
         endDragSafely();
@@ -512,6 +511,62 @@ public final class Interaction {
         PlacementStore.markDirty();
         Sfx.play(Sfx.OPEN);
         return true;
+    }
+
+    /** The lowest layer that still has something missing or wrong (the first one when nothing is known yet). */
+    private static int lowestUnfinishedLayer(Placement p) {
+        Verifier v = GhostRenderer.verifierOf(p);
+        if (v != null) {
+            for (int l = 0; l < v.height; l++) {
+                if (v.layerCount(l, Verifier.MISSING) + v.layerCount(l, Verifier.WRONG) > 0) return l;
+            }
+        }
+        return 0;
+    }
+
+    private static io.github.profetgit.cyanotype.auto.AutoBuilder.Mode autoLast = io.github.profetgit.cyanotype.auto.AutoBuilder.Mode.ASSIST;
+
+    /** The auto-place key: off when on; when off, back on in the mode used last (the server rules still apply). */
+    private static void autoKey(Minecraft mc) {
+        if (io.github.profetgit.cyanotype.auto.AutoBuilder.on()) io.github.profetgit.cyanotype.auto.AutoBuilder.request(mc, io.github.profetgit.cyanotype.auto.AutoBuilder.Mode.OFF);
+        else io.github.profetgit.cyanotype.auto.AutoBuilder.request(mc, autoLast);
+    }
+
+    /** Page Up and Page Down: the layer window moves one layer, the same state the Layers tool and /cyanotype layer set. */
+    private static void layerKey(Minecraft mc, boolean up) {
+        Placement p = Placements.active();
+        if (p == null || !p.ready() || !p.locked) {
+            Sfx.play(Sfx.ERROR);
+            say(mc, "Place a blueprint first");
+            return;
+        }
+        int h = p.sizeY();
+        int lo, hi;
+        if (!p.layered()) {
+            lo = hi = lowestUnfinishedLayer(p);
+        } else {
+            lo = Math.max(0, p.layerLo);
+            hi = p.layerHi < 0 ? h - 1 : Math.min(h - 1, p.layerHi);
+            if (up) {
+                if (hi >= h - 1) {
+                    lo = hi = -1;
+                } else {
+                    lo++;
+                    hi++;
+                }
+            } else if (lo > 0) {
+                lo--;
+                hi--;
+            }
+        }
+        if (lo != p.layerLo || hi != p.layerHi) {
+            p.layerLo = lo;
+            p.layerHi = hi;
+            PlacementStore.markDirty();
+            Sfx.play(Sfx.SNAP, 0.9f + 0.5f * Math.max(0, lo) / Math.max(1, h));
+        }
+        if (lo < 0) say(mc, "All " + h + " layers shown");
+        else say(mc, (lo == hi ? "Layer " + (lo + 1) : "Layers " + (lo + 1) + "-" + (hi + 1)) + " of " + h);
     }
 
     static void endDragSafely() {
@@ -687,7 +742,7 @@ public final class Interaction {
                 Placements.setMode(Mode.IDLE);
             } else {
                 chips(mc, new Chips.Chip("Scroll", "Move up / down"), new Chips.Chip("Shift+Scroll", "Thicker / thinner"), new Chips.Chip("Click", "Done"),
-                    new Chips.Chip("Right click", "Show all layers"), helpChip());
+                    new Chips.Chip("Right click", "Show all layers"), layerKeysChip(), helpChip());
             }
         } else if (mode == Mode.SELECT) {
             Selecting.frame(mc, pos, look);
@@ -709,6 +764,10 @@ public final class Interaction {
         BlockPos target = hit.getType() == HitResult.Type.BLOCK ? hit.getBlockPos().relative(hit.getDirection()) : BlockPos.containing(camera.add(look.scale(AIR_DISTANCE)));
         int[] xz = Moves.centerOn(target.getX(), target.getZ(), p.sizeX(), p.sizeZ());
         p.set(new BlockPos(xz[0], target.getY() + lift, xz[1]), p.orientation);
+    }
+
+    static Chips.Chip layerKeysChip() {
+        return new Chips.Chip(Ui.keyName(Keys.LAYER_UP) + " / " + Ui.keyName(Keys.LAYER_DOWN), "Next / previous layer", true);
     }
 
     /** The last row of every tool's hints: where the lesson for the tool is. */
@@ -752,9 +811,9 @@ public final class Interaction {
             } else {
                 Chips.Chip push = new Chips.Chip("Scroll", "Push " + word(nudgeDir), true), mirror = new Chips.Chip(Ui.keyName(Keys.MIRROR), "Mirror", true),
                     undo = new Chips.Chip("Ctrl+" + Ui.keyName(Keys.UNDO) + " / " + Ui.keyName(Keys.REDO), "Undo / Redo", true),
-                    remove = new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove", true), help = new Chips.Chip(Ui.keyName(Keys.HELP), "How it works", true);
-                if (canPasteHere(mc)) chips(mc, dragChip, turn, push, mirror, new Chips.Chip(Ui.keyName(Keys.PASTE), "Paste it into the world", true), undo, remove, done, help);
-                else chips(mc, dragChip, turn, push, mirror, undo, remove, done, help);
+                    remove = new Chips.Chip(Ui.keyName(Keys.REMOVE), "Remove", true), layers = layerKeysChip(), help = new Chips.Chip(Ui.keyName(Keys.HELP), "How it works", true);
+                if (canPasteHere(mc)) chips(mc, dragChip, turn, push, mirror, new Chips.Chip(Ui.keyName(Keys.PASTE), "Paste it into the world", true), undo, remove, layers, done, help);
+                else chips(mc, dragChip, turn, push, mirror, undo, remove, layers, done, help);
             }
         }
         handles.animate(hover, drag == null ? null : drag.handle, dt(), drag == null ? nudgeDir.getAxis() : null);

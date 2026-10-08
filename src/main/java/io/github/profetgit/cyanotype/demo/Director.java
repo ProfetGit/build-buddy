@@ -242,6 +242,7 @@ public final class Director {
                 case "carry" -> NudgeScenes.carry();
                 case "materials" -> MaterialsScenes.materials();
                 case "settings" -> SettingsScenes.settings();
+                case "keys" -> KeyScenes.keys();
                 case "ponder-stills" -> PonderScenes.stills();
                 case "ponder-flow" -> PonderScenes.flow();
                 case "ponder-take" -> PonderTakes.takes();
