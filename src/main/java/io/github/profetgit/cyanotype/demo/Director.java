@@ -237,6 +237,7 @@ public final class Director {
                 case "save" -> SaveScenes.save();
                 case "pick" -> PickScenes.pick();
                 case "auto" -> AutoScenes.auto();
+                case "auto-own" -> AutoScenes.own();
                 case "nudge" -> NudgeScenes.nudge();
                 case "mega" -> NudgeScenes.mega();
                 case "carry" -> NudgeScenes.carry();

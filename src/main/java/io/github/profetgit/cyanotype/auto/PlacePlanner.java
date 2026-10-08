@@ -52,13 +52,17 @@ import org.jspecify.annotations.Nullable;
  * <p>The plan never reaches further than the player could (the game's own block interaction range, less a margin), never
  * clicks through a block (the line from the eyes must meet the clicked face first), and never leans on a block that
  * would open or use itself when clicked (a chest, a door, a button).
+ *
+ * <p>In a world the player hosts ({@link AutoBuilder#ownWorld}) nobody else is policed, so the rules are the game's own and
+ * no more: the full reach, no line of sight, any facing (the caller turns the packet, not the camera), and a cell with
+ * nothing to lean on is clicked on itself. On a server none of that applies.
  */
 public final class PlacePlanner {
     public enum Why {
         OK, NO_SUPPORT, WRONG_FACING, OUT_OF_REACH, BLOCKED, CANNOT
     }
 
-    /** What to do: click {@code face} of {@code support} at {@code hit} while looking {@code yaw}/{@code pitch}; {@code turn} says that is not how the player looks now. */
+    /** What to do: click {@code face} of {@code support} at {@code hit} while looking {@code yaw}/{@code pitch}; {@code turn} says the view has to turn there first (in a world of the player's own it never does: the caller just says so to the game). */
     public record Plan(BlockPos support, Direction face, Vec3 hit, float yaw, float pitch, boolean turn) {
     }
 
@@ -82,6 +86,7 @@ public final class PlacePlanner {
 
     /** How far the player may place from the eyes. */
     public static double reach(Player p) {
+        if (AutoBuilder.ownWorld(Minecraft.getInstance())) return p.blockInteractionRange();
         return Math.max(1.0, Math.min(REACH_CAP, p.blockInteractionRange()) - REACH_MARGIN);
     }
 
@@ -93,6 +98,7 @@ public final class PlacePlanner {
         Player player = mc.player;
         Level level = mc.level;
         if (player == null || level == null || !(stack.getItem() instanceof BlockItem item)) return Result.no(Why.CANNOT);
+        boolean own = AutoBuilder.ownWorld(mc);
         Vec3 eye = player.getEyePosition();
         double reach = reach(player);
         List<Candidates.Click> clicks = new ArrayList<>();
@@ -101,7 +107,9 @@ public final class PlacePlanner {
         clicks.addAll(Candidates.around(target));
 
         boolean any = false, reachable = false, free = false;
-        List<Candidates.Click> usable = new ArrayList<>();
+        List<Candidates.Click> usable = new ArrayList<>(), onAir = new ArrayList<>();
+        // nothing to lean on: click the empty cell itself, on the faces that look at the player, and the block replaces the air
+        if (own && here.isAir()) for (Candidates.Click c : Candidates.onSelf(target)) if (towardEye(eye, c)) clicks.add(c);
         for (Candidates.Click c : clicks) {
             BlockState s = level.getBlockState(c.support());
             boolean self = c.support().equals(target);
@@ -112,9 +120,9 @@ public final class PlacePlanner {
             Vec3 hit = c.point();
             if (hit.distanceTo(eye) > reach) continue;
             reachable = true;
-            if (!sees(level, player, eye, c.support(), hit)) continue;
+            if (!own && !sees(level, player, eye, c.support(), hit)) continue;
             free = true;
-            usable.add(c);
+            (self && here.isAir() ? onAir : usable).add(c);
         }
         if (!any) return Result.no(Why.NO_SUPPORT);
         if (!reachable) return Result.no(Why.OUT_OF_REACH);
@@ -130,21 +138,25 @@ public final class PlacePlanner {
         looks.add(new float[]{yaw0, -45});
         boolean blocked = false;
         String needed = null;
+        List<List<Candidates.Click>> passes = onAir.isEmpty() ? List.of(usable) : List.of(usable, onAir);
         float savedYaw = player.getYRot(), savedPitch = player.getXRot(), savedYawO = player.yRotO, savedPitchO = player.xRotO;
         try {
-            for (int i = 0; i < looks.size(); i++) {
-                float[] look = looks.get(i);
-                boolean current = i == 0;
-                player.setYRot(look[0]);
-                player.setXRot(look[1]);
-                for (Candidates.Click c : usable) {
-                    int outcome = simulate(level, player, item, stack, c, target, wanted);
-                    if (outcome == 1) {
-                        if (current) return Result.ok(new Plan(c.support(), c.face(), c.point(), yaw0, pitch0, false));
-                        if (allowTurn) return Result.ok(new Plan(c.support(), c.face(), c.point(), look[0], look[1], true));
-                        needed = facingWords(look[0], look[1]);
-                    } else if (outcome == -1) {
-                        blocked = true;
+            for (List<Candidates.Click> pass : passes) {
+                for (int i = 0; i < looks.size(); i++) {
+                    float[] look = looks.get(i);
+                    boolean current = i == 0;
+                    player.setYRot(look[0]);
+                    player.setXRot(look[1]);
+                    for (Candidates.Click c : pass) {
+                        int outcome = simulate(level, player, item, stack, c, target, wanted);
+                        if (outcome == 1) {
+                            if (current) return Result.ok(new Plan(c.support(), c.face(), c.point(), yaw0, pitch0, false));
+                            if (own) return Result.ok(new Plan(c.support(), c.face(), c.point(), look[0], look[1], false));
+                            if (allowTurn) return Result.ok(new Plan(c.support(), c.face(), c.point(), look[0], look[1], true));
+                            needed = facingWords(look[0], look[1]);
+                        } else if (outcome == -1) {
+                            blocked = true;
+                        }
                     }
                 }
             }
@@ -156,6 +168,13 @@ public final class PlacePlanner {
         }
         if (needed != null) return new Result(null, Why.WRONG_FACING, needed);
         return Result.no(blocked ? Why.BLOCKED : Why.CANNOT);
+    }
+
+    /** Whether the clicked face of a cell is one the eyes can see from the outside. */
+    private static boolean towardEye(Vec3 eye, Candidates.Click c) {
+        Direction d = c.face();
+        Vec3 centre = Vec3.atCenterOf(c.support());
+        return (eye.x - centre.x) * d.getStepX() + (eye.y - centre.y) * d.getStepY() + (eye.z - centre.z) * d.getStepZ() > 0;
     }
 
     /** 1 when this click gives the wanted block, -1 when something is in the way (an entity), 0 otherwise. */

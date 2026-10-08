@@ -22,6 +22,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Inventory;
@@ -56,6 +57,8 @@ public final class AutoBuilder {
     public static volatile String testServer;
 
     private static final int PENDING_TICKS = 8, FAILS_BEFORE_SKIP = 2, SKIP_TICKS = 100, NO_ITEM_STOP_TICKS = 50, SCAN_LIMIT = 40, MAX_TURN_STEP = 18, SWAP_SETTLE_TICKS = 3;
+
+    private static final boolean AUTOLOG = Boolean.getBoolean("cyanotype.demo.autolog") || System.getenv("CYANO_AUTOLOG") != null;
 
     private static Mode mode = Mode.OFF;
     private static final Rate RATE = Rate.create();
@@ -118,6 +121,20 @@ public final class AutoBuilder {
         if (sd == null || sd.ip == null || sd.ip.isBlank()) return "unknown-server";
         String k = ServerKey.normalize(sd.ip);
         return k.isEmpty() ? "unknown-server" : k;
+    }
+
+    /** A world the player hosts (singleplayer, or LAN): the strict, player-equivalent rules are for other people's servers. */
+    public static boolean ownWorld(Minecraft mc) {
+        return serverKey(mc) == null;
+    }
+
+    private static boolean creative(Minecraft mc) {
+        return mc.gameMode != null && mc.gameMode.getPlayerMode() == GameType.CREATIVE;
+    }
+
+    /** Whether the item is there to place: in the inventory, or in creative, which hands it out. */
+    private static boolean has(Minecraft mc, LocalPlayer p, Item item) {
+        return creative(mc) || count(p, item) >= 1;
     }
 
     // ---- turning it on and off
@@ -384,6 +401,7 @@ public final class AutoBuilder {
                 }
                 continue;
             }
+            if (PENDING.containsKey(key)) continue;
             BlockPos pos = BlockPos.of(key);
             BlockState wanted = v.expectedAt(pos.getX(), pos.getY(), pos.getZ());
             boolean incremental = v.statusAt(pos.getX(), pos.getY(), pos.getZ()) == Verifier.WRONG;
@@ -392,7 +410,7 @@ public final class AutoBuilder {
             if (incremental && !stacksUp(mc, pos, wanted)) continue;
             looked++;
             if (looked == 1) currentItem = cost.item();
-            if (count(p, cost.item()) < 1) {
+            if (!has(mc, p, cost.item())) {
                 lackingItems++;
                 if (lacking.isEmpty()) lacking = cost.item().getName(new ItemStack(cost.item())).getString();
                 continue;
@@ -473,7 +491,8 @@ public final class AutoBuilder {
     /** Places the ghost block under the crosshair now, with no delay: one block a tick, 20 a second, the ceiling of the mod. */
     private static void assistPlace(Minecraft mc, LocalPlayer p, Assist a) {
         if (lastAssistTick == tickNo) return;
-        if (count(p, a.cost.item()) < 1) {
+        if (PENDING.containsKey(a.cell.asLong())) return;
+        if (!has(mc, p, a.cost.item())) {
             status = "You have no " + a.cost.item().getName(new ItemStack(a.cost.item())).getString();
             return;
         }
@@ -548,33 +567,14 @@ public final class AutoBuilder {
         return true;
     }
 
-    /** Where the Assist aim box is drawn now (eased toward the aimed cell) and how visible it is. */
-    private static @Nullable Vec3 aimAt;
-    private static float aimShown;
-    private static long lastFrameNs;
-
     /**
-     * Each frame: in Assist, a box round the ghost block a press would place (it glides from cell to cell) and the cursor chip;
-     * in both modes a small pop round every block it has just put down. Drawn on top of the world, so shader packs cannot hide it.
+     * Each frame: in Assist, the cursor chip for the ghost block a press would place; in both modes a small pop round every
+     * block it has just put down. Drawn on top of the world, so shader packs cannot hide it.
      */
     public static void frame(Minecraft mc, boolean idle) {
         long now = System.nanoTime();
-        double dt = lastFrameNs == 0 ? 0 : Math.min(0.1, (now - lastFrameNs) / 1e9);
-        lastFrameNs = now;
         boolean still = io.github.profetgit.cyanotype.ui.Motion.reduced();
         boolean show = idle && mode == Mode.ASSIST && assist != null && mc.gui.screen() == null && !GhostRenderer.hidden;
-        if (show) {
-            Vec3 target = Vec3.atLowerCornerOf(assist.cell);
-            aimAt = aimAt == null || still || aimShown < 0.05f ? target : aimAt.lerp(target, 1 - Math.exp(-dt / 0.045));
-        }
-        aimShown = still ? (show ? 1f : 0f) : (float) (aimShown + ((show ? 1 : 0) - aimShown) * (1 - Math.exp(-dt / 0.06)));
-        if (aimAt != null && aimShown > 0.02f) {
-            double pulse = still ? 1 : 0.75 + 0.25 * Math.sin(now / 1e9 * 5.0);
-            double grow = 0.02 + (1 - aimShown) * 0.12;
-            net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(aimAt.x, aimAt.y, aimAt.z, aimAt.x + 1, aimAt.y + 1, aimAt.z + 1).inflate(grow);
-            int line = alpha(0xFFFFFFFF, aimShown * pulse), fill = alpha(0xFF7FE3FF, aimShown * 0.16);
-            net.minecraft.gizmos.Gizmos.cuboid(box, net.minecraft.gizmos.GizmoStyle.strokeAndFill(line, 2.5f, fill)).setAlwaysOnTop();
-        }
         if (show) Chips.show(new Chips.Chip("Hold use", "Place " + nameOf(assist.wanted)));
         // pops: a thin frame that grows out of the new block and fades, a third of a second
         while (!POPS.isEmpty() && now - POPS.peekFirst()[1] > 350_000_000L) POPS.removeFirst();
@@ -636,13 +636,14 @@ public final class AutoBuilder {
         BlockHitResult hit = new BlockHitResult(plan.hit(), plan.face(), plan.support(), false);
         ItemStack held = p.getItemInHand(InteractionHand.MAIN_HAND);
         int before = held.getCount();
-        InteractionResult r = mc.gameMode.useItemOn(p, InteractionHand.MAIN_HAND, hit);
+        InteractionResult r = useFacing(mc, p, hit, plan);
         if (r instanceof InteractionResult.Success success) {
             if (success.swingSource() == InteractionResult.SwingSource.PREDICTED) {
                 p.swing(InteractionHand.MAIN_HAND, held.getInteractAnimation(), false);
                 if (!held.isEmpty() && (held.getCount() != before || p.hasInfiniteMaterials())) p.itemUsed(InteractionHand.MAIN_HAND);
             }
             placed++;
+            if (AUTOLOG) System.out.println("[autolog] tick " + tickNo + " cell " + BlockPos.of(cell).toShortString() + " support " + plan.support().toShortString() + " " + plan.face() + " hit " + plan.hit() + " plan " + plan.yaw() + "/" + plan.pitch() + " pending " + PENDING.containsKey(cell) + " fails " + FAILS.get(cell));
             PENDING.put(cell, tickNo);
             POPS.addLast(new long[]{cell, System.nanoTime()});
             while (POPS.size() > 24) POPS.removeFirst();
@@ -655,6 +656,28 @@ public final class AutoBuilder {
         if (f >= FAILS_BEFORE_SKIP) SKIP_UNTIL.put(cell, tickNo + SKIP_TICKS);
         else SKIP_UNTIL.put(cell, tickNo + 6);
         return false;
+    }
+
+    /**
+     * The game's use-item-on. In a world of the player's own the plan's facing is told to the server in a packet of its own
+     * and shown to the client's prediction for this one call, so the view never moves; the real facing goes back right after.
+     */
+    private static InteractionResult useFacing(Minecraft mc, LocalPlayer p, BlockHitResult hit, PlacePlanner.Plan plan) {
+        boolean face = ownWorld(mc) && (Math.abs(wrap(plan.yaw() - p.getYRot())) > 0.01f || Math.abs(plan.pitch() - p.getXRot()) > 0.01f);
+        if (!face) return mc.gameMode.useItemOn(p, InteractionHand.MAIN_HAND, hit);
+        float yaw = p.getYRot(), pitch = p.getXRot(), yawO = p.yRotO, pitchO = p.xRotO;
+        mc.getConnection().send(new ServerboundMovePlayerPacket.Rot(plan.yaw(), plan.pitch(), p.onGround(), p.horizontalCollision));
+        p.setYRot(plan.yaw());
+        p.setXRot(plan.pitch());
+        try {
+            return mc.gameMode.useItemOn(p, InteractionHand.MAIN_HAND, hit);
+        } finally {
+            p.setYRot(yaw);
+            p.setXRot(pitch);
+            p.yRotO = yawO;
+            p.xRotO = pitchO;
+            mc.getConnection().send(new ServerboundMovePlayerPacket.Rot(yaw, pitch, p.onGround(), p.horizontalCollision));
+        }
     }
 
     private static float wrap(float degrees) {
@@ -701,7 +724,7 @@ public final class AutoBuilder {
                 break;
             }
         }
-        if (from < 0) return false;
+        if (from < 0 && !creative(mc)) return false;
         int into = -1;
         for (int i = 0; i < 9; i++) {
             if (inv.getItem(i).isEmpty()) {
@@ -713,6 +736,13 @@ public final class AutoBuilder {
         if (into < 0) into = workSlot >= 0 && workSlot < 9 ? workSlot : sel;
         workSlot = into;
         inv.setSelectedSlot(into);
+        if (from < 0) {
+            // creative hands the item out the way pick-block does: the slot is set here and told to the server, which sees it before the click
+            ItemStack stack = new ItemStack(item, item.getDefaultMaxStackSize());
+            inv.setItem(into, stack);
+            mc.gameMode.handleCreativeModeItemAdd(stack.copy(), 36 + into);
+            return true;
+        }
         mc.gameMode.handleContainerInput(p.inventoryMenu.containerId, from, into, ContainerInput.SWAP, p);
         handReadyTick = tickNo + SWAP_SETTLE_TICKS;
         return true;

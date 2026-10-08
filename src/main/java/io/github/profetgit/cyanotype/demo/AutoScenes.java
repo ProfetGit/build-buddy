@@ -95,6 +95,10 @@ final class AutoScenes {
     }
 
     static void setup() {
+        setup(Samples.autoTest(), "survival", true);
+    }
+
+    static void setup(io.github.profetgit.cyanotype.blueprint.Blueprint blueprint, String gamemode, boolean give) {
         Director.clean();
         act(() -> {
             Director.hideHud(mc(), false);
@@ -103,13 +107,14 @@ final class AutoScenes {
             Settings.get().autoTurn = false;
             ServerRules.get().unblock("mc.example.com");
         });
-        cmd("gamerule random_tick_speed 0", "gamerule do_mob_loot false", "gamemode survival Builder");
+        cmd("gamerule random_tick_speed 0", "gamerule do_mob_loot false", "gamemode " + gamemode + " Builder");
         waitTicks(10);
         healthy();
         wipe();
-        items();
+        if (give) items();
+        else cmd("clear Builder");
         act(() -> {
-            build = new Placement("auto test", Samples.autoTest(), "cyanotype:auto-test.litematic", Director.DIM, new BlockPos(OX, G + 1, OZ), Orientation.NONE);
+            build = new Placement("auto test", blueprint, "cyanotype:auto-test.litematic", Director.DIM, new BlockPos(OX, G + 1, OZ), Orientation.NONE);
             build.locked = true;
             Placements.add(build);
             UiScenes.house = build;
@@ -216,6 +221,10 @@ final class AutoScenes {
             Settings.get().autoTurn = false;
             Settings.get().autoRate = 20;
         });
+        act(() -> {
+            AutoBuilder.testServer = "strict.example.com";
+            ServerRules.get().allow("strict.example.com");
+        });
         at(32.5, 28.4, 0);
         sweepOn();
         waitTicks(200);
@@ -226,6 +235,10 @@ final class AutoScenes {
         });
         shot("auto_2b_needs_facing");
         off();
+        act(() -> {
+            ServerRules.get().forget("strict.example.com");
+            AutoBuilder.testServer = "";
+        });
 
         // ---- turning: with Turn to face the view turns to the way each block needs, walking only round, always starting from south
         wipe();
@@ -531,6 +544,101 @@ final class AutoScenes {
             Director.hideHud(mc(), true);
         });
         cmd("gamemode spectator Builder");
+    }
+
+    /** Own-world rules: creative with an empty inventory, air placement, any facing, and the same cell refused on a server. */
+    static void own() {
+        setup(Samples.autoOwn(), "creative", false);
+        act(() -> {
+            Settings.get().autoRate = 20;
+            Settings.get().autoTurn = false;
+            boolean empty = true;
+            for (int i = 0; i < 36; i++) empty &= mc().player.getInventory().getItem(i).isEmpty();
+            check("auto-own/creative starts with an empty inventory", empty, "slot 0 " + mc().player.getInventory().getItem(0));
+        });
+        var before = new net.minecraft.world.level.block.state.BlockState[1][];
+        act(() -> before[0] = snapshot());
+        at(33.5, 28.5, 0);
+        sweepOn();
+        float[] yaw = new float[1];
+        for (double[] stop : new double[][]{{33.5, 28.5, 0}, {33.5, 36.5, 180}, {28.5, 32.5, -90}, {38.5, 32.5, 90}}) {
+            if (stop[1] != 28.5) at(stop[0], stop[1], (float) stop[2]);
+            waitTicks(100);
+            act(() -> yaw[0] = mc().player.getYRot());
+            waitTicks(2);
+            act(() -> check("auto-own/the view does not move while stairs of any facing go in", yaw[0] == mc().player.getYRot(), yaw[0] + " then " + mc().player.getYRot()));
+        }
+        act(() -> AutoBuilder.stop(mc(), "scene"));
+        waitTicks(2);
+        done("auto-own/creative, no items: stairs of all four facings and the floating row are all right");
+        act(() -> strayCheck("auto-own/the sweep put nothing outside the build", before[0]));
+        act(() -> check("auto-own/it did not stop for lack of items", AutoBuilder.placedCount() == build.blueprint.totalBlocks(), AutoBuilder.detail() + " of " + build.blueprint.totalBlocks()));
+
+        // ---- assist on a floating cell
+        wipe();
+        act(() -> {
+            before[0] = snapshot();
+            AutoBuilder.request(mc(), AutoBuilder.Mode.ASSIST);
+        });
+        at(33.5, 38.0, 180);
+        act(() -> aim(mc(), 33.5, G + 3.5, 34.5));
+        waitTicks(6);
+        act(() -> check("auto-own/assist claims a press on a floating ghost cell", AutoBuilder.claimsUse(mc()), AutoBuilder.detail()));
+        act(() -> PlaceScenes.tap(mc().options.keyUse));
+        waitTicks(6);
+        act(() -> check("auto-own/a press places the floating cell, nothing around it", mc().level.getBlockState(new BlockPos(33, G + 3, 34)).is(Blocks.OAK_PLANKS), mc().level.getBlockState(new BlockPos(33, G + 3, 34)) + "; " + AutoBuilder.detail()));
+        act(() -> strayCheck("auto-own/assist put nothing outside the build", before[0]));
+        off();
+
+        // ---- the same cell on a server: the strict rules, nothing to attach to
+        wipe();
+        act(() -> {
+            AutoBuilder.testServer = "strict.example.com";
+            ServerRules.get().allow("strict.example.com");
+            AutoBuilder.request(mc(), AutoBuilder.Mode.ASSIST);
+        });
+        at(33.5, 38.0, 180);
+        act(() -> aim(mc(), 33.5, G + 3.5, 34.5));
+        waitTicks(6);
+        act(() -> PlaceScenes.hold(mc().options.keyUse));
+        waitTicks(12);
+        act(() -> {
+            check("auto-own/on a server the floating cell is not placed", mc().level.getBlockState(new BlockPos(33, G + 3, 34)).isAir(), mc().level.getBlockState(new BlockPos(33, G + 3, 34)).toString());
+            check("auto-own/and the badge says it has nothing to attach to", AutoBuilder.status().contains("attach"), "'" + AutoBuilder.status() + "'");
+            PlaceScenes.release(mc().options.keyUse);
+        });
+        waitTicks(2);
+        off();
+        act(() -> {
+            ServerRules.get().forget("strict.example.com");
+            AutoBuilder.testServer = null;
+            for (Placement p : java.util.List.copyOf(Placements.all())) Placements.remove(p);
+            Director.hideHud(mc(), true);
+        });
+        cmd("gamemode spectator Builder");
+    }
+
+    /** The blocks of the build's box grown by 2 each way, in x, y, z order. */
+    private static net.minecraft.world.level.block.state.BlockState[] snapshot() {
+        var b = build.blueprint;
+        var out = new java.util.ArrayList<net.minecraft.world.level.block.state.BlockState>();
+        for (int y = -2; y < b.sizeY + 2; y++) for (int z = -2; z < b.sizeZ + 2; z++) for (int x = -2; x < b.sizeX + 2; x++) out.add(mc().level.getBlockState(new BlockPos(OX + x, G + 1 + y, OZ + z)));
+        return out.toArray(new net.minecraft.world.level.block.state.BlockState[0]);
+    }
+
+    /** Every block in that box that is not a cell of the build is what it was before: a stray block next to the build is what the verifier cannot see. */
+    private static void strayCheck(String what, net.minecraft.world.level.block.state.BlockState[] before) {
+        var b = build.blueprint;
+        var v = GhostRenderer.verifierOf(build);
+        StringBuilder strays = new StringBuilder();
+        int i = 0;
+        for (int y = -2; y < b.sizeY + 2; y++) for (int z = -2; z < b.sizeZ + 2; z++) for (int x = -2; x < b.sizeX + 2; x++, i++) {
+            int wx = OX + x, wy = G + 1 + y, wz = OZ + z;
+            if (!v.expectedAt(wx, wy, wz).isAir()) continue;
+            var now = mc().level.getBlockState(new BlockPos(wx, wy, wz));
+            if (now != before[i]) strays.append(" [").append(wx).append(',').append(wy).append(',').append(wz).append(' ').append(now).append(']');
+        }
+        check(what, strays.length() == 0, strays.length() == 0 ? "box " + before.length + " cells" : strays.toString());
     }
 
     private static void click(int[] at) {

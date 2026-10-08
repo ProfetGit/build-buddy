@@ -153,6 +153,22 @@ public final class Samples {
         return g.build("Auto test");
     }
 
+    /** Auto-placing in a world of the player's own: a base, stairs facing all four ways, and a row sticking out two cells over air. */
+    public static Blueprint autoOwn() {
+        Grid g = new Grid(7, 3, 5);
+        BlockState planks = Blocks.OAK_PLANKS.defaultBlockState();
+        g.fill(1, 0, 1, 5, 0, 3, Blocks.STONE_BRICKS.defaultBlockState());
+        g.set(3, 1, 2, planks);
+        g.set(3, 2, 2, planks);
+        g.set(3, 1, 1, Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.SOUTH).setValue(StairBlock.HALF, Half.BOTTOM));
+        g.set(2, 1, 3, Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.NORTH).setValue(StairBlock.HALF, Half.BOTTOM));
+        g.set(1, 1, 2, Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.EAST).setValue(StairBlock.HALF, Half.BOTTOM));
+        g.set(5, 1, 2, Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.WEST).setValue(StairBlock.HALF, Half.BOTTOM));
+        g.set(3, 2, 3, planks);
+        g.set(3, 2, 4, planks);
+        return g.build("Auto own");
+    }
+
     /** Rows of blocks that read their neighbours, written with their plain default states (the reader gives them their shape). */
     static Blueprint shapes() {
         Grid g = new Grid(9, 3, 7);

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.72
+
+- In a world you host (singleplayer or your LAN world), auto-placing now places a ghost block whenever it is in reach: blocks with nothing to lean on go straight into the air, stairs, doors and other blocks with a facing come out right without your view turning, and there is no line-of-sight rule. In creative it takes the blocks it needs from the creative inventory, so you do not have to carry them. On other servers the rules are unchanged: only what a player could place from where they stand and the way they look.
+- Assist no longer draws a box around the aimed block.
+- A block auto-placing has just put down is never placed again while the game is still confirming it.
+
 ## 0.0.71
 
 - Auto-placing no longer puts a wrong block down right after taking an item out of your bag: it waits until the game has the new item in your hand. When the hotbar is full it always uses the same slot, so the rest of your hotbar stays as it was.
