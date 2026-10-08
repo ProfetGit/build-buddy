@@ -15,6 +15,8 @@ import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.SignBlock;
+import net.minecraft.world.level.block.SlabBlock;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.AnvilBlock;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.BellBlock;
@@ -37,9 +39,12 @@ import net.minecraft.world.level.block.RepeaterBlock;
 import net.minecraft.world.level.block.RespawnAnchorBlock;
 import net.minecraft.world.level.block.TrapDoorBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.SlabType;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import org.jspecify.annotations.Nullable;
 
@@ -110,7 +115,8 @@ public final class PlacePlanner {
         List<Candidates.Click> usable = new ArrayList<>(), onAir = new ArrayList<>();
         // nothing to lean on: click the empty cell itself, on the faces that look at the player, and the block replaces the air
         if (own && here.isAir()) for (Candidates.Click c : Candidates.onSelf(target)) if (towardEye(eye, c)) clicks.add(c);
-        for (Candidates.Click c : clicks) {
+        for (Candidates.Click click : clicks) {
+            Candidates.Click c = click;
             BlockState s = level.getBlockState(c.support());
             boolean self = c.support().equals(target);
             if (!self && (s.isAir() || s.getBlock() instanceof LiquidBlock || s.canBeReplaced() || interactive(level, c.support(), s))) continue;
@@ -120,7 +126,15 @@ public final class PlacePlanner {
             Vec3 hit = c.point();
             if (hit.distanceTo(eye) > reach) continue;
             reachable = true;
-            if (!own && !sees(level, player, eye, c.support(), hit)) continue;
+            if (!own) {
+                if (!Block.isShapeFullBlock(s.getShape(level, c.support()))) {
+                    // a slab, a stair, a trapdoor: the click is where the line from the eyes meets its real outline, which is lower than the cell's edge
+                    c = onShape(level, player, eye, c, s);
+                    if (c == null || c.point().distanceTo(eye) > reach) continue;
+                } else if (!sees(level, player, eye, c.support(), hit)) {
+                    continue;
+                }
+            }
             free = true;
             (self && here.isAir() ? onAir : usable).add(c);
         }
@@ -185,7 +199,43 @@ public final class PlacePlanner {
         if (ctx == null || !ctx.getClickedPos().equals(target) || !ctx.canPlace()) return 0;
         BlockState state = placementState(item, ctx);
         if (state == null) return -1;
-        return Matcher.LENIENT.matches(wanted, state) ? 1 : 0;
+        return matches(wanted, state) ? 1 : 0;
+    }
+
+    /** Whether the state a click gives is the wanted one, or for a double slab its first half (the second goes into it as the next step). */
+    private static boolean matches(BlockState wanted, BlockState state) {
+        if (Matcher.LENIENT.matches(wanted, state)) return true;
+        return wanted.getBlock() == state.getBlock() && wanted.hasProperty(SlabBlock.TYPE) && wanted.getValue(SlabBlock.TYPE) == SlabType.DOUBLE
+            && state.getValue(SlabBlock.TYPE) != SlabType.DOUBLE;
+    }
+
+    /**
+     * The click a player would really make for this candidate on a block that is not a full cube: the spot is pulled onto the
+     * block's outline (the top of a bottom slab is half a block down) and the line from the eyes decides where and on which
+     * face it lands. Null when that line meets something else first.
+     */
+    private static Candidates.@Nullable Click onShape(Level level, Player player, Vec3 eye, Candidates.Click c, BlockState s) {
+        VoxelShape shape = s.getShape(level, c.support());
+        if (shape.isEmpty()) return null;
+        AABB b = shape.bounds();
+        Vec3 p = c.point();
+        double bx = c.support().getX(), by = c.support().getY(), bz = c.support().getZ();
+        double x = Math.max(bx + b.minX, Math.min(bx + b.maxX, p.x)), y = Math.max(by + b.minY, Math.min(by + b.maxY, p.y)), z = Math.max(bz + b.minZ, Math.min(bz + b.maxZ, p.z));
+        switch (c.face()) {
+            case UP -> y = by + b.maxY;
+            case DOWN -> y = by + b.minY;
+            case NORTH -> z = bz + b.minZ;
+            case SOUTH -> z = bz + b.maxZ;
+            case WEST -> x = bx + b.minX;
+            case EAST -> x = bx + b.maxX;
+        }
+        Vec3 aim = new Vec3(x, y, z);
+        Vec3 dir = aim.subtract(eye);
+        double len = dir.length();
+        if (len < 1e-6) return null;
+        BlockHitResult r = level.clip(new ClipContext(eye, aim.add(dir.scale(0.04 / len)), ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player));
+        if (r.getType() != HitResult.Type.BLOCK || !r.getBlockPos().equals(c.support())) return null;
+        return new Candidates.Click(c.support(), r.getDirection(), 0, 0, r.getLocation());
     }
 
     /** What the item would place for this context, with the game's own checks (it can stand there, nothing is in the way): null when it would not. */

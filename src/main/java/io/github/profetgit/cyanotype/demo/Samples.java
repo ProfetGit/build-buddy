@@ -29,6 +29,7 @@ public final class Samples {
         final short[] blocks;
         final List<PaletteEntry> palette = new ArrayList<>(List.of(PaletteEntry.AIR));
         final Map<BlockState, Integer> index = new HashMap<>();
+        final List<net.minecraft.nbt.CompoundTag> tes = new ArrayList<>();
 
         Grid(int sx, int sy, int sz) {
             this.sx = sx;
@@ -50,8 +51,25 @@ public final class Samples {
             for (int y = y0; y <= y1; y++) for (int z = z0; z <= z1; z++) for (int x = x0; x <= x1; x++) set(x, y, z, s);
         }
 
+        /** A sign's block entity: the four lines of its front text. */
+        void signText(int x, int y, int z, String... lines) {
+            net.minecraft.nbt.CompoundTag te = new net.minecraft.nbt.CompoundTag();
+            te.putString("id", "minecraft:sign");
+            te.putInt("x", x);
+            te.putInt("y", y);
+            te.putInt("z", z);
+            net.minecraft.nbt.CompoundTag front = new net.minecraft.nbt.CompoundTag();
+            net.minecraft.nbt.ListTag messages = new net.minecraft.nbt.ListTag();
+            for (int i = 0; i < 4; i++) messages.add(net.minecraft.nbt.StringTag.valueOf(i < lines.length ? lines[i] : ""));
+            front.put("messages", messages);
+            front.putString("color", "black");
+            front.putBoolean("has_glowing_text", false);
+            te.put("front_text", front);
+            tes.add(te);
+        }
+
         Blueprint build(String name) {
-            Region r = new Region("main", 0, 0, 0, sx, sy, sz, palette.toArray(new PaletteEntry[0]), blocks, new ArrayList<>());
+            Region r = new Region("main", 0, 0, 0, sx, sy, sz, palette.toArray(new PaletteEntry[0]), blocks, tes);
             return new Blueprint(new Blueprint.Metadata(name, "Cyanotype demo", "dev sample", System.currentTimeMillis(), System.currentTimeMillis(), 0), List.of(r));
         }
     }
@@ -302,5 +320,70 @@ public final class Samples {
         Random r = new Random(23);
         for (int y = 0; y < side; y++) for (int z = 0; z < side; z++) for (int x = 0; x < side; x++) if (r.nextDouble() < density) g.set(x, y, z, mix[r.nextInt(mix.length)]);
         return g.build("Cyanotype noise " + side);
+    }
+
+    private static BlockState slab(SlabType t) {
+        return Blocks.OAK_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, t);
+    }
+
+    /**
+     * 9 wide (x), 4 tall (y), 4 deep (z): a stone floor, a plank wall behind (z 1), and in front of it (z 0) bottom, top and double
+     * oak slabs on the floor, on each other, beside a block and under the roof of planks. With {@code floating}, three more in the air
+     * at the back (z 3): a top, a double and a bottom slab with nothing near them. A bottom slab on the floor at the back holds up a plank block.
+     */
+    public static Blueprint slabs(boolean floating) {
+        Grid g = new Grid(9, 4, 4);
+        BlockState planks = Blocks.OAK_PLANKS.defaultBlockState();
+        g.fill(0, 0, 0, 8, 0, 3, Blocks.STONE_BRICKS.defaultBlockState());
+        g.fill(0, 1, 1, 8, 2, 1, planks);
+        g.fill(0, 3, 0, 8, 3, 1, planks);
+        g.set(1, 1, 0, slab(SlabType.BOTTOM));
+        g.set(3, 1, 0, slab(SlabType.TOP));
+        g.set(5, 1, 0, slab(SlabType.DOUBLE));
+        g.set(7, 1, 0, planks);
+        g.set(1, 2, 0, slab(SlabType.TOP));
+        g.set(3, 2, 0, slab(SlabType.DOUBLE));
+        g.set(5, 2, 0, slab(SlabType.BOTTOM));
+        g.set(7, 2, 0, slab(SlabType.TOP));
+        // behind the wall, on the floor: a block that only a half slab holds up
+        g.set(7, 1, 3, slab(SlabType.BOTTOM));
+        g.set(7, 2, 3, planks);
+        if (floating) {
+            g.set(1, 2, 3, slab(SlabType.TOP));
+            g.set(3, 2, 3, slab(SlabType.DOUBLE));
+            g.set(5, 2, 3, slab(SlabType.BOTTOM));
+        }
+        return g.build(floating ? "Slabs floating" : "Slabs");
+    }
+
+    /** A plank cottage with one standing sign and one wall sign, each with text, and a hanging sign under the roof. */
+    public static Blueprint signs() {
+        Grid g = new Grid(7, 4, 4);
+        BlockState planks = Blocks.OAK_PLANKS.defaultBlockState();
+        g.fill(0, 0, 0, 6, 0, 3, Blocks.STONE_BRICKS.defaultBlockState());
+        g.fill(0, 1, 3, 6, 2, 3, planks);
+        g.fill(0, 3, 0, 6, 3, 3, planks);
+        g.set(1, 1, 1, Blocks.OAK_SIGN.defaultBlockState().setValue(net.minecraft.world.level.block.StandingSignBlock.ROTATION, 0));
+        g.signText(1, 1, 1, "Standing", "sign");
+        g.set(3, 1, 2, Blocks.OAK_WALL_SIGN.defaultBlockState().setValue(net.minecraft.world.level.block.WallSignBlock.FACING, Direction.NORTH));
+        g.signText(3, 1, 2, "Wall sign", "of the", "blueprint");
+        g.set(5, 2, 2, Blocks.OAK_HANGING_SIGN.defaultBlockState().setValue(net.minecraft.world.level.block.CeilingHangingSignBlock.ROTATION, 0));
+        g.signText(5, 2, 2, "Hanging", "text");
+        return g.build("Signs");
+    }
+
+    /** A 7x7 stone floor under walls three high on its rim and a plank roof: five layers. */
+    public static Blueprint layers() {
+        Grid g = new Grid(7, 5, 7);
+        BlockState planks = Blocks.OAK_PLANKS.defaultBlockState();
+        g.fill(0, 0, 0, 6, 0, 6, Blocks.STONE_BRICKS.defaultBlockState());
+        for (int y = 1; y <= 3; y++) {
+            g.fill(0, y, 0, 6, y, 0, planks);
+            g.fill(0, y, 6, 6, y, 6, planks);
+            g.fill(0, y, 1, 0, y, 5, planks);
+            g.fill(6, y, 1, 6, y, 5, planks);
+        }
+        g.fill(0, 4, 0, 6, 4, 6, planks);
+        return g.build("Layers");
     }
 }

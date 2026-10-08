@@ -53,7 +53,7 @@ final class AutoScenes {
 
     static void giveItems() {
         cmd("give Builder minecraft:stone_bricks 64", "give Builder minecraft:oak_planks 64", "give Builder minecraft:oak_log 64", "give Builder minecraft:glass_pane 64",
-            "give Builder minecraft:oak_door 8", "give Builder minecraft:oak_slab 64", "give Builder minecraft:oak_stairs 64", "give Builder minecraft:lantern 8", "give Builder minecraft:torch 16");
+            "give Builder minecraft:oak_door 8", "give Builder minecraft:oak_slab 64", "give Builder minecraft:oak_stairs 64", "give Builder minecraft:lantern 8", "give Builder minecraft:torch 16", "give Builder minecraft:oak_sign 8", "give Builder minecraft:oak_hanging_sign 8");
         waitTicks(6);
     }
 
@@ -619,7 +619,7 @@ final class AutoScenes {
     }
 
     /** The blocks of the build's box grown by 2 each way, in x, y, z order. */
-    private static net.minecraft.world.level.block.state.BlockState[] snapshot() {
+    static net.minecraft.world.level.block.state.BlockState[] snapshot() {
         var b = build.blueprint;
         var out = new java.util.ArrayList<net.minecraft.world.level.block.state.BlockState>();
         for (int y = -2; y < b.sizeY + 2; y++) for (int z = -2; z < b.sizeZ + 2; z++) for (int x = -2; x < b.sizeX + 2; x++) out.add(mc().level.getBlockState(new BlockPos(OX + x, G + 1 + y, OZ + z)));
@@ -627,7 +627,7 @@ final class AutoScenes {
     }
 
     /** Every block in that box that is not a cell of the build is what it was before: a stray block next to the build is what the verifier cannot see. */
-    private static void strayCheck(String what, net.minecraft.world.level.block.state.BlockState[] before) {
+    static void strayCheck(String what, net.minecraft.world.level.block.state.BlockState[] before) {
         var b = build.blueprint;
         var v = GhostRenderer.verifierOf(build);
         StringBuilder strays = new StringBuilder();

@@ -8,6 +8,7 @@
     "HudMixin",
     "LevelMixin",
     "LevelRendererMixin",
+    "LocalPlayerMixin",
     "MinecraftMixin",
     "MouseHandlerMixin",
     "OptionsMixin"

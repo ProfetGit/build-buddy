@@ -1,6 +1,7 @@
 package io.github.profetgit.cyanotype.auto;
 
 import io.github.profetgit.cyanotype.ghost.GhostRenderer;
+import io.github.profetgit.cyanotype.paste.PasteJob;
 import io.github.profetgit.cyanotype.interaction.Interaction;
 import io.github.profetgit.cyanotype.placement.Placement;
 import io.github.profetgit.cyanotype.placement.Placements;
@@ -22,7 +23,12 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.network.protocol.game.ServerboundSignUpdatePacket;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Inventory;
@@ -32,6 +38,10 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.SignBlock;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.SignText;
+import net.minecraft.world.level.block.entity.SignTextSlot;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -87,6 +97,12 @@ public final class AutoBuilder {
     private static final java.util.ArrayDeque<long[]> POPS = new java.util.ArrayDeque<>();
     /** The item the last block needed, for the badge's icon. */
     private static @Nullable Item currentItem;
+
+    /** Signs this mod has just placed, by cell, with the tick: the editor the server opens for such a sign is not shown. */
+    private static final Map<Long, Long> SIGNS = new HashMap<>();
+    private static final int SIGN_TICKS = 100;
+    private static int signEditors;
+    private static final java.util.IdentityHashMap<Verifier.Part, Map<Integer, CompoundTag>> SIGN_DATA = new java.util.IdentityHashMap<>();
 
     private AutoBuilder() {
     }
@@ -246,6 +262,8 @@ public final class AutoBuilder {
         originalSlot = -1;
         clearBookkeeping();
         SESSION_ALLOWED.clear();
+        SIGNS.clear();
+        SIGN_DATA.clear();
     }
 
     private static void clearBookkeeping() {
@@ -259,6 +277,7 @@ public final class AutoBuilder {
 
     public static void tick(Minecraft mc) {
         tickNo++;
+        if (!SIGNS.isEmpty() && tickNo % 40 == 0) SIGNS.values().removeIf(t -> tickNo - t > SIGN_TICKS);
         LocalPlayer p = mc.player;
         if (mode == Mode.OFF) return;
         if (p == null || mc.level == null || mc.gameMode == null) {
@@ -362,15 +381,14 @@ public final class AutoBuilder {
         int r = (int) Math.ceil(reach);
         BlockPos at = BlockPos.containing(eye);
         List<TargetOrder.Cand> cands = new ArrayList<>();
-        int lo = Math.max(0, pl.layerLo), hi = pl.layerHi < 0 ? Integer.MAX_VALUE : pl.layerHi;
         for (int dy = -r; dy <= r; dy++) {
             for (int dz = -r; dz <= r; dz++) {
                 for (int dx = -r; dx <= r; dx++) {
                     int x = at.getX() + dx, y = at.getY() + dy, z = at.getZ() + dz;
                     byte st = v.statusAt(x, y, z);
                     if (st != Verifier.MISSING && st != Verifier.WRONG) continue;
+                    if (!inWindow(pl, v, y)) continue;
                     int layer = y - v.originY;
-                    if (layer < lo || layer > hi) continue;
                     double d = new Vec3(x + 0.5, y + 0.5, z + 0.5).distanceToSqr(eye);
                     if (d > reach * reach) continue;
                     cands.add(new TargetOrder.Cand(BlockPos.asLong(x, y, z), layer, d));
@@ -449,7 +467,7 @@ public final class AutoBuilder {
         }
         // nothing placed this tick: say why
         if (cands.isEmpty()) {
-            status = "Nothing to build in reach";
+            status = pl.layered() ? "Nothing left on this layer in reach" : "Nothing to build in reach";
             noItemTicks = 0;
         } else if (tried == 0 && lackingItems > 0) {
             status = "Out of " + lacking;
@@ -476,7 +494,7 @@ public final class AutoBuilder {
     // ---- Assist
 
     private static void assist(Minecraft mc, LocalPlayer p, Placement pl, Verifier v) {
-        assist = findAssist(mc, p, v);
+        assist = findAssist(mc, p, pl, v);
         currentItem = assist == null ? null : assist.cost.item();
         if (!mc.options.keyUse.isDown()) {
             status = assist != null ? "Hold use to place " + nameOf(assist.wanted) : "Hold use on a ghost block";
@@ -510,8 +528,14 @@ public final class AutoBuilder {
         if (place(mc, p, res.plan(), a.cost.item(), a.cell.asLong(), false)) lastAssistTick = tickNo;
     }
 
-    /** The ghost block under the crosshair: the first cell along the look that the build wants a block in and has none, before any real block. */
-    private static @Nullable Assist findAssist(Minecraft mc, LocalPlayer p, Verifier v) {
+    /** Whether a world height is in the layers the Layers tool shows: the only ones auto-placing considers. */
+    private static boolean inWindow(Placement pl, Verifier v, int y) {
+        int layer = y - v.originY;
+        return layer >= Math.max(0, pl.layerLo) && (pl.layerHi < 0 || layer <= pl.layerHi);
+    }
+
+    /** The ghost block under the crosshair: the first cell along the look, in the shown layers, that the build wants a block in and has none, before any real block. */
+    private static @Nullable Assist findAssist(Minecraft mc, LocalPlayer p, Placement pl, Verifier v) {
         Vec3 eye = p.getEyePosition(), look = p.getLookAngle();
         double reach = PlacePlanner.reach(p) + 0.5;
         BlockHitResult real = mc.level.clip(new ClipContext(eye, eye.add(look.scale(reach)), ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, p));
@@ -521,6 +545,7 @@ public final class AutoBuilder {
             BlockPos c = BlockPos.containing(eye.add(look.scale(t)));
             if (c.equals(last)) continue;
             last = c;
+            if (!inWindow(pl, v, c.getY())) continue;
             byte st = v.statusAt(c.getX(), c.getY(), c.getZ());
             if (st != Verifier.MISSING && st != Verifier.WRONG) continue;
             BlockState wanted = v.expectedAt(c.getX(), c.getY(), c.getZ());
@@ -530,24 +555,26 @@ public final class AutoBuilder {
             if (cost == null) continue;
             return new Assist(c, wanted, cost, incremental);
         }
+        // the block the look ends on is a cell of the build that wants one more of the same (the second half of a double slab): its face is where the line stops, between two samples
+        if (real.getType() == HitResult.Type.BLOCK) {
+            BlockPos c = real.getBlockPos();
+            if (v.statusAt(c.getX(), c.getY(), c.getZ()) == Verifier.WRONG && inWindow(pl, v, c.getY())) {
+                BlockState wanted = v.expectedAt(c.getX(), c.getY(), c.getZ());
+                Materials.Cost cost = Materials.costOf(wanted);
+                if (cost != null && stacksUp(mc, c, wanted)) return new Assist(c, wanted, cost, true);
+            }
+        }
         return null;
     }
 
     /**
-     * Whether a use-key press belongs to auto-placing. With it on, a block never goes down anywhere but where the build wants
-     * it: a ghost block under the crosshair takes the press, and so does any press with a block in hand (nothing is placed
-     * on the ground at random). A block that does something when used (a chest, a door) is still the game's.
+     * Whether a use-key press belongs to auto-placing. With it on (any mode) every press is taken, on a block, an entity or
+     * the air, with either hand: a ghost block under the crosshair is placed, anything else does nothing. The game's own
+     * use path ({@code Minecraft.startUseItem}, the one door to {@code useItemOn}, {@code interact} and {@code useItem}) never
+     * runs, so no chest opens, no door swings, nobody is traded with and nothing is put down where the build does not want it.
      */
     public static boolean claimsUse(Minecraft mc) {
-        if (mode == Mode.OFF || mc.gui.screen() != null || GhostRenderer.hidden || mc.player == null || mc.level == null) return false;
-        Placement pl = Placements.active();
-        Verifier v = pl == null || !pl.locked || !pl.ready() ? null : GhostRenderer.verifierOf(pl);
-        if (v != null && findAssist(mc, mc.player, v) != null) return true;
-        if (!(mc.player.getMainHandItem().getItem() instanceof BlockItem) && !(mc.player.getOffhandItem().getItem() instanceof BlockItem)) return false;
-        Vec3 eye = mc.player.getEyePosition();
-        BlockHitResult real = mc.level.clip(new ClipContext(eye, eye.add(mc.player.getLookAngle().scale(PlacePlanner.reach(mc.player) + 0.5)), ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, mc.player));
-        if (real.getType() == HitResult.Type.BLOCK && !mc.player.isShiftKeyDown() && PlacePlanner.interactive(mc.level, real.getBlockPos(), mc.level.getBlockState(real.getBlockPos()))) return false;
-        return true;
+        return mode != Mode.OFF && mc.gui.screen() == null && !GhostRenderer.hidden && mc.player != null && mc.level != null;
     }
 
     /** A use press, as the game handles it: takes it (true) and places the block under the crosshair at once, or leaves it to the game (false). */
@@ -556,7 +583,7 @@ public final class AutoBuilder {
         LocalPlayer p = mc.player;
         Placement pl = Placements.active();
         Verifier v = pl == null || !pl.locked || !pl.ready() ? null : GhostRenderer.verifierOf(pl);
-        Assist a = v == null ? null : findAssist(mc, p, v);
+        Assist a = v == null ? null : findAssist(mc, p, pl, v);
         if (a != null) {
             assist = a;
             assistPlace(mc, p, a);
@@ -610,6 +637,51 @@ public final class AutoBuilder {
         return s.getBlock().getName().getString();
     }
 
+    // ---- signs
+
+    /**
+     * The server opens the sign editor for whoever placed a sign. For a sign this mod has just placed it is not shown: the
+     * lines the blueprint has for that cell (or none) are sent the way the editor sends them when it is closed. Signs the
+     * player places or edits by hand are never touched. @return true when the editor was taken
+     */
+    public static boolean takeSignEditor(Minecraft mc, SignBlockEntity sign, SignTextSlot slot) {
+        BlockPos pos = sign.getBlockPos();
+        Long at = SIGNS.remove(pos.asLong());
+        if (at == null || tickNo - at > SIGN_TICKS || mc.getConnection() == null || mc.level == null) return false;
+        mc.getConnection().send(new ServerboundSignUpdatePacket(pos, blueprintSignLines(mc, pos), slot));
+        signEditors++;
+        return true;
+    }
+
+    /** The four front lines the blueprint has for a sign at this position: blank when there is no text. */
+    private static List<String> blueprintSignLines(Minecraft mc, BlockPos pos) {
+        List<String> lines = new ArrayList<>(List.of("", "", "", ""));
+        try {
+            for (Placement pl : Placements.all()) {
+                Verifier v = pl.ready() ? GhostRenderer.verifierOf(pl) : null;
+                if (v == null) continue;
+                for (Verifier.Part part : v.parts) {
+                    var r = part.region;
+                    int lx = pos.getX() - part.wx, ly = pos.getY() - part.wy, lz = pos.getZ() - part.wz;
+                    if (lx < 0 || ly < 0 || lz < 0 || lx >= r.sx || ly >= r.sy || lz >= r.sz) continue;
+                    CompoundTag data = SIGN_DATA.computeIfAbsent(part, k -> PasteJob.Part.of(k.region, k.wx, k.wy, k.wz).blockEntities()).get((ly * r.sz + lz) * r.sx + lx);
+                    if (data == null) return lines;
+                    var parsed = SignText.CODEC.parse(RegistryOps.create(NbtOps.INSTANCE, mc.level.registryAccess()), data.getCompoundOrEmpty("front_text")).result();
+                    if (parsed.isEmpty()) return lines;
+                    List<Component> messages = parsed.get().getMessages(false);
+                    for (int i = 0; i < 4 && i < messages.size(); i++) {
+                        String text = messages.get(i).getString();
+                        lines.set(i, text.length() > 384 ? text.substring(0, 384) : text);
+                    }
+                    return lines;
+                }
+            }
+        } catch (RuntimeException e) {
+            return new ArrayList<>(List.of("", "", "", ""));
+        }
+        return lines;
+    }
+
     // ---- placing
 
     /** Does one placement: the right item in hand, a turn when the plan needs one, then the game's own use-item-on. @return whether a block was placed */
@@ -644,6 +716,7 @@ public final class AutoBuilder {
             placed++;
             if (AUTOLOG) System.out.println("[autolog] tick " + tickNo + " cell " + BlockPos.of(cell).toShortString() + " support " + plan.support().toShortString() + " " + plan.face() + " hit " + plan.hit() + " plan " + plan.yaw() + "/" + plan.pitch() + " pending " + PENDING.containsKey(cell) + " fails " + FAILS.get(cell));
             PENDING.put(cell, tickNo);
+            if (item instanceof BlockItem bi && bi.getBlock() instanceof SignBlock) SIGNS.put(cell, tickNo);
             POPS.addLast(new long[]{cell, System.nanoTime()});
             while (POPS.size() > 24) POPS.removeFirst();
             if (paid) RATE.spend();
@@ -756,6 +829,11 @@ public final class AutoBuilder {
     /** Dev demo: how many blocks are waiting to be seen as placed. */
     public static int pendingCount() {
         return PENDING.size();
+    }
+
+    /** Dev demo: how many sign editors were taken from the player so far. */
+    public static int signEditorsHandled() {
+        return signEditors;
     }
 
     public static int[] reasons() {

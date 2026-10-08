@@ -5,6 +5,7 @@ import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.phys.Vec3;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Where a player could click to put a block in a place: on any of the six neighbours' faces that look at it, at a few
@@ -15,10 +16,14 @@ public final class Candidates {
     /** The spots tried on a face, as fractions across it: the middle first, then a quarter off in each direction. */
     static final double[][] SPOTS = {{0.5, 0.5}, {0.5, 0.25}, {0.5, 0.75}, {0.25, 0.5}, {0.75, 0.5}};
 
-    /** A click: on {@code face} of the block at {@code support}, {@code u} and {@code v} across it. */
-    public record Click(BlockPos support, Direction face, double u, double v) {
+    /** A click: on {@code face} of the block at {@code support}, {@code u} and {@code v} across it, or at {@code exact} when the spot was worked out on the block's real outline. */
+    public record Click(BlockPos support, Direction face, double u, double v, @Nullable Vec3 exact) {
+        public Click(BlockPos support, Direction face, double u, double v) {
+            this(support, face, u, v, null);
+        }
+
         public Vec3 point() {
-            return Candidates.point(support, face, u, v);
+            return exact != null ? exact : Candidates.point(support, face, u, v);
         }
 
         /** The cell a block put by this click lands in (when the clicked block does not give way). */

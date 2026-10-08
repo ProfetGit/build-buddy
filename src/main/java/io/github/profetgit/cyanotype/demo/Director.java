@@ -241,6 +241,10 @@ public final class Director {
                 case "finish" -> StrictScenes.finish();
                 case "assist-strict" -> StrictScenes.assistStrict();
                 case "pick-key" -> StrictScenes.pickKey();
+                case "slabs" -> StrictScenes.slabs();
+                case "interact-lock" -> StrictScenes.interactLock();
+                case "sign" -> StrictScenes.sign();
+                case "layer" -> StrictScenes.layer();
                 case "nudge" -> NudgeScenes.nudge();
                 case "mega" -> NudgeScenes.mega();
                 case "carry" -> NudgeScenes.carry();
