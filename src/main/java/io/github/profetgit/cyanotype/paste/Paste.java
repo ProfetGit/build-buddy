@@ -92,6 +92,18 @@ public final class Paste {
         return job != null && job.state() != PasteJob.State.DONE && job.state() != PasteJob.State.UNDONE;
     }
 
+    /** When the last op paste (or its undo) was still sending commands: their answers keep arriving a moment after. */
+    private static long commandsSeenNs;
+
+    /** Whether a chat line is the server's answer to one of an op paste's own /fill or /setblock commands (shown to nobody but the log). */
+    public static boolean isOwnCommandFeedback(net.minecraft.network.chat.Component message) {
+        if (!(job instanceof CommandPasteJob)) return false;
+        if (!busy() && System.nanoTime() - commandsSeenNs > 10_000_000_000L) return false;
+        if (!(message.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents t)) return false;
+        String key = t.getKey();
+        return key.startsWith("commands.setblock.") || key.startsWith("commands.fill.");
+    }
+
     public static @Nullable PasteRun job() {
         return job;
     }
@@ -230,6 +242,7 @@ public final class Paste {
 
     /** Once per client tick: hands the server a slice of work, and says what happened when it is done. */
     public static void tick(Minecraft mc) {
+        if (job instanceof CommandPasteJob && busy()) commandsSeenNs = System.nanoTime();
         Placement q = queued;
         if (q != null && mc.level != null) {
             if (!Placements.all().contains(q)) {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.78
+
+- An op paste on a server no longer fills your chat with "Changed the block at ..." lines: the answers to the paste's own commands are hidden while it runs and for a moment after. Other chat is untouched.
+
 ## 0.0.77
 
 - Paste on a server, for operators: in creative, an op can paste a placed build on a multiplayer server (P or the Build panel). The build goes in as /fill and /setblock commands (runs of the same block are joined into boxes, signs keep their text), paced so the server keeps up, bottom up, supports first. Ctrl+Z puts back what was there, except items inside chests (the client cannot see them; the message says so). Players who are not op get "Pasting on a server needs operator permission."
