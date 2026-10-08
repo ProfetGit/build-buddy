@@ -35,6 +35,9 @@ public abstract class OptionsMixin {
         all.add(Keys.REMOVE);
         all.add(Keys.PICK);
         all.add(Keys.HELP);
+        all.add(Keys.AUTO);
+        all.add(Keys.LAYER_UP);
+        all.add(Keys.LAYER_DOWN);
         keyMappings = all.toArray(KeyMapping[]::new);
     }
 }

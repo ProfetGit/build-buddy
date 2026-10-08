@@ -8,5 +8,8 @@
   "key.cyanotype.paste": "Paste the build into the world (creative, your own world)",
   "key.cyanotype.remove": "Remove the selected placement",
   "key.cyanotype.pick": "Smart pick: save a build",
-  "key.cyanotype.help": "How it works (the lesson of the tool you are using, or the list of lessons)"
+  "key.cyanotype.help": "How it works (the lesson of the tool you are using, or the list of lessons)",
+  "key.cyanotype.auto": "Auto-placing on or off (comes back in the mode you used last)",
+  "key.cyanotype.layer_up": "Layers: move the window up one layer (past the top shows all)",
+  "key.cyanotype.layer_down": "Layers: move the window down one layer"
 }
