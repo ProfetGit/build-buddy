@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.81
+
+- Smart Pick is now on **U** by default (it was K, which Iris uses to toggle shaders, so one press did both). If you already changed the key in Controls, yours stays.
+
 ## 0.0.80
 
 - Chat commands for scripted recordings: `/cyanotype samples` (four sample builds into the Library), `/cyanotype library` (opens it), `/cyanotype paste` (pastes the active build).

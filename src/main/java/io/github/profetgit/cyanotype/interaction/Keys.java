@@ -20,7 +20,7 @@ public final class Keys {
     public static final KeyMapping MIRROR = new KeyMapping("key.cyanotype.mirror", InputConstants.KEY_M, CATEGORY);
     public static final KeyMapping PASTE = new KeyMapping("key.cyanotype.paste", InputConstants.KEY_P, CATEGORY);
     public static final KeyMapping REMOVE = new KeyMapping("key.cyanotype.remove", InputConstants.KEY_DELETE, CATEGORY);
-    public static final KeyMapping PICK = new KeyMapping("key.cyanotype.pick", InputConstants.KEY_K, CATEGORY);
+    public static final KeyMapping PICK = new KeyMapping("key.cyanotype.pick", InputConstants.KEY_U, CATEGORY);
     public static final KeyMapping HELP = new KeyMapping("key.cyanotype.help", InputConstants.KEY_J, CATEGORY);
     public static final KeyMapping AUTO = new KeyMapping("key.cyanotype.auto", InputConstants.KEY_N, CATEGORY);
     public static final KeyMapping LAYER_UP = new KeyMapping("key.cyanotype.layer_up", InputConstants.KEY_PAGEUP, CATEGORY);

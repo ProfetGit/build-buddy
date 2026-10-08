@@ -304,14 +304,14 @@ final class StrictScenes {
             Director.hideHud(mc(), false);
             GhostRenderer.hidden = false;
             Placements.setMode(Placements.Mode.IDLE);
-            check("pick-key/the key is K by default", Keys.PICK.getDefaultKey().getValue() == com.mojang.blaze3d.platform.InputConstants.KEY_K && Ui.keyName(Keys.PICK).length() > 0, Ui.keyName(Keys.PICK));
+            check("pick-key/the key is U by default", Keys.PICK.getDefaultKey().getValue() == com.mojang.blaze3d.platform.InputConstants.KEY_U && Ui.keyName(Keys.PICK).length() > 0, Ui.keyName(Keys.PICK));
         });
         act(() -> PlaceScenes.tap(Keys.PICK));
         waitTicks(4);
-        act(() -> check("pick-key/K starts Smart Pick", Placements.mode() == Placements.Mode.PICK, String.valueOf(Placements.mode())));
+        act(() -> check("pick-key/U starts Smart Pick", Placements.mode() == Placements.Mode.PICK, String.valueOf(Placements.mode())));
         act(() -> PlaceScenes.tap(Keys.PICK));
         waitTicks(4);
-        act(() -> check("pick-key/K again cancels it", Placements.mode() == Placements.Mode.IDLE, String.valueOf(Placements.mode())));
+        act(() -> check("pick-key/U again cancels it", Placements.mode() == Placements.Mode.IDLE, String.valueOf(Placements.mode())));
         act(() -> GhostRenderer.hidden = true);
         act(() -> PlaceScenes.tap(Keys.PICK));
         waitTicks(4);
