@@ -1182,10 +1182,10 @@ public final class Interaction {
             boolean strong = p == active && (Placements.mode() != Mode.IDLE || p.locked);
             double y = GhostRenderer.visualY(p);
             AABB box = new AABB(p.vx, y, p.vz, p.vx + p.sizeX(), y + p.sizeY(), p.vz + p.sizeZ());
-            Handles.outline(box, p.accent, strong);
+            Handles.outline(box, p.accent, strong, camera);
             if (p.layered()) {
                 int lo = Math.max(0, p.layerLo), hi = p.layerHi < 0 ? p.sizeY() - 1 : Math.min(p.sizeY() - 1, p.layerHi);
-                Handles.layerBorder(box, y + lo, y + hi + 1, p.accent);
+                Handles.layerBorder(box, y + lo, y + hi + 1, p.accent, camera);
             }
             Vec3 c = box.getCenter();
             if (camera.distanceToSqr(c) < 96 * 96) {

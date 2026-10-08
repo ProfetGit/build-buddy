@@ -83,6 +83,6 @@ final class BoxFrame {
         // the floor is lightly filled: where the box stands
         fill(face(a, Direction.DOWN, 0), CYAN, 0.10);
         if (pointed != null) fill(face(a, pointed, 0.01), CYAN, dragging ? 0.30 : 0.20);
-        Handles.brackets(a, CYAN, true);
+        Handles.brackets(a, CYAN, true, camera);
     }
 }

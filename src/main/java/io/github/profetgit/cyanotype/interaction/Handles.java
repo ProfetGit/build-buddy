@@ -426,22 +426,62 @@ final class Handles {
 
     // ---- layer focus
 
+    /** Whether the face of {@code b} on this axis (0 x, 1 y, 2 z) and side (false low, true high) looks toward the camera. */
+    private static boolean faces(AABB b, Vec3 cam, int axis, boolean high) {
+        double v = axis == 0 ? cam.x : axis == 1 ? cam.y : cam.z;
+        double lo = axis == 0 ? b.minX : axis == 1 ? b.minY : b.minZ, hi = axis == 0 ? b.maxX : axis == 1 ? b.maxY : b.maxZ;
+        return high ? v > hi : v < lo;
+    }
+
+    private static boolean inside(AABB b, Vec3 cam) {
+        return cam.x >= b.minX && cam.x <= b.maxX && cam.y >= b.minY && cam.y <= b.maxY && cam.z >= b.minZ && cam.z <= b.maxZ;
+    }
+
+    private static double side(AABB b, int axis, boolean high) {
+        return axis == 0 ? (high ? b.maxX : b.minX) : axis == 1 ? (high ? b.maxY : b.minY) : (high ? b.maxZ : b.minZ);
+    }
+
+    private static Vec3 point(AABB b, boolean hx, boolean hy, boolean hz) {
+        return new Vec3(side(b, 0, hx), side(b, 1, hy), side(b, 2, hz));
+    }
+
+    /** Whether one of the (up to three) faces meeting at this corner looks toward the camera. */
+    private static boolean nearCorner(AABB b, Vec3 cam, boolean hx, boolean hy, boolean hz) {
+        return inside(b, cam) || faces(b, cam, 0, hx) || faces(b, cam, 1, hy) || faces(b, cam, 2, hz);
+    }
+
+    /**
+     * The 12 edges of a box, drawn on top (a depth-tested line loses against a shader pack's depth): the ones with a face toward the
+     * camera in full, the ones that only face away scaled by {@code farAlpha} and {@code farWidth} (alpha 0 leaves them out), and the
+     * vertical ones fainter by {@code postAlpha}.
+     */
+    private static void edges(AABB b, Vec3 cam, int color, float width, double farAlpha, double farWidth, double postAlpha) {
+        for (int axis = 0; axis < 3; axis++) {
+            int o1 = (axis + 1) % 3, o2 = (axis + 2) % 3;
+            for (int s = 0; s < 4; s++) {
+                boolean h1 = (s & 1) != 0, h2 = (s & 2) != 0;
+                boolean[] hi = new boolean[3];
+                hi[o1] = h1;
+                hi[o2] = h2;
+                Vec3 p = point(b, hi[0], hi[1], hi[2]);
+                hi[axis] = true;
+                Vec3 q = point(b, hi[0], hi[1], hi[2]);
+                boolean near = inside(b, cam) || faces(b, cam, o1, h1) || faces(b, cam, o2, h2);
+                double a = (axis == 1 ? postAlpha : 1.0) * (near ? 1.0 : farAlpha);
+                if (a <= 0) continue;
+                float w = (float) (width * (axis == 1 ? 0.56 : 1.0) * (near ? 1.0 : farWidth));
+                Gizmos.line(p, q, alpha(color, a * ((color >>> 24) / 255.0)), w).setAlwaysOnTop();
+            }
+        }
+    }
+
     /** The frame of the layers being shown: a rectangle at the bottom and at the top of the range, joined at the corners. */
-    static void layerBorder(AABB footprint, double yLo, double yHi, int color) {
+    static void layerBorder(AABB footprint, double yLo, double yHi, int color, Vec3 camera) {
         int c = alpha(mix(color, WHITE, 0.35f), 0.95);
         double x0 = footprint.minX, x1 = footprint.maxX, z0 = footprint.minZ, z1 = footprint.maxZ;
-        for (double y : new double[]{yLo, yHi}) {
-            Vec3 a = new Vec3(x0, y, z0), b = new Vec3(x1, y, z0), d = new Vec3(x1, y, z1), e = new Vec3(x0, y, z1);
-            Gizmos.line(a, b, c, 3.2f);
-            Gizmos.line(b, d, c, 3.2f);
-            Gizmos.line(d, e, c, 3.2f);
-            Gizmos.line(e, a, c, 3.2f);
-        }
+        edges(new AABB(x0, yLo, z0, x1, yHi, z1), camera, c, 3.2f, 0.4, 0.6, 0.55);
         GizmoStyle plane = GizmoStyle.fill(alpha(color, 0.10));
-        Gizmos.rect(new Vec3(x0, yLo, z0), new Vec3(x1, yLo, z0), new Vec3(x1, yLo, z1), new Vec3(x0, yLo, z1), plane);
-        for (double[] corner : new double[][]{{x0, z0}, {x1, z0}, {x1, z1}, {x0, z1}}) {
-            Gizmos.line(new Vec3(corner[0], yLo, corner[1]), new Vec3(corner[0], yHi, corner[1]), alpha(c, 0.55), 1.8f);
-        }
+        Gizmos.rect(new Vec3(x0, yLo, z0), new Vec3(x1, yLo, z0), new Vec3(x1, yLo, z1), new Vec3(x0, yLo, z1), plane).setAlwaysOnTop();
     }
 
     // ---- next block marker
@@ -468,24 +508,28 @@ final class Handles {
     // ---- placement outline
 
     /** The placement's box as corner brackets (the blueprint look) over a faint full outline for the one being edited. */
-    static void outline(AABB b, int color, boolean strong) {
-        brackets(b, color, strong);
-        if (strong) Gizmos.cuboid(b, GizmoStyle.stroke(alpha(color, 0.28), 1.5f));
+    static void outline(AABB b, int color, boolean strong, Vec3 camera) {
+        brackets(b, color, strong, camera);
+        if (strong) edges(b, camera, alpha(color, 0.28), 1.5f, 0, 1, 1);
     }
 
-    /** Only the corner brackets of {@link #outline}. */
-    static void brackets(AABB b, int color, boolean strong) {
+    /** Only the corner brackets of {@link #outline}; the ones on the far side of the box are fainter and thinner. */
+    static void brackets(AABB b, int color, boolean strong, Vec3 camera) {
         double[] size = {b.maxX - b.minX, b.maxY - b.minY, b.maxZ - b.minZ};
         double[] len = {Math.max(0.6, Math.min(2.5, size[0] * 0.28)), Math.max(0.6, Math.min(2.5, size[1] * 0.28)), Math.max(0.6, Math.min(2.5, size[2] * 0.28))};
-        int bracket = strong ? color : alpha(color, 0.55);
+        int near = strong ? color : alpha(color, 0.55);
+        int far = alpha(color, strong ? 0.5 : 0.3);
         float width = strong ? 4.0f : 2.6f;
         for (int ix = 0; ix < 2; ix++) {
             for (int iy = 0; iy < 2; iy++) {
                 for (int iz = 0; iz < 2; iz++) {
                     Vec3 c = new Vec3(ix == 0 ? b.minX : b.maxX, iy == 0 ? b.minY : b.maxY, iz == 0 ? b.minZ : b.maxZ);
-                    Gizmos.line(c, c.add(ix == 0 ? len[0] : -len[0], 0, 0), bracket, width);
-                    Gizmos.line(c, c.add(0, iy == 0 ? len[1] : -len[1], 0), bracket, width);
-                    Gizmos.line(c, c.add(0, 0, iz == 0 ? len[2] : -len[2]), bracket, width);
+                    boolean n = nearCorner(b, camera, ix == 1, iy == 1, iz == 1);
+                    int bracket = n ? near : far;
+                    float w = n ? width : width * 0.6f;
+                    Gizmos.line(c, c.add(ix == 0 ? len[0] : -len[0], 0, 0), bracket, w).setAlwaysOnTop();
+                    Gizmos.line(c, c.add(0, iy == 0 ? len[1] : -len[1], 0), bracket, w).setAlwaysOnTop();
+                    Gizmos.line(c, c.add(0, 0, iz == 0 ? len[2] : -len[2]), bracket, w).setAlwaysOnTop();
                 }
             }
         }
