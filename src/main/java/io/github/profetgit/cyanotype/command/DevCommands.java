@@ -75,6 +75,7 @@ public final class DevCommands {
                 case "clear" -> clear();
                 case "info" -> info();
                 case "ponder" -> ponder(mc, arg);
+                case "auto" -> auto(mc, arg);
                 default -> help();
             }
         } catch (RuntimeException e) {
@@ -119,6 +120,18 @@ public final class DevCommands {
 
     private static void say(String text) {
         Minecraft.getInstance().gui.hud.getChat().addClientSystemMessage(Component.literal("[Cyanotype] " + text));
+    }
+
+    /** /cyanotype auto assist | sweep | off: the same modes as the N key and the Build panel (scripted recordings use it). */
+    private static void auto(Minecraft mc, String arg) {
+        var mode = switch (arg.toLowerCase(Locale.ROOT)) {
+            case "assist" -> io.github.profetgit.cyanotype.auto.AutoBuilder.Mode.ASSIST;
+            case "sweep" -> io.github.profetgit.cyanotype.auto.AutoBuilder.Mode.SWEEP;
+            case "off" -> io.github.profetgit.cyanotype.auto.AutoBuilder.Mode.OFF;
+            default -> null;
+        };
+        if (mode == null) say("auto assist | sweep | off");
+        else io.github.profetgit.cyanotype.auto.AutoBuilder.request(mc, mode);
     }
 
     private static void help() {

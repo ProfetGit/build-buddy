@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.79
+
+- `/cyanotype auto assist|sweep|off` turns auto-placing on or off from chat, the same as the N key and the Build panel.
+
 ## 0.0.78
 
 - An op paste on a server no longer fills your chat with "Changed the block at ..." lines: the answers to the paste's own commands are hidden while it runs and for a moment after. Other chat is untouched.
