@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.71
+
+- Auto-placing no longer puts a wrong block down right after taking an item out of your bag: it waits until the game has the new item in your hand. When the hotbar is full it always uses the same slot, so the rest of your hotbar stays as it was.
+- In Assist mode a box now glides to the ghost block a press would place, and every block auto-placing puts down gets a small pop.
+- The AUTO badge grows to fit its words instead of cutting them off, shows the block it is working on, and no longer shows a speed in Assist (Assist always places at once). When auto-placing stops by itself, the badge stays for a moment and says why.
+- Opening the chat only pauses auto-placing; other menus still stop it.
+
 ## 0.0.70
 
 - The Save box highlight now shows with shader packs. Under Iris the lit blocks were drawn behind the world's depth and never appeared; they are now drawn on top, and only the faces that look toward you are drawn, so nothing lights through a wall.

@@ -32,24 +32,38 @@ public final class CyanotypeHud {
         Welcome.draw(mc, g);
     }
 
-    /** "AUTO: ON" while auto-placing is running: always visible then, amber on a multiplayer server (PRD 7.8), with what it is doing. */
+    /**
+     * "AUTO: ON" while auto-placing is running: always visible then, amber on a multiplayer server (PRD 7.8), with the block it
+     * is working on and what it is doing; it grows to fit the words (two lines at most) rather than cutting them. When it stops by
+     * itself the badge stays a moment as "AUTO: OFF" with the reason, so a stop is never silent.
+     */
     private static void autoBadge(Minecraft mc, GuiGraphicsExtractor g) {
         boolean on = AutoBuilder.on();
-        float a = Motion.follow("hud#auto", on ? 1f : 0f, 0.12);
+        boolean stopped = !on && !AutoBuilder.stoppedWhy().isEmpty() && AutoBuilder.sinceStopped() < 3.5;
+        float a = Motion.follow("hud#auto", on || stopped ? 1f : 0f, 0.12);
         if (a < 0.02f) return;
         boolean server = AutoBuilder.serverKey(mc) != null;
-        int w = 150, h = 29, x = g.guiWidth() - w - 6, y = 6;
+        int accent = stopped ? Ui.WARN : server ? Ui.WARN : Ui.CYAN;
+        String head = on ? "AUTO: ON" : "AUTO: OFF";
+        String mode = !on ? "" : AutoBuilder.mode() == AutoBuilder.Mode.SWEEP ? "Sweep  " + Settings.get().autoRate + "/s" : "Assist";
+        String status = on ? AutoBuilder.status() : AutoBuilder.stoppedWhy();
+        net.minecraft.world.item.Item item = on ? AutoBuilder.currentItem() : null;
+        int pad = item != null ? 30 : 10;
+        int cap = Math.max(150, g.guiWidth() / 2 - 98 - 12);
+        int want = Math.max(Ui.font().width(head) + Ui.font().width(mode) + 34, Ui.font().width(status) + pad + 8);
+        int w = Math.max(150, Math.min(cap, want));
+        java.util.List<String> lines = Ui.wrap(status, w - pad - 8, 2);
+        int h = Math.max(19 + 11 * Math.max(1, lines.size()), item != null ? 37 : 0), x = g.guiWidth() - w - 6, y = 6;
         double t = System.nanoTime() / 1e9;
         float inner = Ui.panelOpening(g, x, y, w, h, Motion.reduced() ? 1 : Math.min(1.0, a));
         if (inner < 0.05f) return;
-        int accent = server ? Ui.WARN : Ui.CYAN;
-        // a small pulse beside the words says it is live
-        float pulse = Motion.reduced() ? 1f : (float) (0.55 + 0.45 * Math.sin(t * 4));
+        // a small pulse beside the words says it is live; a steady dot once it has stopped
+        float pulse = Motion.reduced() || stopped ? 1f : (float) (0.55 + 0.45 * Math.sin(t * 4));
         g.fill(x + 8, y + 8, x + 13, y + 13, Ui.withAlpha(accent, inner * pulse));
-        String mode = AutoBuilder.mode() == AutoBuilder.Mode.SWEEP ? "Sweep" : "Assist";
-        Ui.text(g, "AUTO: ON", x + 18, y + 6, Ui.withAlpha(accent, inner));
-        Ui.right(g, mode + "  " + Settings.get().autoRate + "/s", x + w - 8, y + 6, Ui.withAlpha(Ui.LINE, inner));
-        Ui.text(g, Ui.fit(AutoBuilder.status(), w - 16), x + 8, y + 18, Ui.withAlpha(Ui.DIM, inner));
+        Ui.text(g, head, x + 18, y + 6, Ui.withAlpha(accent, inner));
+        if (!mode.isEmpty()) Ui.right(g, mode, x + w - 8, y + 6, Ui.withAlpha(Ui.LINE, inner));
+        if (item != null) g.item(new net.minecraft.world.item.ItemStack(item), x + 7, y + 17);
+        for (int i = 0; i < lines.size(); i++) Ui.text(g, lines.get(i), x + pad, y + 18 + 11 * i + (item != null && lines.size() == 1 ? 3 : 0), Ui.withAlpha(stopped ? Ui.LINE : Ui.DIM, inner));
     }
 
     /** A thin panel under the progress one while a paste (or the undo of one) runs in the world. */

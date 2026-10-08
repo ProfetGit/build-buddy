@@ -146,7 +146,7 @@ public final class SettingsScreen extends Screen {
                 r.add(new Toggle("autoTurn", "Turn to face", "Let it turn your view toward blocks that need a facing (stairs, logs, observers). Off: it places only what works the way you look.",
                     () -> d.autoTurn, v -> d.autoTurn = v));
                 r.add(new Note("auto", "How to use it", "Choose Build on the wheel: Assist places the ghost under your crosshair the moment you press use and keeps going while you hold it (and puts nothing else down), Sweep builds everything in reach, lowest layer first. "
-                    + "It stops when you are hurt, open any screen (Esc too) or run out of the blocks. On a multiplayer server it stays off until you say yes for that server."));
+                    + "It stops when you are hurt, open a menu (Esc too; chat only pauses it) or run out of the blocks. On a multiplayer server it stays off until you say yes for that server."));
             }
             case SERVERS -> serverRows(r);
             case LESSONS -> {

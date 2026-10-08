@@ -708,7 +708,7 @@ public final class Interaction {
                 edit(mc, p, pos, look);
             }
         }
-        if (mode == Mode.IDLE) io.github.profetgit.cyanotype.auto.AutoBuilder.frame(mc);
+        io.github.profetgit.cyanotype.auto.AutoBuilder.frame(mc, mode == Mode.IDLE);
         outlines(mc, pos);
     }
 

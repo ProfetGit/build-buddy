@@ -55,7 +55,7 @@ public final class AutoBuilder {
     /** Dev demo only: acts as if connected to this server address (null = what the game says). */
     public static volatile String testServer;
 
-    private static final int PENDING_TICKS = 8, FAILS_BEFORE_SKIP = 2, SKIP_TICKS = 100, NO_ITEM_STOP_TICKS = 50, SCAN_LIMIT = 40, MAX_TURN_STEP = 18;
+    private static final int PENDING_TICKS = 8, FAILS_BEFORE_SKIP = 2, SKIP_TICKS = 100, NO_ITEM_STOP_TICKS = 50, SCAN_LIMIT = 40, MAX_TURN_STEP = 18, SWAP_SETTLE_TICKS = 3;
 
     private static Mode mode = Mode.OFF;
     private static final Rate RATE = Rate.create();
@@ -65,6 +65,10 @@ public final class AutoBuilder {
     private static int originalSlot = -1;
     private static float lastHealth;
     private static int noItemTicks;
+    /** After an item is swapped in from the bag, the server has to see the swap before anything is placed with it: no placing until this tick. */
+    private static long handReadyTick;
+    /** The hotbar slot the mod swaps items into when no slot is free, so it reuses one slot instead of shuffling the player's hotbar. */
+    private static int workSlot = -1;
     private static String missingItem = "";
     private static final Map<Long, Long> PENDING = new HashMap<>(), SKIP_UNTIL = new HashMap<>();
     private static final Map<Long, Integer> FAILS = new HashMap<>();
@@ -73,6 +77,13 @@ public final class AutoBuilder {
     /** Servers the player said yes to this session (without "don't ask again"): until they leave. */
     private static final Set<String> SESSION_ALLOWED = new HashSet<>();
     private static @Nullable Assist assist;
+    /** Why it last stopped and when, so the HUD badge can say so for a moment instead of just vanishing. */
+    private static String stoppedWhy = "";
+    private static long stoppedNs;
+    /** Blocks placed in the last moment, each with its time: they get a small pop in the world. */
+    private static final java.util.ArrayDeque<long[]> POPS = new java.util.ArrayDeque<>();
+    /** The item the last block needed, for the badge's icon. */
+    private static @Nullable Item currentItem;
 
     private AutoBuilder() {
     }
@@ -180,6 +191,8 @@ public final class AutoBuilder {
             placed = wrongFacing = noSupport = outOfReach = planFails = useFails = 0;
             clearBookkeeping();
             originalSlot = mc.player.getInventory().getSelectedSlot();
+            workSlot = originalSlot;
+            handReadyTick = 0;
             lastHealth = mc.player.getHealth();
             noItemTicks = 0;
             missingItem = "";
@@ -201,6 +214,10 @@ public final class AutoBuilder {
         originalSlot = -1;
         clearBookkeeping();
         Sfx.play(Sfx.CLOSE);
+        stoppedWhy = why.startsWith("Auto-placing off") ? "" : why.replaceFirst("^Auto-placing stopped: ", "").replaceFirst("^Auto-placing ", "");
+        if (stoppedWhy.equals("stopped")) stoppedWhy = "Stopped";
+        stoppedNs = System.nanoTime();
+        currentItem = null;
         if (mc != null) Interaction.say(mc, why + (placed > 0 ? " (" + placed + " placed)" : ""));
     }
 
@@ -253,8 +270,8 @@ public final class AutoBuilder {
         }
         var screen = mc.gui.screen();
         if (screen != null) {
-            // the tool wheel opens over the game to choose a tool: that only pauses it; anything else is the player doing something else
-            if (screen instanceof WheelScreen) {
+            // the tool wheel and the chat open over the game for a moment: they only pause it; anything else is the player doing something else
+            if (screen instanceof WheelScreen || screen instanceof net.minecraft.client.gui.screens.ChatScreen) {
                 assist = null;
                 return;
             }
@@ -374,6 +391,7 @@ public final class AutoBuilder {
             if (cost == null) continue;
             if (incremental && !stacksUp(mc, pos, wanted)) continue;
             looked++;
+            if (looked == 1) currentItem = cost.item();
             if (count(p, cost.item()) < 1) {
                 lackingItems++;
                 if (lacking.isEmpty()) lacking = cost.item().getName(new ItemStack(cost.item())).getString();
@@ -408,8 +426,8 @@ public final class AutoBuilder {
                 missingItem = "";
                 return;
             }
-            // turning toward the block counts as working on it
-            if (res.plan().turn()) return;
+            // turning toward the block, or waiting for a swapped item to reach the hand, counts as working on it
+            if (res.plan().turn() || tickNo < handReadyTick) return;
         }
         // nothing placed this tick: say why
         if (cands.isEmpty()) {
@@ -441,6 +459,7 @@ public final class AutoBuilder {
 
     private static void assist(Minecraft mc, LocalPlayer p, Placement pl, Verifier v) {
         assist = findAssist(mc, p, v);
+        currentItem = assist == null ? null : assist.cost.item();
         if (!mc.options.keyUse.isDown()) {
             status = assist != null ? "Hold use to place " + nameOf(assist.wanted) : "Hold use on a ghost block";
             return;
@@ -529,10 +548,63 @@ public final class AutoBuilder {
         return true;
     }
 
-    /** The cursor chip for Assist: what a held use key would place. */
-    public static void frame(Minecraft mc) {
-        if (mode == Mode.OFF || assist == null || mc.gui.screen() != null || GhostRenderer.hidden) return;
-        Chips.show(new Chips.Chip("Hold use", "Place " + nameOf(assist.wanted)));
+    /** Where the Assist aim box is drawn now (eased toward the aimed cell) and how visible it is. */
+    private static @Nullable Vec3 aimAt;
+    private static float aimShown;
+    private static long lastFrameNs;
+
+    /**
+     * Each frame: in Assist, a box round the ghost block a press would place (it glides from cell to cell) and the cursor chip;
+     * in both modes a small pop round every block it has just put down. Drawn on top of the world, so shader packs cannot hide it.
+     */
+    public static void frame(Minecraft mc, boolean idle) {
+        long now = System.nanoTime();
+        double dt = lastFrameNs == 0 ? 0 : Math.min(0.1, (now - lastFrameNs) / 1e9);
+        lastFrameNs = now;
+        boolean still = io.github.profetgit.cyanotype.ui.Motion.reduced();
+        boolean show = idle && mode == Mode.ASSIST && assist != null && mc.gui.screen() == null && !GhostRenderer.hidden;
+        if (show) {
+            Vec3 target = Vec3.atLowerCornerOf(assist.cell);
+            aimAt = aimAt == null || still || aimShown < 0.05f ? target : aimAt.lerp(target, 1 - Math.exp(-dt / 0.045));
+        }
+        aimShown = still ? (show ? 1f : 0f) : (float) (aimShown + ((show ? 1 : 0) - aimShown) * (1 - Math.exp(-dt / 0.06)));
+        if (aimAt != null && aimShown > 0.02f) {
+            double pulse = still ? 1 : 0.75 + 0.25 * Math.sin(now / 1e9 * 5.0);
+            double grow = 0.02 + (1 - aimShown) * 0.12;
+            net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(aimAt.x, aimAt.y, aimAt.z, aimAt.x + 1, aimAt.y + 1, aimAt.z + 1).inflate(grow);
+            int line = alpha(0xFFFFFFFF, aimShown * pulse), fill = alpha(0xFF7FE3FF, aimShown * 0.16);
+            net.minecraft.gizmos.Gizmos.cuboid(box, net.minecraft.gizmos.GizmoStyle.strokeAndFill(line, 2.5f, fill)).setAlwaysOnTop();
+        }
+        if (show) Chips.show(new Chips.Chip("Hold use", "Place " + nameOf(assist.wanted)));
+        // pops: a thin frame that grows out of the new block and fades, a third of a second
+        while (!POPS.isEmpty() && now - POPS.peekFirst()[1] > 350_000_000L) POPS.removeFirst();
+        if (still || GhostRenderer.hidden) return;
+        for (long[] pop : POPS) {
+            double t = (now - pop[1]) / 350_000_000.0;
+            double e = 1 - Math.pow(1 - t, 3);
+            BlockPos c = BlockPos.of(pop[0]);
+            net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(c).inflate(0.03 + 0.22 * e);
+            net.minecraft.gizmos.Gizmos.cuboid(box, net.minecraft.gizmos.GizmoStyle.stroke(alpha(0xFF7FE3FF, (1 - t) * 0.9), (float) (3.0 - 1.5 * e))).setAlwaysOnTop();
+        }
+    }
+
+    private static int alpha(int argb, double a) {
+        return ((int) Math.max(0, Math.min(255, a * 255)) << 24) | (argb & 0xFFFFFF);
+    }
+
+    /** What the badge shows after it stopped, for a moment: the reason, or empty. */
+    public static String stoppedWhy() {
+        return stoppedWhy;
+    }
+
+    /** Seconds since it last stopped. */
+    public static double sinceStopped() {
+        return stoppedNs == 0 ? Double.MAX_VALUE : (System.nanoTime() - stoppedNs) / 1e9;
+    }
+
+    /** The item of the block it is working on (Sweep: the next it will place; Assist: the aimed one), or null. */
+    public static @Nullable Item currentItem() {
+        return currentItem;
     }
 
     private static String nameOf(BlockState s) {
@@ -555,6 +627,12 @@ public final class AutoBuilder {
             status = "Cannot take " + item.getName(new ItemStack(item)).getString() + " in hand";
             return false;
         }
+        // a swap from the bag goes to the server as its own packet: placing in the same tick could use what the server
+        // still thinks is in the hand (the wrong block), so wait until it has seen the swap
+        if (tickNo < handReadyTick || !p.getMainHandItem().is(item)) {
+            status = "Taking " + item.getName(new ItemStack(item)).getString() + " in hand";
+            return false;
+        }
         BlockHitResult hit = new BlockHitResult(plan.hit(), plan.face(), plan.support(), false);
         ItemStack held = p.getItemInHand(InteractionHand.MAIN_HAND);
         int before = held.getCount();
@@ -566,6 +644,8 @@ public final class AutoBuilder {
             }
             placed++;
             PENDING.put(cell, tickNo);
+            POPS.addLast(new long[]{cell, System.nanoTime()});
+            while (POPS.size() > 24) POPS.removeFirst();
             if (paid) RATE.spend();
             status = "Placed " + placed;
             return true;
@@ -622,15 +702,19 @@ public final class AutoBuilder {
             }
         }
         if (from < 0) return false;
-        int into = sel;
+        int into = -1;
         for (int i = 0; i < 9; i++) {
             if (inv.getItem(i).isEmpty()) {
                 into = i;
                 break;
             }
         }
+        // no free slot: always the same one (the one in hand when it started), so only one slot of the hotbar changes
+        if (into < 0) into = workSlot >= 0 && workSlot < 9 ? workSlot : sel;
+        workSlot = into;
         inv.setSelectedSlot(into);
         mc.gameMode.handleContainerInput(p.inventoryMenu.containerId, from, into, ContainerInput.SWAP, p);
+        handReadyTick = tickNo + SWAP_SETTLE_TICKS;
         return true;
     }
 
