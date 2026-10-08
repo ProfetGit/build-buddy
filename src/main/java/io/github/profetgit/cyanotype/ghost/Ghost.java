@@ -117,6 +117,8 @@ public final class Ghost {
         int quads;
         /** Quads emitted up to the end of each layer of the section (length h + 1): a range of layers is a range of quads. */
         int[] layerQuads;
+        /** The same for the quads of blocks that stand in water (null when none does): they come after the dry ones in the buffer. */
+        int[] wetQuads;
 
         Section(Ghost ghost, OrientedRegion region, int part, int vsec, int wx, int wy, int wz, int x, int y, int z, int w, int h, int d) {
             this.ghost = ghost;

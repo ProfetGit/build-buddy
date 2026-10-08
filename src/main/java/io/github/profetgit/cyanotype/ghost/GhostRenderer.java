@@ -3,6 +3,7 @@ package io.github.profetgit.cyanotype.ghost;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
@@ -27,6 +28,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.core.BlockPos;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.phys.AABB;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -57,6 +63,8 @@ public final class GhostRenderer {
     private static final int MAX_IN_FLIGHT = 8;
     private static final int UPLOAD_BYTES_PER_FRAME = 4 << 20;
     /** A placement that has not moved for this long gets a ghost baked for its true position (tints and offsets depend on it). */
+    /** Opacity of the blocks that stand in water, as a multiple of the ghost's own (capped at 1): the water drawn over them thins them out. */
+    static final double WET_BOOST = 1.7;
     private static final long REBAKE_AFTER_NS = 250_000_000L;
     /** Ghosts start to fade out this far into the draw range (as a share of it). */
     private static final double FADE_FROM = 0.55;
@@ -199,29 +207,87 @@ public final class GhostRenderer {
         return g;
     }
 
+    /** What this frame draws, decided in {@link #prepare}: the blocks standing in water go in before the water, the rest after everything. */
+    private static List<DrawItem> earlyItems = List.of(), lateItems = List.of();
+    private static int earlyQuads, lateQuads;
+    private static boolean prepared, earlyDrawn;
+
+    /**
+     * Called once per frame from the level renderer, before any pass: moves the ghosts, bakes, uploads and decides what
+     * is drawn. The draws come later ({@link #drawEarly}, {@link #render}).
+     */
+    public static void prepare(Minecraft mc, CameraRenderState cam) {
+        long t0 = System.nanoTime();
+        earlyItems = lateItems = List.of();
+        earlyQuads = lateQuads = 0;
+        earlyDrawn = false;
+        prepared = true;
+        Stats.quadsDrawn = 0;
+        if (t0 < pausedUntilNs) return;
+        try {
+            prepareTimed(mc, cam);
+            failStreak = 0;
+        } catch (Throwable t) {
+            failed(t0, t, "prepared");
+        } finally {
+            if (!SLOTS.isEmpty()) Stats.cpuNanos += System.nanoTime() - t0;
+        }
+    }
+
+    /**
+     * Draws the blocks that stand in water into the pass that is about to draw the translucent features, so the water
+     * (drawn after them) blends over them like it does over real blocks and tints them.
+     */
+    public static void drawEarly(RenderPass pass) {
+        if (earlyItems.isEmpty() || earlyDrawn || System.nanoTime() < pausedUntilNs) return;
+        long t0 = System.nanoTime();
+        try {
+            earlyDrawn = true;
+            // the pass may have been opened by someone else (a shader pack's mod makes its own): bind what the pipeline reads
+            RenderSystem.bindDefaultUniforms(pass);
+            if (drawItems(pass, earlyItems)) Stats.quadsDrawn += earlyQuads;
+        } catch (Throwable t) {
+            failed(t0, t, "drawn before the water");
+        } finally {
+            Stats.cpuNanos += System.nanoTime() - t0;
+        }
+    }
+
+    /** The same with improved transparency, where no pass is open before the water goes in: a pass of its own on the main target. */
+    public static void drawEarly(RenderTarget target) {
+        if (earlyItems.isEmpty() || earlyDrawn || System.nanoTime() < pausedUntilNs) return;
+        long t0 = System.nanoTime();
+        try {
+            earlyDrawn = true;
+            if (drawOwnPass(target, earlyItems)) Stats.quadsDrawn += earlyQuads;
+        } catch (Throwable t) {
+            failed(t0, t, "drawn before the water");
+        } finally {
+            Stats.cpuNanos += System.nanoTime() - t0;
+        }
+    }
+
     /** Called once per frame from the level renderer, after the main pass has composed the scene. */
     public static void render(Minecraft mc, CameraRenderState cam, RenderTarget target) {
         long t0 = System.nanoTime();
+        if (!prepared) prepare(mc, cam);
+        prepared = false;
         if (t0 < pausedUntilNs) return;
         try {
-            renderTimed(mc, cam, target);
+            // whatever was not drawn before the water (a pass that never came) is drawn now, as the whole ghost once was
+            List<DrawItem> items = lateItems;
+            int quads = lateQuads;
+            if (!earlyDrawn && !earlyItems.isEmpty()) {
+                items = new ArrayList<>(earlyItems);
+                items.addAll(lateItems);
+                quads += earlyQuads;
+            }
+            earlyDrawn = true;
+            if (!items.isEmpty() && drawOwnPass(target, items)) Stats.quadsDrawn += quads;
+            earlyItems = lateItems = List.of();
             failStreak = 0;
         } catch (Throwable t) {
-            // the ghost is a guest in the frame: whatever goes wrong with it must not take the game down
-            if (t0 - lastFailLogNs > 10_000_000_000L) {
-                lastFailLogNs = t0;
-                Cyanotype.LOG.error("The ghost could not be drawn this frame", t);
-            }
-            if (++failStreak >= 3) {
-                // something is broken for now (a pipeline being rebuilt, say): rest, throw the meshes away, start again clean
-                pausedUntilNs = t0 + 2_000_000_000L;
-                failStreak = 0;
-                try {
-                    clear();
-                } catch (Throwable ignored) {
-                    SLOTS.clear();
-                }
-            }
+            failed(t0, t, "drawn");
         } finally {
             java.util.List<long[]> rec = Stats.record;
             if (rec != null) rec.add(new long[]{t0, Stats.quadsDrawn, Stats.drawn, Stats.capsDrawn});
@@ -232,7 +298,26 @@ public final class GhostRenderer {
         }
     }
 
-    private static void renderTimed(Minecraft mc, CameraRenderState cam, RenderTarget target) {
+    private static void failed(long t0, Throwable t, String what) {
+        // the ghost is a guest in the frame: whatever goes wrong with it must not take the game down
+        if (t0 - lastFailLogNs > 10_000_000_000L) {
+            lastFailLogNs = t0;
+            Cyanotype.LOG.error("The ghost could not be " + what + " this frame", t);
+        }
+        if (++failStreak >= 3) {
+            // something is broken for now (a pipeline being rebuilt, say): rest, throw the meshes away, start again clean
+            pausedUntilNs = t0 + 2_000_000_000L;
+            failStreak = 0;
+            earlyItems = lateItems = List.of();
+            try {
+                clear();
+            } catch (Throwable ignored) {
+                SLOTS.clear();
+            }
+        }
+    }
+
+    private static void prepareTimed(Minecraft mc, CameraRenderState cam) {
         ClientLevel level = mc.level;
         long now = System.nanoTime();
         double dt = lastFrameNs == 0 ? 0.016 : Math.min(0.1, (now - lastFrameNs) / 1e9);
@@ -338,11 +423,11 @@ public final class GhostRenderer {
         if (hidden) {
             Stats.drawn = 0;
             Stats.capsDrawn = 0;
-            Stats.quadsDrawn = 0;
             return;
         }
-        List<DrawItem> draw = new ArrayList<>();
-        int sectionsDrawn = 0, capsDrawn = 0;
+        List<DrawItem> early = new ArrayList<>(), late = new ArrayList<>();
+        Matrix4f modelView = RenderSystem.getModelViewMatrixCopy();
+        int sectionsDrawn = 0, capsDrawn = 0, eq = 0, lq = 0;
         double fadeStart = range * FADE_FROM;
         for (int i : order) {
             Ghost.Section sec = candidates.get(i);
@@ -364,30 +449,55 @@ public final class GhostRenderer {
             boolean fits = sec.meshFormat == null || sameFormat(sec.meshFormat, live);
             if (fits && sec.buffer != null && sec.layerQuads != null) {
                 int q0 = sec.layerQuads[a], q1 = sec.layerQuads[b + 1];
+                boolean any = false;
                 if (q1 > q0) {
-                    draw.add(new DrawItem(sec, sec.buffer, sec.indexCount, m, q0, q1, fade));
-                    sectionsDrawn++;
+                    late.add(item(sec, sec.buffer, sec.indexCount, m, q0, q1, fade, false, cam, modelView));
+                    lq += q1 - q0;
+                    any = true;
                 }
+                // the blocks standing in water, drawn before the water goes in
+                if (sec.wetQuads != null) {
+                    int w0 = sec.wetQuads[a], w1 = sec.wetQuads[b + 1];
+                    if (w1 > w0) {
+                        early.add(item(sec, sec.buffer, sec.indexCount, m, w0, w1, fade, true, cam, modelView));
+                        eq += w1 - w0;
+                        any = true;
+                    }
+                }
+                if (any) sectionsDrawn++;
             }
             // the faces the cut layers would have covered
             for (Ghost.Cap c : sec.caps.values()) {
                 if (c.exact && c.buffer != null && c.quads > 0 && (c.meshFormat == null || sameFormat(c.meshFormat, live))) {
-                    draw.add(new DrawItem(sec, c.buffer, c.indexCount, m, 0, c.quads, fade));
+                    late.add(item(sec, c.buffer, c.indexCount, m, 0, c.quads, fade, false, cam, modelView));
+                    lq += c.quads;
                     capsDrawn++;
                 }
             }
         }
         Stats.drawn = sectionsDrawn;
         Stats.capsDrawn = capsDrawn;
-        if (draw.isEmpty()) {
-            Stats.quadsDrawn = 0;
-            return;
-        }
-        draw(cam, target, draw);
+        earlyItems = early;
+        lateItems = late;
+        earlyQuads = eq;
+        lateQuads = lq;
+    }
+
+    private static DrawItem item(Ghost.Section s, GpuBuffer buffer, int indexCount, double[] m, int q0, int q1, double fade, boolean wet, CameraRenderState cam, Matrix4f modelView) {
+        double base = s.ghost.placement.opacity;
+        // the water drawn over it takes most of what a ghost shows: stronger, so it reads like a block under water
+        float opacity = (float) (Math.min(1.0, wet ? base * WET_BOOST : base) * fade);
+        // written now, before any pass is open, like the game does for its own draws
+        GpuBufferSlice slice = RenderSystem.getDynamicUniforms().writeTransform(
+            modelView,
+            new Vector4f(tintR, tintG, tintB, opacity),
+            new Vector3f((float) (s.wx + s.x + m[0] - cam.pos.x), (float) (s.wy + s.y + m[1] - cam.pos.y), (float) (s.wz + s.z + m[2] - cam.pos.z)),
+            new Matrix4f());
+        return new DrawItem(buffer, indexCount, q0, q1, slice);
     }
 
     /** One buffer to draw: a section's mesh (a range of its quads) or one of its cap meshes. */
-    private record DrawItem(Ghost.Section s, GpuBuffer buffer, int indexCount, double[] shift, int q0, int q1, double fade) {
+    private record DrawItem(GpuBuffer buffer, int indexCount, int q0, int q1, GpuBufferSlice transforms) {
     }
 
     // ---- caps for the Layers tool
@@ -599,12 +709,57 @@ public final class GhostRenderer {
         return dx * dx + dy * dy + dz * dz;
     }
 
+    private static final java.util.function.Predicate<BlockState> HAS_WATER = st -> st.getFluidState().is(FluidTags.WATER);
+
+    /**
+     * Which blocks of a section stand in water right now, in the mesher's order, or null when none does. Read here, on the
+     * render thread, because the world's blocks must not be read from a worker while the game changes them; the cheap
+     * palette check of the world's own sections keeps a dry place from paying for a block-by-block look.
+     */
+    private static byte[] wetCells(Ghost.Section s) {
+        ClientLevel level = s.ghost.level;
+        if (level == null) return null;
+        int x0 = s.wx + s.x, y0 = s.wy + s.y, z0 = s.wz + s.z;
+        boolean maybe = false;
+        for (int cx = x0 >> 4; cx <= (x0 + s.w - 1) >> 4 && !maybe; cx++) {
+            for (int cz = z0 >> 4; cz <= (z0 + s.d - 1) >> 4 && !maybe; cz++) {
+                LevelChunk chunk = level.getChunkSource().getChunk(cx, cz, ChunkStatus.FULL, false);
+                if (chunk == null) continue;
+                for (int sy = y0 >> 4; sy <= (y0 + s.h - 1) >> 4; sy++) {
+                    int idx = chunk.getSectionIndex(sy << 4);
+                    if (idx < 0 || idx >= chunk.getSectionsCount()) continue;
+                    if (chunk.getSection(idx).maybeHas(HAS_WATER)) {
+                        maybe = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!maybe) return null;
+        byte[] wet = new byte[s.w * s.h * s.d];
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        int n = 0;
+        for (int y = 0; y < s.h; y++) {
+            for (int z = 0; z < s.d; z++) {
+                for (int x = 0; x < s.w; x++) {
+                    if (s.region.state(s.x + x, s.y + y, s.z + z).isAir()) continue;
+                    if (level.getFluidState(pos.set(x0 + x, y0 + y, z0 + z)).is(FluidTags.WATER)) {
+                        wet[(y * s.d + z) * s.w + x] = 1;
+                        n++;
+                    }
+                }
+            }
+        }
+        return n == 0 ? null : wet;
+    }
+
     private static void startBake(Ghost.Section s) {
         s.state = Ghost.Section.BAKING;
         VertexFormat format = SectionMesher.renderType().format();
         // what the world looked like when this bake started; a later change bumps the version and bakes the section again
         Verifier v = s.ghost.verifier;
         byte[] mask = v == null ? null : v.snapshot(s.part, s.x, s.y, s.z, s.w, s.h, s.d);
+        byte[] wet = wetCells(s);
         s.bakingVersion = v == null ? 0 : v.version(s.part, s.vsec);
         IN_FLIGHT.incrementAndGet();
         WORKERS.execute(() -> {
@@ -615,7 +770,7 @@ public final class GhostRenderer {
                     return;
                 }
                 // null: nothing to draw in this box (all of it built, or empty); the section still counts as baked
-                SectionMesher.Baked b = SectionMesher.bake(s.region, s.wx, s.wy, s.wz, s.x, s.y, s.z, s.w, s.h, s.d, s.ghost.level, mask, format);
+                SectionMesher.Baked b = SectionMesher.bake(s.region, s.wx, s.wy, s.wz, s.x, s.y, s.z, s.w, s.h, s.d, s.ghost.level, mask, wet, format);
                 s.baked = b;
                 s.state = Ghost.Section.BAKED;
                 if (s.ghost.disposed && b != null) s.release();
@@ -645,6 +800,7 @@ public final class GhostRenderer {
             s.indexCount = 0;
             s.quads = 0;
             s.layerQuads = null;
+            s.wetQuads = null;
             s.state = Ghost.Section.UPLOADED;
             return 0;
         }
@@ -663,6 +819,7 @@ public final class GhostRenderer {
             s.meshFormat = b.mesh().drawState().format();
             s.quads = b.quads();
             s.layerQuads = b.layerQuads();
+            s.wetQuads = b.wetQuads();
             RenderSystem.getSequentialBuffer(SectionMesher.renderType().primitiveTopology()).requestIndexCount(s.indexCount);
             s.state = Ghost.Section.UPLOADED;
             Stats.uploaded++;
@@ -679,40 +836,38 @@ public final class GhostRenderer {
         return bytes;
     }
 
-    private static void draw(CameraRenderState cam, RenderTarget target, List<DrawItem> items) {
-        PreparedRenderType prepared = SectionMesher.renderType().prepare();
-        RenderPipeline pipeline = prepared.pipeline();
-        // the pipeline must expect the layout the meshes were written in; if it moved on this very frame, wait for the next
-        VertexFormat expected = pipeline.getVertexFormatBinding(0);
-        if (expected != null && liveFormat != null && !sameFormat(expected, liveFormat)) {
-            Stats.quadsDrawn = 0;
-            return;
-        }
-        Matrix4f modelView = RenderSystem.getModelViewMatrixCopy();
-        Matrix4f texture = new Matrix4f();
-        var index = RenderSystem.getSequentialBuffer(SectionMesher.renderType().primitiveTopology());
-        int quads = 0;
+    /** Draws the items in a render pass of their own on the main target; false when the pipeline is not (yet) the layout the meshes are in. */
+    private static boolean drawOwnPass(RenderTarget target, List<DrawItem> items) {
+        if (!pipelineFits()) return false;
         try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
             () -> "Cyanotype ghost", target.getColorTextureView(), Optional.empty(), target.getDepthTextureView(), OptionalDouble.empty())) {
             RenderSystem.bindDefaultUniforms(pass);
-            pass.setPipeline(RenderSystem.getCompiledPipeline(pipeline));
-            for (PreparedRenderType.Texture t : prepared.textures()) pass.setUniform(t.name(), t.textureView(), t.sampler());
-            for (DrawItem it : items) {
-                Ghost.Section s = it.s();
-                double[] m = it.shift();
-                float opacity = (float) (s.ghost.placement.opacity * it.fade());
-                var slice = RenderSystem.getDynamicUniforms().writeTransform(
-                    modelView,
-                    new Vector4f(tintR, tintG, tintB, opacity),
-                    new Vector3f((float) (s.wx + s.x + m[0] - cam.pos.x), (float) (s.wy + s.y + m[1] - cam.pos.y), (float) (s.wz + s.z + m[2] - cam.pos.z)),
-                    texture);
-                pass.setUniform("DynamicTransforms", slice);
-                pass.setVertexBuffer(0, it.buffer().slice());
-                pass.setIndexBuffer(index.getBuffer(it.indexCount()), index.type());
-                pass.drawIndexed((it.q1() - it.q0()) * 6, 1, it.q0() * 6, 0, 0);
-                quads += it.q1() - it.q0();
-            }
+            return drawItems(pass, items);
         }
-        Stats.quadsDrawn = quads;
+    }
+
+    /** The pipeline must expect the layout the meshes were written in; if it moved on this very frame, wait for the next. */
+    private static boolean pipelineFits() {
+        RenderPipeline pipeline = SectionMesher.renderType().prepare().pipeline();
+        VertexFormat expected = pipeline.getVertexFormatBinding(0);
+        return expected == null || liveFormat == null || sameFormat(expected, liveFormat);
+    }
+
+    /** Draws the items in an open pass (the default uniforms are bound); false when the layout does not fit. */
+    private static boolean drawItems(RenderPass pass, List<DrawItem> items) {
+        PreparedRenderType prepared = SectionMesher.renderType().prepare();
+        RenderPipeline pipeline = prepared.pipeline();
+        VertexFormat expected = pipeline.getVertexFormatBinding(0);
+        if (expected != null && liveFormat != null && !sameFormat(expected, liveFormat)) return false;
+        var index = RenderSystem.getSequentialBuffer(SectionMesher.renderType().primitiveTopology());
+        pass.setPipeline(RenderSystem.getCompiledPipeline(pipeline));
+        for (PreparedRenderType.Texture t : prepared.textures()) pass.setUniform(t.name(), t.textureView(), t.sampler());
+        for (DrawItem it : items) {
+            pass.setUniform("DynamicTransforms", it.transforms());
+            pass.setVertexBuffer(0, it.buffer().slice());
+            pass.setIndexBuffer(index.getBuffer(it.indexCount()), index.type());
+            pass.drawIndexed((it.q1() - it.q0()) * 6, 1, it.q0() * 6, 0, 0);
+        }
+        return true;
     }
 }

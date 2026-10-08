@@ -29,8 +29,12 @@ import net.minecraft.world.level.block.state.BlockState;
  * red and drawn a hair larger so they do not fight the real block they overlap.
  */
 final class SectionMesher {
-    /** The result and the memory behind it; close both once the mesh is uploaded. */
-    record Baked(MeshData mesh, ByteBufferBuilder bytes, int quads, int[] layerQuads) implements AutoCloseable {
+    /**
+     * The result and the memory behind it; close both once the mesh is uploaded. {@code layerQuads} counts the dry quads up to
+     * the end of each layer; {@code wetQuads} (null when nothing stands in water) is the same for the quads that come after them
+     * and belong to blocks standing in water, which are drawn before the water is.
+     */
+    record Baked(MeshData mesh, ByteBufferBuilder bytes, int quads, int[] layerQuads, int[] wetQuads) implements AutoCloseable {
         @Override
         public void close() {
             mesh.close();
@@ -61,10 +65,11 @@ final class SectionMesher {
      * @param region the placed region; the box {@code x0..x0+w} etc. is in its own turned coordinates
      * @param wx world position of the region's min corner
      * @param mask the verifier's states of the box (y, then z, then x), or null to draw every block
+     * @param wet which blocks of the box stand in water (same order), or null when none does: their quads come last, in layer order too
      * @param format the vertex layout the draw will expect (a shader pack changes it): decided on the render thread when the bake starts
      * @return null when the box has nothing to draw
      */
-    static Baked bake(OrientedRegion region, int wx, int wy, int wz, int x0, int y0, int z0, int w, int h, int d, ClientLevel level, byte[] mask, VertexFormat format) {
+    static Baked bake(OrientedRegion region, int wx, int wy, int wz, int x0, int y0, int z0, int w, int h, int d, ClientLevel level, byte[] mask, byte[] wet, VertexFormat format) {
         Minecraft mc = Minecraft.getInstance();
         PlacementView view = new PlacementView(region, wx, wy, wz, level);
         ModelBlockRenderer renderer = new ModelBlockRenderer(false, true, mc.getBlockColors());
@@ -91,27 +96,34 @@ final class SectionMesher {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         var models = mc.getModelManager().getBlockStateModelSet();
         int[] layerQuads = new int[h + 1];
-        for (int y = y0; y < y0 + h; y++) {
-            for (int z = z0; z < z0 + d; z++) {
-                for (int x = x0; x < x0 + w; x++) {
-                    byte status = mask == null ? Verifier.MISSING : mask[((y - y0) * d + (z - z0)) * w + (x - x0)];
-                    if (status == Verifier.CORRECT) continue;
-                    BlockState state = region.state(x, y, z);
-                    if (state.isAir() || state.getRenderShape() != RenderShape.MODEL) continue;
-                    wrong[0] = status == Verifier.WRONG;
-                    pos.set(wx + x, wy + y, wz + z);
-                    BlockStateModel model = models.get(state);
-                    renderer.tesselateBlock(out, x - x0, y - y0, z - z0, view, pos, state, model, state.getSeed(pos));
+        int[] wetQuads = wet == null ? null : new int[h + 1];
+        // the dry blocks first, then the ones standing in water: both in layer order
+        for (int pass = 0; pass < (wet == null ? 1 : 2); pass++) {
+            if (pass == 1) wetQuads[0] = quads[0];
+            for (int y = y0; y < y0 + h; y++) {
+                for (int z = z0; z < z0 + d; z++) {
+                    for (int x = x0; x < x0 + w; x++) {
+                        int cell = ((y - y0) * d + (z - z0)) * w + (x - x0);
+                        if (wet != null && (wet[cell] != 0) != (pass == 1)) continue;
+                        byte status = mask == null ? Verifier.MISSING : mask[cell];
+                        if (status == Verifier.CORRECT) continue;
+                        BlockState state = region.state(x, y, z);
+                        if (state.isAir() || state.getRenderShape() != RenderShape.MODEL) continue;
+                        wrong[0] = status == Verifier.WRONG;
+                        pos.set(wx + x, wy + y, wz + z);
+                        BlockStateModel model = models.get(state);
+                        renderer.tesselateBlock(out, x - x0, y - y0, z - z0, view, pos, state, model, state.getSeed(pos));
+                    }
                 }
+                (pass == 0 ? layerQuads : wetQuads)[y - y0 + 1] = quads[0];
             }
-            layerQuads[y - y0 + 1] = quads[0];
         }
         MeshData mesh = builder.build();
         if (mesh == null) {
             bytes.close();
             return null;
         }
-        return new Baked(mesh, bytes, quads[0], layerQuads);
+        return new Baked(mesh, bytes, quads[0], layerQuads, wetQuads != null && wetQuads[h] > wetQuads[0] ? wetQuads : null);
     }
 
     /**

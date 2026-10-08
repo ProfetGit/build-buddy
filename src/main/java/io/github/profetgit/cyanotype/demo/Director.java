@@ -231,6 +231,7 @@ public final class Director {
                 case "undo" -> UiScenes.undo();
                 case "layer-caps" -> UiScenes.layerCaps();
                 case "ghost-flicker" -> FlickerScenes.flicker();
+                case "ghost-water" -> WaterScenes.water();
                 case "shapes" -> UiScenes.shapes();
                 case "library" -> UiScenes.library();
                 case "firstrun" -> UiScenes.firstRun();
