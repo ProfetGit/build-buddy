@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.74
+
+- Slabs auto-place properly: double (full block) slabs go down in two steps, top slabs come out on top, and on servers a block can be built on a slab or stair (the click now lands on the block's real shape).
+- With auto-placing on, a right click never uses anything: barrels, chests, doors, item frames and villagers are left alone, so a stray click no longer stops auto-placing.
+- Signs placed by auto-placing get the blueprint's text and no editor pops up. Signs you place yourself still open the editor.
+- Building one layer works: with the layer window on, auto-placing only looks at the shown layer, so the middle of a floor gets placed too (Assist used to aim at the hidden layers above it).
+- New keys (rebindable): N switches auto-placing on and off (back in the mode you used last), Page Up / Page Down move the layer window one layer (the first press starts at the lowest unfinished layer; Page Up past the top shows all layers). The hints and the Build panel mention them.
+
 ## 0.0.73
 
 - A finished build's ghost now goes away by itself, two seconds after the DONE moment. Ctrl+Z brings it back. A ghost you lock over a build that is already complete stays.
