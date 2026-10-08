@@ -15,15 +15,16 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.level.Level;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Creative paste: the whole placed blueprint goes into the world at once instead of being built block by block. It works where
- * the game lets the player do that without a command: creative mode in a world the player hosts (singleplayer, or a LAN world
- * they opened), where the client reaches the server in the same process. On somebody else's server it is not offered, and the
- * panel says why. The work is a few milliseconds of the server's time per tick ({@link PasteJob}); this class decides when it
- * is allowed, hands the job its slices, shows how it is going and takes part in Ctrl+Z.
+ * Creative paste: the whole placed blueprint goes into the world at once instead of being built block by block. In a world the
+ * player hosts (singleplayer, or a LAN world they opened) the client reaches the server in the same process and {@link PasteJob}
+ * places the blocks on the server thread. On another server an operator in creative mode gets {@link CommandPasteJob}, which
+ * sends {@code /fill} and {@code /setblock} commands a few per tick (operators are exempt from the command-spam kick). This
+ * class decides when it is allowed, hands the job its turn, shows how it is going and takes part in Ctrl+Z.
  */
 public final class Paste {
     /** The server thread's share per tick, so a big paste never stalls the world. */
@@ -31,6 +32,8 @@ public final class Paste {
 
     /** The most cells of work a tick may do when the game is running smoothly, and the least when it is struggling. */
     private static final int MAX_PER_TICK = 6000, MIN_PER_TICK = 150;
+    /** Commands a tick on a server when the game is smooth; {@link CommandPasteJob} lowers it further when the server is slow to show the blocks. */
+    private static final double COMMANDS_PER_TICK = 20;
     /** How long frames have been taking, the worst of the last few (ms), and the share of {@link #MAX_PER_TICK} the paste allows itself. */
     private static final double[] RECENT_FRAMES = new double[8];
     private static int frameAt;
@@ -38,7 +41,12 @@ public final class Paste {
     private static double pace = 1.0;
     private static volatile int blocksPerTick = MAX_PER_TICK;
 
-    private static PasteJob job;
+    /** Dev only: pretend to be on a server (true: as an operator, false: not one), so the command path can be tried in singleplayer. */
+    public static volatile Boolean testServerOps;
+
+    private static PasteRun job;
+    /** The last result message, for the dev checks. */
+    public static String lastReport = "";
     private static @Nullable Placement target;
     private static boolean inFlight, wasDone;
     private static long finishedNs;
@@ -51,11 +59,25 @@ public final class Paste {
     private Paste() {
     }
 
+    /** Whether pasting goes through commands (a server the player is an operator on) instead of the server thread of a world they host. */
+    public static boolean commandMode(Minecraft mc) {
+        return testServerOps != null || mc.getSingleplayerServer() == null;
+    }
+
+    private static boolean isOp(Minecraft mc) {
+        Boolean t = testServerOps;
+        return t != null ? t : mc.player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+    }
+
     /** Why a paste is not possible right now, in words for the player, or empty when it is. */
     public static String unavailable(Minecraft mc) {
         if (mc.level == null || mc.player == null) return "Not in a world.";
+        if (commandMode(mc)) {
+            if (!isOp(mc)) return "Pasting on a server needs operator permission.";
+            if (!mc.player.isCreative()) return "Switch to creative mode to paste.";
+            return "";
+        }
         MinecraftServer server = mc.getSingleplayerServer();
-        if (server == null) return "Pasting works in a world you host: singleplayer, or a LAN world you opened.";
         if (!mc.player.isCreative()) return "Switch to creative mode to paste.";
         if (!server.isSingleplayerOwner(mc.player.nameAndId())) return "Only the host of the world can paste.";
         return "";
@@ -70,7 +92,7 @@ public final class Paste {
         return job != null && job.state() != PasteJob.State.DONE && job.state() != PasteJob.State.UNDONE;
     }
 
-    public static @Nullable PasteJob job() {
+    public static @Nullable PasteRun job() {
         return job;
     }
 
@@ -101,12 +123,21 @@ public final class Paste {
             Sfx.play(Sfx.ERROR);
             return false;
         }
-        MinecraftServer server = mc.getSingleplayerServer();
-        ServerLevel level = server.getLevel(ResourceKey.create(Registries.DIMENSION, Identifier.parse(p.dimension)));
-        if (level == null) {
-            Interaction.say(mc, "That dimension is not loaded.");
-            Sfx.play(Sfx.ERROR);
-            return false;
+        boolean commands = commandMode(mc);
+        ServerLevel level = null;
+        if (commands) {
+            if (!mc.level.dimension().identifier().equals(Identifier.parse(p.dimension))) {
+                Interaction.say(mc, "That dimension is not the one you are in.");
+                Sfx.play(Sfx.ERROR);
+                return false;
+            }
+        } else {
+            level = mc.getSingleplayerServer().getLevel(ResourceKey.create(Registries.DIMENSION, Identifier.parse(p.dimension)));
+            if (level == null) {
+                Interaction.say(mc, "That dimension is not loaded.");
+                Sfx.play(Sfx.ERROR);
+                return false;
+            }
         }
         // the undo log lives in memory: a paste that would not leave room for it (and for the game) is refused rather than risking a crash
         long need = PasteJob.undoBytes(preview(p)[0] + preview(p)[1]);
@@ -122,11 +153,11 @@ public final class Paste {
         java.util.Arrays.fill(RECENT_FRAMES, 0);
         List<PasteJob.Part> parts = new ArrayList<>();
         for (Verifier.Part part : v.parts) parts.add(PasteJob.Part.of(part.region, part.wx, part.wy, part.wz));
-        job = new PasteJob(level, parts);
+        job = commands ? new CommandPasteJob(mc.level, parts) : new PasteJob(level, parts);
         target = p;
         inFlight = false;
         wasDone = false;
-        final PasteJob made = job;
+        final PasteRun made = job;
         Placements.rememberPaste(p, () -> undo(mc, made));
         // the ghost steps aside while the build goes in: it would compare and re-draw every block the paste changes, on top of what the game itself does
         Placements.removeAfterPaste(p);
@@ -161,7 +192,7 @@ public final class Paste {
     }
 
     /** Undoes a paste (what went in comes out, what was overwritten comes back). Called by the undo history. */
-    public static void undo(Minecraft mc, PasteJob j) {
+    public static void undo(Minecraft mc, PasteRun j) {
         if (j == null) return;
         j.beginUndo();
         job = j;
@@ -212,7 +243,7 @@ public final class Paste {
                 Sfx.play(Sfx.ERROR);
             }
         }
-        PasteJob j = job;
+        PasteRun j = job;
         if (j == null || mc.level == null || mc.player == null) return;
         PasteJob.State s = j.state();
         boolean finished = s == PasteJob.State.DONE && !j.undoPending() || s == PasteJob.State.UNDONE;
@@ -227,26 +258,34 @@ public final class Paste {
         if (inFlight) return;
         adapt();
         if (s == PasteJob.State.RUNNING && !mc.player.isCreative()) j.stop("Stopped: you are not in creative mode any more.");
+        if (j instanceof CommandPasteJob cj) {
+            cj.tick(mc, COMMANDS_PER_TICK * pace);
+            return;
+        }
+        PasteJob local = (PasteJob) j;
         MinecraftServer server = mc.getSingleplayerServer();
         if (server == null) return;
         inFlight = true;
         server.execute(() -> {
             try {
-                j.work(SLICE_NS, blocksPerTick);
+                local.work(SLICE_NS, blocksPerTick);
             } finally {
                 inFlight = false;
             }
         });
     }
 
-    private static void report(Minecraft mc, PasteJob j, PasteJob.State s) {
+    private static void report(Minecraft mc, PasteRun j, PasteJob.State s) {
         if (s == PasteJob.State.UNDONE) {
             // undoing a paste brings back the ghost that went when it was pasted
             Placement back = removedForPaste;
             removedForPaste = null;
             if (back != null) Placements.putBack(back);
             Sfx.play(Sfx.CLOSE, 1.1f);
-            Interaction.say(mc, "Undone: " + String.format(Locale.ROOT, "%,d", j.undoable()) + " blocks put back.");
+            String undone = "Undone: " + String.format(Locale.ROOT, "%,d", j.undoable()) + " blocks put back."
+                + (j instanceof CommandPasteJob cj && cj.lostContainers() > 0 ? " Items that were inside chests and other containers are not restored." : "");
+            lastReport = undone;
+            Interaction.say(mc, undone);
             return;
         }
         Sfx.play(j.stopped().isEmpty() ? Sfx.COMPLETE : Sfx.ERROR);
@@ -261,12 +300,13 @@ public final class Paste {
             + (j.same() > 0 ? " (" + String.format(Locale.ROOT, "%,d", j.same()) + " were already right)" : "")
             + (j.unloaded() > 0 ? ". " + String.format(Locale.ROOT, "%,d", j.unloaded()) + " were in chunks that are not loaded: walk closer and paste again" : "")
             + (j.stopped().isEmpty() ? "." : ". " + j.stopped()) + " Ctrl+Z undoes it.";
+        lastReport = text;
         Interaction.say(mc, text);
     }
 
     /** 0..1 while a paste or an undo runs, else -1 (for the progress panel). */
     public static double progress() {
-        PasteJob j = job;
+        PasteRun j = job;
         if (j == null) return -1;
         PasteJob.State s = j.state();
         if (s == PasteJob.State.DONE || s == PasteJob.State.UNDONE) return System.nanoTime() - finishedNs < 1_500_000_000L && wasDone ? 1.0 : -1;

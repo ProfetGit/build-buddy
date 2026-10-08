@@ -228,6 +228,7 @@ public final class Director {
                 case "wheel-counts" -> UiScenes.wheelCounts();
                 case "remove" -> UiScenes.remove();
                 case "paste" -> PasteScenes.paste();
+                case "paste-ops" -> PasteScenes.pasteOps();
                 case "paste-water" -> PasteScenes.pasteWater();
                 case "undo" -> UiScenes.undo();
                 case "layer-caps" -> UiScenes.layerCaps();

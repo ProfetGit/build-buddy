@@ -10,6 +10,7 @@ import io.github.profetgit.cyanotype.ghost.GhostRenderer;
 import io.github.profetgit.cyanotype.interaction.Keys;
 import io.github.profetgit.cyanotype.paste.Paste;
 import io.github.profetgit.cyanotype.paste.PasteJob;
+import io.github.profetgit.cyanotype.paste.PasteRun;
 import io.github.profetgit.cyanotype.placement.Placement;
 import io.github.profetgit.cyanotype.placement.Placements;
 import io.github.profetgit.cyanotype.ui.ChoiceScreen;
@@ -120,7 +121,7 @@ final class PasteScenes {
         double avg = sorted.stream().mapToLong(Long::longValue).average().orElse(0) / 1e6;
         double p99 = sorted.isEmpty() ? 0 : sorted.get((int) (sorted.size() * 0.99)) / 1e6, max = sorted.isEmpty() ? 0 : sorted.get(sorted.size() - 1) / 1e6;
         var server = mc().getSingleplayerServer();
-        PasteJob j = Paste.job();
+        PasteRun j = Paste.job();
         String line = String.format(java.util.Locale.ROOT, "{\"measure\":\"pastePerf/%s %s\",\"wallS\":%.1f,\"frames\":%d,\"avgFrameMs\":%.2f,\"p99FrameMs\":%.2f,\"maxFrameMs\":%.1f,\"serverTickMaxMs\":%.1f,\"serverTickAvgMs\":%.1f,\"blocks\":%d,\"heapGrowMiB\":%.0f}",
             what, kind, (System.nanoTime() - t0) / 1e9, sorted.size(), avg, p99, max, tickMax / 1e6, server == null ? 0 : server.getAverageTickTimeNanos() / 1e6, j == null ? 0 : j.placed(), (peak - heap0) / 1048576.0);
         Director.perf.add(line);
@@ -161,6 +162,155 @@ final class PasteScenes {
             if (!mc().level.getFluidState(new BlockPos(x, y, z)).isEmpty()) n++;
         }
         return n;
+    }
+
+    private static java.util.Map<BlockPos, BlockState> snapshot(BlockPos min, int sx, int sy, int sz) {
+        java.util.Map<BlockPos, BlockState> m = new java.util.HashMap<>();
+        for (int y = -1; y <= sy; y++) for (int z = -1; z <= sz; z++) for (int x = -1; x <= sx; x++) {
+            BlockPos at = min.offset(x, y, z);
+            m.put(at, mc().level.getBlockState(at));
+        }
+        return m;
+    }
+
+    private static String firstDiffs(java.util.Map<BlockPos, BlockState> before) {
+        StringBuilder b = new StringBuilder();
+        int n = 0;
+        for (var e : before.entrySet()) if (differs(e.getKey(), e.getValue()) && n++ < 4) b.append(e.getKey().toShortString()).append(" was ").append(e.getValue()).append(" now ").append(mc().level.getBlockState(e.getKey())).append("; ");
+        return b.toString();
+    }
+
+    /** Grass under a block turns to dirt by itself (random ticks), which is the game's doing and not the paste's. */
+    private static boolean differs(BlockPos at, BlockState was) {
+        BlockState now = mc().level.getBlockState(at);
+        return now != was && !(was.is(net.minecraft.world.level.block.Blocks.GRASS_BLOCK) && now.is(net.minecraft.world.level.block.Blocks.DIRT));
+    }
+
+    private static int differences(java.util.Map<BlockPos, BlockState> before) {
+        int n = 0;
+        for (var e : before.entrySet()) if (differs(e.getKey(), e.getValue())) n++;
+        return n;
+    }
+
+
+    /** Paste for an operator on a server, through commands (a fake server flag inside singleplayer): fills, signs, undo, and a player who is not an operator. */
+    static void pasteOps() {
+        UiScenes.setup();
+        mode("creative");
+        until("pasteops/the placement is baked and looked at", 600, () -> GhostRenderer.verifierOf(UiScenes.house) != null && GhostRenderer.verifierOf(UiScenes.house).scanned() && GhostRenderer.verifierOf(UiScenes.house).settled());
+        act(() -> {
+            Paste.testServerOps = Boolean.FALSE;
+            check("pasteops/a player who is not an operator is told so", Paste.unavailable(mc()).equals("Pasting on a server needs operator permission."), Paste.unavailable(mc()));
+            Paste.testServerOps = Boolean.TRUE;
+            check("pasteops/an operator in creative may paste", Paste.unavailable(mc()).isEmpty() && Paste.commandMode(mc()), Paste.unavailable(mc()));
+        });
+        mode("survival");
+        act(() -> check("pasteops/an operator in survival is told to switch", Paste.unavailable(mc()).contains("creative"), Paste.unavailable(mc())));
+        mode("creative");
+
+        // something that is in the way: stone, and a chest
+        Placement[] hs = new Placement[1];
+        BlockPos[] mins = new BlockPos[1];
+        java.util.Map<BlockPos, BlockState>[] snap = new java.util.Map[1];
+        act(() -> {
+            hs[0] = UiScenes.house;
+            var r0 = hs[0].blueprint.regions.get(0);
+            mins[0] = hs[0].origin.offset(r0.x, r0.y, r0.z);
+            runSync0(mins[0], hs[0]);
+        });
+        waitTicks(10);
+        act(() -> {
+            var r0 = hs[0].blueprint.regions.get(0);
+            snap[0] = snapshot(mins[0], r0.sx, r0.sy, r0.sz);
+        });
+
+        act(() -> cheats(true));
+        waitTicks(5);
+        // ---- P pastes through commands
+        act(() -> PlaceScenes.tap(Keys.PASTE));
+        until("pasteops/finished", 1800, () -> Paste.job() != null && Paste.job().state() == PasteJob.State.DONE);
+        waitTicks(6);
+        act(() -> {
+            var j = (io.github.profetgit.cyanotype.paste.CommandPasteJob) Paste.job();
+            int[] m = worldMatch(hs[0]);
+            check("pasteops/it took the command path", Paste.job() instanceof io.github.profetgit.cyanotype.paste.CommandPasteJob, String.valueOf(Paste.job()));
+            check("pasteops/every block of the house is in the world", m[1] > 100 && m[0] == m[1], m[0] + " of " + m[1]);
+            check("pasteops/fills were used: fewer commands than half the blocks", j.commandsSent() * 2 < j.total(), j.commandsSent() + " commands for " + j.total() + " blocks");
+            check("pasteops/no command went missing", j.failed() == 0, j.failed() + " failed");
+            check("pasteops/the ghost went", !Placements.all().contains(hs[0]), "placements " + Placements.all().size());
+            System.out.println("[cydemo] PASTEOPS house: " + j.commandsSent() + " commands for " + j.total() + " blocks (" + j.placed() + " placed, " + j.same() + " already right)");
+            Director.perf.add("{\"measure\":\"pasteOps/house\",\"commands\":" + j.commandsSent() + ",\"blocks\":" + j.total() + "}");
+        });
+        shot("pasteops_1_done");
+
+        // ---- Ctrl+Z puts back exactly what the client saw before
+        PlaceScenes.ctrlTap(Keys.UNDO, false);
+        until("pasteops/undone", 1800, () -> Paste.job() != null && Paste.job().state() == PasteJob.State.UNDONE);
+        waitTicks(10);
+        act(() -> {
+            check("pasteops/Ctrl+Z restored every cell (client view compared with the snapshot)", differences(snap[0]) == 0, differences(snap[0]) + " cells differ of " + snap[0].size() + " " + firstDiffs(snap[0]));
+            check("pasteops/the undo message says what is not restored", Paste.lastReport.contains("not restored"), Paste.lastReport);
+            check("pasteops/the ghost is back", Placements.all().contains(hs[0]), "placements " + Placements.all().size());
+        });
+
+        // ---- signs go in with their text
+        Placement[] cottage = new Placement[1];
+        act(() -> {
+            for (Placement p : java.util.List.copyOf(Placements.all())) Placements.remove(p);
+            var bp = Samples.signs();
+            cottage[0] = new Placement("signs", bp, "cyanotype:signs.litematic", Director.DIM, new BlockPos(30, Director.G + 1, 10), io.github.profetgit.cyanotype.placement.Orientation.NONE);
+            cottage[0].locked = true;
+            Placements.add(cottage[0]);
+        });
+        until("pasteops/cottage baked", 600, () -> GhostRenderer.verifierOf(cottage[0]) != null && GhostRenderer.verifierOf(cottage[0]).scanned() && GhostRenderer.verifierOf(cottage[0]).settled());
+        act(() -> Paste.start(mc(), cottage[0]));
+        until("pasteops/cottage pasted", 1200, () -> Paste.job() != null && Paste.job().state() == PasteJob.State.DONE);
+        waitTicks(10);
+        act(() -> {
+            int[] m = worldMatch(cottage[0]);
+            check("pasteops/the cottage is in the world", m[1] > 50 && m[0] == m[1], m[0] + " of " + m[1]);
+            var r = cottage[0].blueprint.regions.get(0);
+            BlockPos wall = cottage[0].origin.offset(r.x + 3, r.y + 1, r.z + 2), stand = cottage[0].origin.offset(r.x + 1, r.y + 1, r.z + 1);
+            String t1 = mc().level.getBlockEntity(wall) instanceof net.minecraft.world.level.block.entity.SignBlockEntity s ? s.getText(net.minecraft.world.level.block.entity.SignTextSlot.FRONT).getMessages(false).get(0).getString() + "/" + s.getText(net.minecraft.world.level.block.entity.SignTextSlot.FRONT).getMessages(false).get(2).getString() : "no sign entity";
+            String t2 = mc().level.getBlockEntity(stand) instanceof net.minecraft.world.level.block.entity.SignBlockEntity s ? s.getText(net.minecraft.world.level.block.entity.SignTextSlot.FRONT).getMessages(false).get(0).getString() : "no sign entity";
+            check("pasteops/the wall sign has its text", t1.equals("Wall sign/blueprint"), t1);
+            check("pasteops/the standing sign has its text", t2.equals("Standing"), t2);
+        });
+        shot("pasteops_2_signs");
+        PlaceScenes.ctrlTap(Keys.UNDO, false);
+        until("pasteops/cottage undone", 1800, () -> Paste.job().state() == PasteJob.State.UNDONE);
+        waitTicks(10);
+        act(() -> {
+            int[] m = worldMatch(cottage[0]);
+            check("pasteops/the cottage is gone again", m[0] < m[1] / 4, m[0] + " of " + m[1] + " still there");
+            Paste.testServerOps = null;
+            cheats(false);
+            Paste.reset();
+            for (Placement p : java.util.List.copyOf(Placements.all())) Placements.remove(p);
+            Director.hideHud(mc(), true);
+        });
+        waitTicks(4);
+    }
+
+    private static void cheats(boolean on) {
+        var server = mc().getSingleplayerServer();
+        server.execute(() -> {
+            server.getWorldData().setAllowCommands(on);
+            for (var sp : server.getPlayerList().getPlayers()) {
+                server.getPlayerList().sendPlayerPermissionLevel(sp);
+                server.getCommands().sendCommands(sp);
+            }
+        });
+    }
+
+    private static void runSync0(BlockPos min, Placement house) {
+        var r = house.blueprint.regions.get(0);
+        BlockPos chest = null;
+        for (int y = 0; y < r.sy && chest == null; y++) for (int z = 0; z < r.sz && chest == null; z++) for (int x = 0; x < r.sx && chest == null; x++) {
+            if (y >= 1 && !r.at(x, y, z).state().isAir()) chest = min.offset(x, y, z);
+        }
+        Director.run(mc(), "fill " + (min.getX() + 1) + " " + min.getY() + " " + (min.getZ() + 1) + " " + (min.getX() + 4) + " " + (min.getY() + 2) + " " + (min.getZ() + 3) + " cobblestone",
+            "setblock " + chest.getX() + " " + chest.getY() + " " + chest.getZ() + " chest");
     }
 
     static void paste() {
@@ -228,7 +378,7 @@ final class PasteScenes {
             io.github.profetgit.cyanotype.interaction.Interaction.startPlacing("p test", io.github.profetgit.cyanotype.demo.Samples.house(), "cyanotype:none.litematic");
         });
         waitTicks(20);
-        PasteJob[] firstJob = new PasteJob[1];
+        PasteRun[] firstJob = new PasteRun[1];
         act(() -> {
             firstJob[0] = Paste.job();
             check("paste/a ghost is following the crosshair", Placements.mode() == Placements.Mode.PLACING && Placements.active() != null && !Placements.active().locked, Placements.mode() + "");

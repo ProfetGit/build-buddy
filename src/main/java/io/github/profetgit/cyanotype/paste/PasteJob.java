@@ -30,7 +30,7 @@ import org.jspecify.annotations.Nullable;
  * is first swapped for a barrier without drops, so the items of a chest it overwrites are not scattered; the old block entity
  * is kept in the undo log with its items.
  */
-public final class PasteJob {
+public final class PasteJob implements PasteRun {
     private static final int FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
     /** Replace a block that has a block entity without its drops: the flags a structure placement uses for the same job. */
     private static final int QUIET = 820;
@@ -97,33 +97,40 @@ public final class PasteJob {
     }
 
     /** How many blocks the paste puts in at most: the cells of the blueprint that are not air and not unknown. */
+    @Override
     public long total() {
         return total;
     }
 
+    @Override
     public State state() {
         return state;
     }
 
+    @Override
     public long placed() {
         return placed;
     }
 
     /** Cells that already held exactly the right block. */
+    @Override
     public long same() {
         return same;
     }
 
     /** Cells left alone because their chunk was not loaded. */
+    @Override
     public long unloaded() {
         return unloaded;
     }
 
+    @Override
     public String stopped() {
         return stopped;
     }
 
     /** How far along, 0..1. */
+    @Override
     public double progress() {
         if (state == State.UNDOING) return undoPos.isEmpty() ? 1 : 1.0 - (undoPos.size() - undoAt) / (double) undoPos.size();
         return total == 0 ? 1 : Math.min(1.0, (placed + same + unloaded) / (double) total);
@@ -223,6 +230,7 @@ public final class PasteJob {
     }
 
     /** Stops placing; what went in so far can still be undone. */
+    @Override
     public void stop(String why) {
         if (state == State.RUNNING) {
             stopped = why;
@@ -231,11 +239,13 @@ public final class PasteJob {
     }
 
     /** Whether an undo was asked for and has not started. */
+    @Override
     public boolean undoPending() {
         return undoRequested && state != State.UNDOING && state != State.UNDONE;
     }
 
     /** Asks for the old blocks to be put back; the server thread starts on it at its next slice (also while the paste is still running). */
+    @Override
     public void beginUndo() {
         undoRequested = true;
     }
@@ -293,6 +303,7 @@ public final class PasteJob {
     }
 
     /** Blocks that went in and can be taken out again. */
+    @Override
     public int undoable() {
         return undoPos.size();
     }
