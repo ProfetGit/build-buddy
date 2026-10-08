@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.0.76
+
+- A ghost that is partly under water now shows its underwater part from the air, through the water like real blocks, with and without shader packs. Before, it only appeared once you were in the water.
+- The box around a placement (corner brackets, edit outline, layer frame) shows at every camera angle with shader packs. Corners behind the build are drawn fainter.
+
 ## 0.0.75
 
 - No more flicker while auto-placing with one layer shown: the top and bottom faces of the shown layer used to vanish and come back after every placed block. They now stay until their new picture is ready.
