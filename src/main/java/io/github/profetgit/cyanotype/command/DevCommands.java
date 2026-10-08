@@ -33,6 +33,8 @@ public final class DevCommands {
     private static Blueprint loaded;
     private static String loadedRef = "";
     private static String loadedName = "";
+    private static boolean loading;
+    private static final java.util.ArrayList<String> queued = new java.util.ArrayList<>();
 
     private DevCommands() {
     }
@@ -52,6 +54,10 @@ public final class DevCommands {
         String line = (message.startsWith("/") ? message.substring(1) : message).substring("cyanotype".length()).trim();
         String[] parts = line.isEmpty() ? new String[0] : line.split("\\s+", 2);
         String cmd = parts.length == 0 ? "help" : parts[0].toLowerCase(Locale.ROOT);
+        if (loading && !cmd.equals("load")) {
+            queued.add(message);
+            return;
+        }
         String arg = parts.length > 1 ? parts[1].trim() : "";
         try {
             switch (cmd) {
@@ -76,6 +82,9 @@ public final class DevCommands {
                 case "info" -> info();
                 case "ponder" -> ponder(mc, arg);
                 case "auto" -> auto(mc, arg);
+                case "samples" -> samples();
+                case "library" -> mc.gui.setScreen(new io.github.profetgit.cyanotype.ui.LibraryScreen());
+                case "paste" -> paste(mc);
                 default -> help();
             }
         } catch (RuntimeException e) {
@@ -134,6 +143,27 @@ public final class DevCommands {
         else io.github.profetgit.cyanotype.auto.AutoBuilder.request(mc, mode);
     }
 
+    /** /cyanotype samples: a few dev builds into the library (scripted recordings). */
+    private static void samples() {
+        try {
+            Files.createDirectories(BlueprintLibrary.ownDir());
+            LitematicWriter.write(Samples.pyramid(), BlueprintLibrary.ownDir().resolve("little-pyramid.litematic"));
+            LitematicWriter.write(Samples.bridge(), BlueprintLibrary.ownDir().resolve("arch-bridge.litematic"));
+            LitematicWriter.write(Samples.tower(), BlueprintLibrary.ownDir().resolve("watch-tower.litematic"));
+            LitematicWriter.write(Samples.house(), BlueprintLibrary.ownDir().resolve("sample-house.litematic"));
+            say("Wrote four sample builds.");
+        } catch (IOException e) {
+            say("Could not write the samples: " + e.getMessage());
+        }
+    }
+
+    /** /cyanotype paste: pastes the active placement (creative, a world you host). */
+    private static void paste(Minecraft mc) {
+        Placement p = Placements.active();
+        if (p == null) say("Nothing placed.");
+        else io.github.profetgit.cyanotype.paste.Paste.pasteWhenReady(mc, p);
+    }
+
     private static void help() {
         say("Files: list | load <name> | sample | place [x y z]");
         say("Placements: placements | select <n or name> | show / hide / remove [n or name] | move x y z | rotate | mirror [x] | opacity 5-100 | info | clear");
@@ -162,6 +192,7 @@ public final class DevCommands {
         }
         say("Loading " + found.getFileName() + " ...");
         long t0 = System.nanoTime();
+        loading = true;
         BlueprintLibrary.load(found, bp -> {
             loaded = bp;
             loadedRef = BlueprintLibrary.refOf(found);
@@ -169,7 +200,14 @@ public final class DevCommands {
             say(loadedName + ": " + bp.sizeX + " x " + bp.sizeY + " x " + bp.sizeZ + ", " + bp.totalBlocks() + " blocks, " + bp.regions.size() + " region(s), read in " + (System.nanoTime() - t0) / 1_000_000 + " ms.");
             if (!bp.unknownBlocks().isEmpty()) say("Unknown blocks (shown red): " + String.join(", ", bp.unknownBlocks()));
             say("Now /cyanotype place, then aim and click.");
-        }, why -> say("Could not open " + found.getFileName() + ": " + why));
+            loading = false;
+            for (String m : new java.util.ArrayList<>(queued)) run(m);
+            queued.clear();
+        }, why -> {
+            loading = false;
+            queued.clear();
+            say("Could not open " + found.getFileName() + ": " + why);
+        });
     }
 
     private static void sample() {

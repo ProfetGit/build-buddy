@@ -245,7 +245,7 @@ public final class Samples {
         return g.build("Cyanotype water pillar");
     }
 
-    static Blueprint tower() {
+    public static Blueprint tower() {
         Grid g = new Grid(9, 24, 9);
         BlockState brick = Blocks.STONE_BRICKS.defaultBlockState(), mossy = Blocks.MOSSY_STONE_BRICKS.defaultBlockState();
         for (int y = 0; y < 20; y++) {
@@ -272,7 +272,7 @@ public final class Samples {
     }
 
     /** A stepped sandstone pyramid. */
-    static Blueprint pyramid() {
+    public static Blueprint pyramid() {
         int n = 17;
         Grid g = new Grid(n, 9, n);
         for (int y = 0; y < 9; y++) {
@@ -285,7 +285,7 @@ public final class Samples {
     }
 
     /** A stone arch bridge over a gap. */
-    static Blueprint bridge() {
+    public static Blueprint bridge() {
         Grid g = new Grid(27, 9, 5);
         BlockState stone = Blocks.STONE_BRICKS.defaultBlockState(), slab = Blocks.STONE_BRICK_SLAB.defaultBlockState();
         for (int x = 0; x < 27; x++) {

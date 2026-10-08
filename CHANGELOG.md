@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.80
+
+- Chat commands for scripted recordings: `/cyanotype samples` (four sample builds into the Library), `/cyanotype library` (opens it), `/cyanotype paste` (pastes the active build).
+
 ## 0.0.79
 
 - `/cyanotype auto assist|sweep|off` turns auto-placing on or off from chat, the same as the N key and the Build panel.
