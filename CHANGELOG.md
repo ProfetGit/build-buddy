@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.83
+
+- `/cyanotype materials` opens the Materials list (scripted recordings).
+
 ## 0.0.82
 
 - `/cyanotype savename <text>` sets the name in an open Save screen (scripted recordings).
