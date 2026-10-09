@@ -43,6 +43,49 @@ final class NudgeScenes {
         waitTicks(10);
     }
 
+    /** A build sunk with Shift+scroll while it was placed from the Library keeps that height when it is carried afterwards. */
+    static void carryLifted() {
+        Director.clean();
+        act(() -> io.github.profetgit.buildbuddy.command.DevCommands.run("/buildbuddy sample"));
+        until("carry-lifted/blueprint loaded", 200, () -> io.github.profetgit.buildbuddy.command.DevCommands.loadedBlueprint() != null);
+        camera(20.5, G + 6, 3.5, 0, 90);
+        waitTicks(10);
+        act(() -> io.github.profetgit.buildbuddy.command.DevCommands.run("/buildbuddy place"));
+        waitTicks(8);
+        act(() -> {
+            Interaction.testModifiers = 1;
+            scroll(mc(), -1);
+            Interaction.testModifiers = -1;
+        });
+        waitTicks(6);
+        act(() -> check("carry-lifted/sunk a block below the surface", Placements.active().origin.getY() == G, "origin " + Placements.active().origin));
+        act(() -> PlaceScenes.hold(mc().options.keyAttack));
+        waitTicks(3);
+        act(() -> PlaceScenes.release(mc().options.keyAttack));
+        waitTicks(40);
+        until("carry-lifted/baked and drawn", 600, () -> GhostRenderer.settled());
+        BlockPos[] o = new BlockPos[1];
+        act(() -> {
+            house = Placements.active();
+            o[0] = house.origin;
+            check("carry-lifted/locked at the sunk height", house.locked && o[0].getY() == G, "origin " + o[0]);
+        });
+        look(20.5, G + 14, -12, 0, 20);
+        act(() -> PlaceScenes.aim(mc(), 20.5, G + 7, 3));
+        waitTicks(6);
+        act(() -> PlaceScenes.hold(mc().options.keyAttack));
+        waitTicks(4);
+        act(() -> check("carry-lifted/pressing on it picks it up", Interaction.grabbing(), "grabbing " + Interaction.grabbing()));
+        waitTicks(4);
+        act(() -> check("carry-lifted/picking it up does not move it", house.origin.equals(o[0]), "origin " + house.origin + " from " + o[0]));
+        act(() -> PlaceScenes.aim(mc(), 30.5, G + 1, 3));
+        waitTicks(6);
+        act(() -> check("carry-lifted/carried sideways it keeps its height", house.origin.getY() == o[0].getY() && !house.origin.equals(o[0]), "origin " + house.origin + " from " + o[0]));
+        act(() -> PlaceScenes.release(mc().options.keyAttack));
+        waitTicks(4);
+        act(() -> check("carry-lifted/dropped at the same height", house.origin.getY() == o[0].getY(), "origin " + house.origin + " from " + o[0]));
+    }
+
     /** Carrying a tall build from the ground: picked up by its roof, followed with the view lowered to the ground, put back with a right click. */
     static void carry() {
         UiScenes.setup();
