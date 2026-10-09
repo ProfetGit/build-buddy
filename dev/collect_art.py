@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "release-art"
 WS = ROOT.parents[1]
 ICON = ROOT / "dev/icon/out"
-KIT_PROMO = WS / "tools/Description-Kit/dist/promo/buildbuddy.gif"
+KIT_PROMO = WS / "tools/Description-Kit/dist/promo/cyanotype.gif"
 
 FILES = {
     "icon": [(ICON / "icon-animated.gif", "icon-animated.gif"), (ICON / "webp/icon-animated.webp", "icon-animated-60fps.webp"),
