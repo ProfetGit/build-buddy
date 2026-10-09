@@ -34,7 +34,7 @@ import net.minecraft.client.input.MouseButtonInfo;
 
 /**
  * The Community tab in the real client against a local copy of the community site (`bun run dev` in
- * ~/Projects/cyanotype-community, http://localhost:3150, seeded). The scene expects the sample data of that site: it reads
+ * ~/Projects/build-buddy-community, http://localhost:3150, seeded). The scene expects the sample data of that site: it reads
  * the list straight from the API first and compares what the screen shows with it, then drives the tab through the real
  * click paths: the first-run notice, the grid, search, a category chip, sort, paging, a build's detail, a download, the
  * file arriving in the Library, a second download that must not replace the first, a .nbt build that cannot be downloaded,
@@ -113,7 +113,7 @@ final class CommunityScenes {
                 reference = "failed: " + e.forPlayer();
             }
         }));
-        until("community/the site answers (is `bun run dev` running in cyanotype-community?)", 200, () -> !reference.equals("waiting"));
+        until("community/the site answers (is `bun run dev` running in build-buddy-community?)", 200, () -> !reference.equals("waiting"));
         act(() -> check("community/reference list read straight from the API", reference.startsWith("ok") && ALL.size() >= 12, reference));
 
         act(() -> {

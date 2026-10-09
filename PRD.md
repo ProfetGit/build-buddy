@@ -39,7 +39,7 @@ Both newcomers already have auto-placing and wide format support, so neither is 
 - Not a world editor (no WorldEdit-style fill, copy-paste into the world, brush tools).
 - No server-side component. It works as a client-only mod on any server.
 - No multi-version support beyond Fabric 26.3 at first (26.2 and backports are a later question).
-- No marketplace or uploading inside the mod. Decided 2026-10-05 (the author's call, replacing "no online sharing"): the Library has a read-only Community tab that browses and downloads builds from the separate community website (`~/Projects/cyanotype-community`, API v1, see 7.1b). Sharing a build (accounts, upload, moderation) stays on the website; the mod never sends the player's files or any account data.
+- No marketplace or uploading inside the mod. Decided 2026-10-05 (the author's call, replacing "no online sharing"): the Library has a read-only Community tab that browses and downloads builds from the separate community website (`~/Projects/build-buddy-community`, API v1, see 7.1b). Sharing a build (accounts, upload, moderation) stays on the website; the mod never sends the player's files or any account data.
 - No features that hide the player from server rules: no spoofing of the client brand, no attempts to defeat anti-cheat, no placing through walls or beyond normal reach.
 
 ## 5. Users

@@ -12,7 +12,7 @@ import java.util.Locale;
 public final class CommunityConfig {
     /** The public site. Empty until the site has a host: with no address the tab says so and sends nothing. */
     public static final String DEFAULT_BASE_URL = "";
-    /** The dev server of the community project (`bun run dev` in ~/Projects/cyanotype-community). */
+    /** The dev server of the community project (`bun run dev` in ~/Projects/build-buddy-community). */
     public static final String LOCAL_TEST_URL = "http://localhost:3150";
 
     public static final String ASK = "ask", ON = "on", OFF = "off";
