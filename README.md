@@ -18,6 +18,13 @@
 - **Paste in creative.** In a world you host, press P to drop the whole build in at once. Ctrl+Z puts everything back.
 - **It explains itself.** Little hints by the cursor show the mouse button or key for what you can do right now.
 
+<p align="center">
+<img src="https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/clips/ghost-lock.webp" alt="Aim the ghost, turn it, click to lock it down" width="49%">
+<img src="https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/clips/auto-build.webp" alt="Auto-placing builds the ghost block by block while the progress bar fills" width="49%">
+<img src="https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/clips/smart-pick.webp" alt="Smart Pick: click a build and a box fits round it" width="49%">
+<img src="https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/clips/materials.webp" alt="The Materials list in stacks, with gold boxes in the world showing where a block goes" width="49%">
+</p>
+
 ![How to use](https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/desc/title-how-to-use.webp)
 
 The first time you play, a small card reminds you of the keys. Press **J** any time for a short lesson on every tool. An empty Library has an "Add a sample house" button so you can try it straight away.
