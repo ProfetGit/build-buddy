@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.82
+
+- `/cyanotype savename <text>` sets the name in an open Save screen (scripted recordings).
+
 ## 0.0.81
 
 - Smart Pick is now on **U** by default (it was K, which Iris uses to toggle shaders, so one press did both). If you already changed the key in Controls, yours stays.

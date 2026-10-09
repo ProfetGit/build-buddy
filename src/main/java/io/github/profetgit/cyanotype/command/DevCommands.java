@@ -85,6 +85,9 @@ public final class DevCommands {
                 case "samples" -> samples();
                 case "library" -> mc.gui.setScreen(new io.github.profetgit.cyanotype.ui.LibraryScreen());
                 case "paste" -> paste(mc);
+                case "savename" -> {
+                    if (mc.gui.screen() instanceof io.github.profetgit.cyanotype.ui.SaveScreen ss) ss.setName(arg);
+                }
                 default -> help();
             }
         } catch (RuntimeException e) {
