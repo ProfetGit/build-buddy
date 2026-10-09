@@ -253,6 +253,7 @@ public final class Director {
                 case "mega" -> NudgeScenes.mega();
                 case "carry" -> NudgeScenes.carry();
                 case "carry-lifted" -> NudgeScenes.carryLifted();
+                case "carry-file" -> NudgeScenes.carryMansion();
                 case "materials" -> MaterialsScenes.materials();
                 case "settings" -> SettingsScenes.settings();
                 case "keys" -> KeyScenes.keys();

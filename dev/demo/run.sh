@@ -22,6 +22,8 @@ args=(26.3 fabric "$OUT" --game "$HERE/.work/game${WORK_TAG:+-$WORK_TAG}" --jar 
       -D "buildbuddy.demo=$OUT" -D "buildbuddy.demo.scenes=$SCENES" -D "buildbuddy.demo.measure=${MEASURE:-300}"
       --opt "fps=${FPS:-260}" --opt volume=0.0001 --opt render_distance=8 --opt "xmx=${XMX:-3G}" --width "${WIDTH:-1280}" --height "${HEIGHT:-720}"
       --user Builder --log-errors "Build Buddy.*(cannot|failed|error)" --timeout "${TIMEOUT:-900}" --label "buildbuddy $SCENES")
+[ -n "${FILE:-}" ] && args+=(-D "buildbuddy.demo.file=$FILE")
+[ -n "${SINK:-}" ] && args+=(-D "buildbuddy.demo.sink=$SINK")
 [ -n "${PERF:-}" ] && args+=(-D "buildbuddy.demo.perf=$PERF")
 [ -n "${PERF_EDIT:-}" ] && args+=(-D "buildbuddy.demo.perf.edit=true")
 [ -n "${SITE:-}" ] && args+=(-D "buildbuddy.demo.site=$SITE")

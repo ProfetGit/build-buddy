@@ -45,8 +45,17 @@ final class NudgeScenes {
 
     /** A build sunk with Shift+scroll while it was placed from the Library keeps that height when it is carried afterwards. */
     static void carryLifted() {
+        carryLifted("sample", -1, 0);
+    }
+
+    /** The same with a real file from the schematics folder (-Dbuildbuddy.demo.file=China mansion, ...demo.sink=3). */
+    static void carryMansion() {
+        carryLifted(System.getProperty("buildbuddy.demo.file", "sample"), -Integer.getInteger("buildbuddy.demo.sink", 1), Integer.getInteger("buildbuddy.demo.pad", 0));
+    }
+
+    static void carryLifted(String file, int sink, int pad) {
         Director.clean();
-        act(() -> io.github.profetgit.buildbuddy.command.DevCommands.run("/buildbuddy sample"));
+        act(() -> io.github.profetgit.buildbuddy.command.DevCommands.run(file.equals("sample") ? "/buildbuddy sample" : "/buildbuddy load " + file));
         until("carry-lifted/blueprint loaded", 200, () -> io.github.profetgit.buildbuddy.command.DevCommands.loadedBlueprint() != null);
         camera(20.5, G + 6, 3.5, 0, 90);
         waitTicks(10);
@@ -54,11 +63,15 @@ final class NudgeScenes {
         waitTicks(8);
         act(() -> {
             Interaction.testModifiers = 1;
-            scroll(mc(), -1);
+            scroll(mc(), sink);
             Interaction.testModifiers = -1;
         });
         waitTicks(6);
-        act(() -> check("carry-lifted/sunk a block below the surface", Placements.active().origin.getY() == G, "origin " + Placements.active().origin));
+        int[] y0 = new int[1];
+        act(() -> {
+            y0[0] = Placements.active().origin.getY();
+            check("carry-lifted/sunk below the surface", y0[0] == G + 1 + sink, "origin " + Placements.active().origin + " sink " + sink);
+        });
         act(() -> PlaceScenes.hold(mc().options.keyAttack));
         waitTicks(3);
         act(() -> PlaceScenes.release(mc().options.keyAttack));
@@ -68,19 +81,21 @@ final class NudgeScenes {
         act(() -> {
             house = Placements.active();
             o[0] = house.origin;
-            check("carry-lifted/locked at the sunk height", house.locked && o[0].getY() == G, "origin " + o[0]);
+            check("carry-lifted/locked at the sunk height", house.locked && o[0].getY() == y0[0], "origin " + o[0]);
         });
-        look(20.5, G + 14, -12, 0, 20);
-        act(() -> PlaceScenes.aim(mc(), 20.5, G + 7, 3));
+        boolean big = !file.equals("sample");
+        look(20.5, big ? G + 1 : G + 14, big ? -70 : -12, 0, big ? -10 : 20);
+        act(() -> PlaceScenes.aim(mc(), big ? 6.5 : 20.5, big ? G + 22 : G + 7, big ? 0 : 3));
         waitTicks(6);
         act(() -> PlaceScenes.hold(mc().options.keyAttack));
         waitTicks(4);
         act(() -> check("carry-lifted/pressing on it picks it up", Interaction.grabbing(), "grabbing " + Interaction.grabbing()));
         waitTicks(4);
         act(() -> check("carry-lifted/picking it up does not move it", house.origin.equals(o[0]), "origin " + house.origin + " from " + o[0]));
-        act(() -> PlaceScenes.aim(mc(), 30.5, G + 1, 3));
+        act(() -> PlaceScenes.aim(mc(), big ? 70.5 : 30.5, G + 1, 3));
         waitTicks(6);
         act(() -> check("carry-lifted/carried sideways it keeps its height", house.origin.getY() == o[0].getY() && !house.origin.equals(o[0]), "origin " + house.origin + " from " + o[0]));
+        act(() -> check("carry-lifted/the picture is at the same height while carrying", Math.abs(GhostRenderer.visualY(house) - o[0].getY()) < 0.5, "visual " + GhostRenderer.visualY(house) + " origin " + house.origin));
         act(() -> PlaceScenes.release(mc().options.keyAttack));
         waitTicks(4);
         act(() -> check("carry-lifted/dropped at the same height", house.origin.getY() == o[0].getY(), "origin " + house.origin + " from " + o[0]));
