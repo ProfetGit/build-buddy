@@ -1,10 +1,10 @@
 """Helpers for writing lessons (PRD 7.12a). A lesson is built with calls like `L.cursor(...)`, `L.caption(...)` and written as
-format-1 JSON into src/main/resources/assets/cyanotype/ponders/. The loader in the mod is strict, so a typo fails there (the
+format-1 JSON into src/main/resources/assets/buildbuddy/ponders/. The loader in the mod is strict, so a typo fails there (the
 Java test over every shipped lesson) and not as a missing arrow in the game."""
 import json
 from pathlib import Path
 
-SHIP = Path(__file__).resolve().parent.parent.parent / "src/main/resources/assets/cyanotype/ponders"
+SHIP = Path(__file__).resolve().parent.parent.parent / "src/main/resources/assets/buildbuddy/ponders"
 
 
 def r(x, n=4):

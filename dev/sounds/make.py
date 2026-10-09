@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Synthesizes Cyanotype's own interface sounds (soft ticks, clicks, chimes) and writes them into the mod.
+"""Synthesizes Build Buddy's own interface sounds (soft ticks, clicks, chimes) and writes them into the mod.
 
-numpy makes the samples, ffmpeg's Vorbis encoder turns them into .ogg. Output: src/main/resources/assets/cyanotype/sounds/*.ogg
+numpy makes the samples, ffmpeg's Vorbis encoder turns them into .ogg. Output: src/main/resources/assets/buildbuddy/sounds/*.ogg
 and sounds.json. Run: python3 dev/sounds/make.py   (add --wav to keep the WAVs in dev/sounds/out for a listen)
 
 Design rules (PRD 6b): quiet and short, vanilla-like loudness, never louder than vanilla UI. A sound is a pitched tone with a
@@ -17,7 +17,7 @@ import numpy as np
 
 SR = 44100
 HERE = Path(__file__).resolve().parent
-OUT = HERE.parent.parent / "src/main/resources/assets/cyanotype"
+OUT = HERE.parent.parent / "src/main/resources/assets/buildbuddy"
 rng = np.random.default_rng(7)
 
 
@@ -133,7 +133,7 @@ def main():
         write_wav(wav, make())
         ogg = sounds_dir / f"{name}.ogg"
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(wav), "-ac", "2", "-c:a", "vorbis", "-strict", "-2", "-q:a", "5", str(ogg)], check=True)
-        events[name] = {"sounds": [{"name": f"cyanotype:{name}", "volume": 1.0}]}
+        events[name] = {"sounds": [{"name": f"buildbuddy:{name}", "volume": 1.0}]}
         if not keep:
             wav.unlink()
     (OUT / "sounds.json").write_text(json.dumps(events, indent=2) + "\n")

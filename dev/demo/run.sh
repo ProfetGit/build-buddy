@@ -16,19 +16,19 @@ OUT=$(realpath -m "${1:?usage: run.sh <out> [scenes]}")
 SCENES=${2:-house}
 export JAVA_HOME=/usr/lib/jvm/java-25-openjdk
 if [ -z "${SKIP_BUILD:-}" ]; then (cd "$ROOT" && ./gradlew -q --console=plain build --offline); fi
-JAR=$(ls -t "$ROOT"/build/libs/cyanotype-*.jar | grep -v -- -sources | sed -n 1p)
+JAR=$(ls -t "$ROOT"/build/libs/buildbuddy-*.jar | grep -v -- -sources | sed -n 1p)
 WORLD="$HERE/.work/world-26.3"
 args=(26.3 fabric "$OUT" --game "$HERE/.work/game${WORK_TAG:+-$WORK_TAG}" --jar "$JAR" --world "$WORLD"
-      -D "cyanotype.demo=$OUT" -D "cyanotype.demo.scenes=$SCENES" -D "cyanotype.demo.measure=${MEASURE:-300}"
+      -D "buildbuddy.demo=$OUT" -D "buildbuddy.demo.scenes=$SCENES" -D "buildbuddy.demo.measure=${MEASURE:-300}"
       --opt "fps=${FPS:-260}" --opt volume=0.0001 --opt render_distance=8 --opt "xmx=${XMX:-3G}" --width "${WIDTH:-1280}" --height "${HEIGHT:-720}"
-      --user Builder --log-errors "Cyanotype.*(cannot|failed|error)" --timeout "${TIMEOUT:-900}" --label "cyanotype $SCENES")
-[ -n "${PERF:-}" ] && args+=(-D "cyanotype.demo.perf=$PERF")
-[ -n "${PERF_EDIT:-}" ] && args+=(-D "cyanotype.demo.perf.edit=true")
-[ -n "${SITE:-}" ] && args+=(-D "cyanotype.demo.site=$SITE")
-[ -n "${PONDER:-}" ] && args+=(-D "cyanotype.demo.ponder=$PONDER")
-[ -n "${PONDER_STEP:-}" ] && args+=(-D "cyanotype.demo.ponder.step=$PONDER_STEP")
-[ -n "${TAKE:-}" ] && args+=(-D "cyanotype.demo.take=$TAKE")
-[ "${NBT:-}" = "0" ] && args+=(-D "cyanotype.demo.nbt=false")
+      --user Builder --log-errors "Build Buddy.*(cannot|failed|error)" --timeout "${TIMEOUT:-900}" --label "buildbuddy $SCENES")
+[ -n "${PERF:-}" ] && args+=(-D "buildbuddy.demo.perf=$PERF")
+[ -n "${PERF_EDIT:-}" ] && args+=(-D "buildbuddy.demo.perf.edit=true")
+[ -n "${SITE:-}" ] && args+=(-D "buildbuddy.demo.site=$SITE")
+[ -n "${PONDER:-}" ] && args+=(-D "buildbuddy.demo.ponder=$PONDER")
+[ -n "${PONDER_STEP:-}" ] && args+=(-D "buildbuddy.demo.ponder.step=$PONDER_STEP")
+[ -n "${TAKE:-}" ] && args+=(-D "buildbuddy.demo.take=$TAKE")
+[ "${NBT:-}" = "0" ] && args+=(-D "buildbuddy.demo.nbt=false")
 # the mod needs Fabric API (its resource loader serves the art and sounds), so every run has it unless FABRIC_API=0
 [ "${FABRIC_API:-1}" != "0" ] && args+=(--fabric-api)
 if [ -n "${MODS:-}" ]; then IFS=: read -ra extra <<< "$MODS"; for m in "${extra[@]}"; do args+=(--mod "$m"); done; fi
@@ -36,7 +36,7 @@ if [ -n "${SHADERS:-}" ]; then args+=(--shaders "$(ls -t "$HOME"/.local/share/Mo
 if [ -n "${PROFILE:-}" ]; then
   P="$HOME/.local/share/ModrinthApp/profiles/Fabric 26.3/mods"
   for m in "$P"/*.jar; do
-    case "$(basename "$m")" in cyanotype*) continue ;; esac
+    case "$(basename "$m")" in buildbuddy*) continue ;; esac
     [ -n "${EXCLUDE:-}" ] && basename "$m" | grep -qiE "$EXCLUDE" && continue
     args+=(--mod "$m")
   done

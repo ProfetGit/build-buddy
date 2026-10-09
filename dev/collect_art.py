@@ -11,11 +11,11 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "release-art"
 WS = ROOT.parents[1]
 ICON = ROOT / "dev/icon/out"
-KIT_PROMO = WS / "tools/Description-Kit/dist/promo/cyanotype.gif"
+KIT_PROMO = WS / "tools/Description-Kit/dist/promo/buildbuddy.gif"
 
 FILES = {
     "icon": [(ICON / "icon-animated.gif", "icon-animated.gif"), (ICON / "webp/icon-animated.webp", "icon-animated-60fps.webp"),
-             (ICON / "icon-512.png", "icon-512.png"), (ROOT / "src/main/resources/assets/cyanotype/icon.png", "jar-icon-128.png")],
+             (ICON / "icon-512.png", "icon-512.png"), (ROOT / "src/main/resources/assets/buildbuddy/icon.png", "jar-icon-128.png")],
     "banner": [(ICON / "banner-animated.gif", "banner-animated.gif"), (ROOT / "docs/banner.webp", "banner-animated-60fps.webp"),
                (ICON / "banner.png", "banner.png")],
     "promo-tile": [(KIT_PROMO, "promo-tile.gif"), (ICON / "webp/promo-tile.webp", "promo-tile-60fps.webp")],

@@ -1,4 +1,4 @@
-![Cyanotype](https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/banner.webp)
+![Build Buddy](https://raw.githubusercontent.com/ProfetGit/build-buddy/main/docs/banner.webp)
 
 <p align="center">
 <a href="https://github.com/ProfetGit"><img src="https://raw.githubusercontent.com/ProfetGit/assets/main/buttons/github.webp" alt="GitHub" width="23.96%"></a>
@@ -7,7 +7,7 @@
 
 **Blueprints, made easy.** Load a build, see it as a see-through ghost in your world, and put it up block by block while the screen tells you what to do next. For Minecraft 26.3 on Fabric. It runs on your client alone, so it works on any server, and you never need a tutorial to use it.
 
-![Features](https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/desc/title-features.webp)
+![Features](https://raw.githubusercontent.com/ProfetGit/build-buddy/main/docs/desc/title-features.webp)
 
 - **Ghost it.** Load a `.litematic` build and it floats where you aim. Scroll to turn it, Shift + scroll to lift it, press M to mirror it, click to lock it down. Grab it by its body and carry it, however big it is.
 - **See what's left.** Blocks you got right disappear from the ghost, wrong ones turn red, and a progress bar fills up. A pulsing marker shows the next block, and Layers lets you work one level at a time.
@@ -19,41 +19,41 @@
 - **It explains itself.** Little hints by the cursor show the mouse button or key for what you can do right now.
 
 <p align="center">
-<img src="https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/clips/ghost-lock.webp" alt="Aim the ghost, turn it, click to lock it down" width="49%">
-<img src="https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/clips/auto-build.webp" alt="Auto-placing builds the ghost block by block while the progress bar fills" width="49%">
-<img src="https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/clips/smart-pick.webp" alt="Smart Pick: click a build and a box fits round it" width="49%">
-<img src="https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/clips/materials.webp" alt="The Materials list in stacks, with gold boxes in the world showing where a block goes" width="49%">
+<img src="https://raw.githubusercontent.com/ProfetGit/build-buddy/main/docs/clips/ghost-lock.webp" alt="Aim the ghost, turn it, click to lock it down" width="49%">
+<img src="https://raw.githubusercontent.com/ProfetGit/build-buddy/main/docs/clips/auto-build.webp" alt="Auto-placing builds the ghost block by block while the progress bar fills" width="49%">
+<img src="https://raw.githubusercontent.com/ProfetGit/build-buddy/main/docs/clips/smart-pick.webp" alt="Smart Pick: click a build and a box fits round it" width="49%">
+<img src="https://raw.githubusercontent.com/ProfetGit/build-buddy/main/docs/clips/materials.webp" alt="The Materials list in stacks, with gold boxes in the world showing where a block goes" width="49%">
 </p>
 
-![How to use](https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/desc/title-how-to-use.webp)
+![How to use](https://raw.githubusercontent.com/ProfetGit/build-buddy/main/docs/desc/title-how-to-use.webp)
 
 The first time you play, a small card reminds you of the keys. Press **J** any time for a short lesson on every tool. An empty Library has an "Add a sample house" button so you can try it straight away.
 
 Tap **V** to start or stop editing. Hold **V** to open the wheel: Library, Edit, Layers, Build, Materials and Save.
 
-Put your builds in `config/cyanotype/blueprints` or the game's `schematics` folder, open the Library, and click one. It follows your crosshair: scroll to turn, Shift + scroll to lift, **M** to mirror, click to lock it. To move it later, tap **V** and drag an arrow or the ring, or press on the build and look where you want it.
+Put your builds in `config/buildbuddy/blueprints` or the game's `schematics` folder, open the Library, and click one. It follows your crosshair: scroll to turn, Shift + scroll to lift, **M** to mirror, click to lock it. To move it later, tap **V** and drag an arrow or the ring, or press on the build and look where you want it.
 
 **Ctrl+Z** undoes and **Ctrl+Y** redoes. **H** hides every ghost. **Delete** removes the one you are on. You can rebind the keys in Controls.
 
 To save a build, hold **V**, choose Save, and click the build you want. Right click to save it.
 
-![Compatibility](https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/desc/title-compatibility.webp)
+![Compatibility](https://raw.githubusercontent.com/ProfetGit/build-buddy/main/docs/desc/title-compatibility.webp)
 
 - Minecraft Java 26.3 on Fabric. [Fabric API](https://www.curseforge.com/minecraft/mc-mods/fabric-api) is required: it serves the mod's art and sounds.
 - Works with Sodium, and with Iris shaders (checked with Complementary).
 - Client side only. Nothing has to be installed on a server.
 
-![Installation](https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/desc/title-installation.webp)
+![Installation](https://raw.githubusercontent.com/ProfetGit/build-buddy/main/docs/desc/title-installation.webp)
 
-Put the Cyanotype jar and Fabric API in your `mods` folder. Builds go in `config/cyanotype/blueprints`, or in the game's `schematics` folder where Litematica keeps them.
+Put the Build Buddy jar and Fabric API in your `mods` folder. Builds go in `config/buildbuddy/blueprints`, or in the game's `schematics` folder where Litematica keeps them.
 
-![Good to know](https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/desc/title-good-to-know.webp)
+![Good to know](https://raw.githubusercontent.com/ProfetGit/build-buddy/main/docs/desc/title-good-to-know.webp)
 
 - Auto-placing uses the game's own block placing, at your normal reach and at most 20 blocks a second, and you can see your arm swing. Some servers don't allow building aids, so on a server it asks first and remembers your answer for that server. Check the server's rules before you turn it on.
 - Chest contents and mobs are not saved with a build. Sign text is kept.
 - Pasting only works in creative, in a world you host. On other servers the game's command limits make a build of any size impractical, so use the ghost and the progress bar there.
 
-![More from Profet](https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/desc/title-more-from-profet.webp)
+![More from Profet](https://raw.githubusercontent.com/ProfetGit/build-buddy/main/docs/desc/title-more-from-profet.webp)
 
 <!-- promo:start -->
 <p align="center">
@@ -64,9 +64,9 @@ Put the Cyanotype jar and Fabric API in your `mods` folder. Builds go in `config
 </p>
 <!-- promo:end -->
 
-![Support](https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/desc/title-support.webp)
+![Support](https://raw.githubusercontent.com/ProfetGit/build-buddy/main/docs/desc/title-support.webp)
 
-Cyanotype is free. If it saves you some building time, a coffee helps fund the next update.
+Build Buddy is free. If it saves you some building time, a coffee helps fund the next update.
 
 [![Support me on Ko-fi](https://raw.githubusercontent.com/ProfetGit/assets/main/kofi-banner.webp)](https://ko-fi.com/profetgit)
 
@@ -74,10 +74,10 @@ Want your own server to play on with friends? My BisectHosting affiliate link gi
 
 [![Get 25% off your first month at BisectHosting](https://raw.githubusercontent.com/ProfetGit/assets/main/bisecthosting-banner.webp)](https://url-shortener.curseforge.com/Pp2BN)
 
-![License](https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/desc/title-license.webp)
+![License](https://raw.githubusercontent.com/ProfetGit/build-buddy/main/docs/desc/title-license.webp)
 
-All rights reserved, with permissions: you can use it anywhere, include it in modpacks with credit, and show it in videos. Full terms: [LICENSE](https://github.com/ProfetGit/cyanotype/blob/main/LICENSE).
+All rights reserved, with permissions: you can use it anywhere, include it in modpacks with credit, and show it in videos. Full terms: [LICENSE](https://github.com/ProfetGit/build-buddy/blob/main/LICENSE).
 
 Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.
 
-![](https://raw.githubusercontent.com/ProfetGit/cyanotype/main/docs/desc/divider.webp)
+![](https://raw.githubusercontent.com/ProfetGit/build-buddy/main/docs/desc/divider.webp)

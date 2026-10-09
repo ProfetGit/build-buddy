@@ -5,7 +5,7 @@ Shapes are drawn as filled layers on a 16 x 16 grid and each layer gets its outl
 straight neighbours only, so corners come out soft). The mouse and the key are the approved designs (2026-10-05).
 
     python3 dev/ui/pixel.py preview   -> dev/ui/out/pixel_all.png (every icon at 1x and 8x)
-    python3 dev/ui/pixel.py build     -> src/main/resources/assets/cyanotype/ui/pixel.png + pixel.json (drawn crisp in the game)
+    python3 dev/ui/pixel.py build     -> src/main/resources/assets/buildbuddy/ui/pixel.png + pixel.json (drawn crisp in the game)
 """
 import json
 import math
@@ -16,7 +16,7 @@ from PIL import Image
 
 HERE = Path(__file__).resolve().parent
 OUT = HERE / "out"
-SHIP = HERE.parent.parent / "src/main/resources/assets/cyanotype/ui"
+SHIP = HERE.parent.parent / "src/main/resources/assets/buildbuddy/ui"
 
 K = (28, 34, 46)        # ink: the outline
 W = (250, 252, 255)     # white body

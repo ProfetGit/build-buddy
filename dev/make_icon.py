@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cyanotype icon: a blueprint ghost of a little house, built block by block (pack-icon-animation skill, pure 2D).
+"""Build Buddy icon: a blueprint ghost of a little house, built block by block (pack-icon-animation skill, pure 2D).
 
 No Blockbench: every frame is ray-cast on a 128 px canvas from boxes in world units (24 px per unit, 2:1 isometric,
 12x12 texel textures at 2 px per texel), so squash, stairs and the ghost lines stay pixel-crisp. Boxes are either solid
@@ -10,7 +10,7 @@ a flash and a ring; the house is done, a check pops and the shine runs over it; 
   python3 dev/make_icon.py [--options]
 
 Textures: dev/make_textures.py -> dev/icon/sprites. Outputs in dev/icon/out/ (icon-animated.gif 256 px, icon-512.png),
-the jar icon src/main/resources/assets/cyanotype/icon.png, dev/icon/contact.png.
+the jar icon src/main/resources/assets/buildbuddy/icon.png, dev/icon/contact.png.
 """
 import math
 import sys
@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ICON = ROOT / "dev" / "icon"
 SPR = ICON / "sprites"
 OUT = ICON / "out"
-MOD_ICON = ROOT / "src/main/resources/assets/cyanotype/icon.png"
+MOD_ICON = ROOT / "src/main/resources/assets/buildbuddy/icon.png"
 N = 128
 U = 24                      # px per unit along x and z (and up)
 HU = U // 2

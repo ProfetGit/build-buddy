@@ -49,7 +49,7 @@ def main():
         banner.append(Image.fromarray(arr, "RGBA"))
     sys.path.insert(0, str(mi.ROOT.parents[1] / "tools/Description-Kit/dev"))
     import make_promo as mp
-    base, _ = mp.compose_static("cyanotype", mp.TILES["cyanotype"])
+    base, _ = mp.compose_static("buildbuddy", mp.TILES["buildbuddy"])
     base = base.convert("RGBA")
     pos = (mp.icon_x(mi.GIF_SIZE), (mp.TH * mp.S - mi.GIF_SIZE) // 2)
     tile = []

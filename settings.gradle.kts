@@ -6,4 +6,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "cyanotype"
+rootProject.name = "buildbuddy"

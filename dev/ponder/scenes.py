@@ -1,4 +1,4 @@
-"""The lessons. Run make.py to write them into src/main/resources/assets/cyanotype/ponders/."""
+"""The lessons. Run make.py to write them into src/main/resources/assets/buildbuddy/ponders/."""
 from pondlib import Lesson, Follow, Builder, add, follow_cursor, stage, cells_of, cottage_keys, COTTAGE
 from recording import Recording, Take
 
@@ -354,7 +354,7 @@ def auto():
 
     # the server warning
     L.panel("warning", 13.9, 19.0, title="Auto-placing on a server",
-            text="Auto-placing may break this server's rules and can get you banned. Cyanotype can't know what this server allows. Check the rules or ask the staff first. You're responsible for how you use it.",
+            text="Auto-placing may break this server's rules and can get you banned. Build Buddy can't know what this server allows. Check the rules or ask the staff first. You're responsible for how you use it.",
             buttons=["Keep it off", "Enable on this server"], focus=0, wait=3, lit=-1, states=[{"t": 17.7, "lit": 1}], rect=[0.12, 0.12, 0.76, 0.68], fade=0.35)
     L.cursor(16.4, ease="inOut", screen=[0.85, 0.85], alpha=0)
     L.cursor(16.8, ease="out", alpha=1)

@@ -214,10 +214,10 @@ do
   THEMES[#THEMES + 1] = T
 end
 
--- B: Cyanotype ----------------------------------------------------------------------------------------------------
+-- B: Build Buddy ----------------------------------------------------------------------------------------------------
 do
   local N0, N1, N2, N3, W, CY = "#0A1E45", "#0F2A5C", "#173B7E", "#2A64C4", "#E8F7FF", "#6FC4F5"
-  local T = { name = "B_cyanotype", bg = "#101820" }
+  local T = { name = "B_buildbuddy", bg = "#101820" }
   function T.panel(c, x, y, w, h)
     c:rect(x, y, w, h, N1)
     for j = 0, h - 1 do for i = 0, w - 1 do
@@ -453,7 +453,7 @@ end
 
 -- final export of theme B ----------------------------------------------------------------------------------------
 local B
-for _, T in ipairs(THEMES) do if T.name == "B_cyanotype" then B = T end end
+for _, T in ipairs(THEMES) do if T.name == "B_buildbuddy" then B = T end end
 local FD = ROOT .. "B_final/"
 os.execute('mkdir -p "' .. FD .. '"')
 local function one(name, w, h, fn) local c = newc(); fn(c); c:save(FD .. name, w, h) end

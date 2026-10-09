@@ -1,0 +1,1308 @@
+{
+ "format": 1,
+ "id": "auto",
+ "title": "Let the mod place blocks",
+ "summary": "Assist places what you look at, Sweep builds what is in reach while you walk, and a server is asked about first.",
+ "tags": [
+  "auto",
+  "assist",
+  "sweep",
+  "place",
+  "server",
+  "warning",
+  "printer",
+  "build"
+ ],
+ "action": "auto",
+ "duration": 21.0,
+ "stage": {
+  "size": [
+   11,
+   9,
+   11
+  ],
+  "focus": [
+   5.5,
+   3.4,
+   5.5
+  ]
+ },
+ "palette": {
+  "G": "minecraft:grass_block",
+  "D": "minecraft:dirt",
+  "c": "minecraft:cobblestone",
+  "m": "minecraft:mossy_cobblestone",
+  "p": "minecraft:oak_planks",
+  "l": "minecraft:oak_log",
+  "g": "minecraft:glass_pane[north=true,south=true]",
+  "h": "minecraft:glass_pane[east=true,west=true]",
+  "w": "minecraft:cobblestone_wall[up=true]",
+  "n": "minecraft:brick_stairs[facing=south]",
+  "s": "minecraft:brick_stairs[facing=north]",
+  "t": "minecraft:brick_slab[type=bottom]",
+  "u": "minecraft:bricks",
+  "b": "minecraft:oak_door[facing=south,half=lower]",
+  "B": "minecraft:oak_door[facing=south,half=upper]"
+ },
+ "groups": [
+  {
+   "id": "ground",
+   "mode": "solid",
+   "pos": [
+    0,
+    0,
+    0
+   ],
+   "layers": [
+    [
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD",
+     "DDDDDDDDDDD"
+    ],
+    [
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG",
+     "GGGGGGGGGGG"
+    ]
+   ],
+   "start": "full"
+  },
+  {
+   "id": "ghost",
+   "mode": "ghost",
+   "pos": [
+    3,
+    2,
+    3
+   ],
+   "layers": [
+    [
+     "cmccc",
+     "ccccm",
+     "mcccc",
+     "ccmcc",
+     "cccmc"
+    ],
+    [
+     "lpppl",
+     "p...p",
+     "g...g",
+     "p...p",
+     "lpbpl"
+    ],
+    [
+     "lphpl",
+     "p...p",
+     "p...p",
+     "p...p",
+     "lpBpl"
+    ],
+    [
+     "nnnnn",
+     "uuuuu",
+     "uuuuu",
+     "uuuuu",
+     "sssss"
+    ],
+    [
+     ".....",
+     "nnnnc",
+     "uuuuu",
+     "sssss",
+     "....."
+    ],
+    [
+     ".....",
+     "....w",
+     "ttttt",
+     ".....",
+     "....."
+    ]
+   ],
+   "start": "full",
+   "match": [
+    "real"
+   ]
+  },
+  {
+   "id": "real",
+   "mode": "solid",
+   "pos": [
+    3,
+    2,
+    3
+   ],
+   "layers": [
+    [
+     "cmccc",
+     "ccccm",
+     "mcccc",
+     "ccmcc",
+     "cccmc"
+    ],
+    [
+     "lpppl",
+     "p...p",
+     "g...g",
+     "p...p",
+     "lpbpl"
+    ],
+    [
+     "lphpl",
+     "p...p",
+     "p...p",
+     "p...p",
+     "lpBpl"
+    ],
+    [
+     "nnnnn",
+     "uuuuu",
+     "uuuuu",
+     "uuuuu",
+     "sssss"
+    ],
+    [
+     ".....",
+     "nnnnc",
+     "uuuuu",
+     "sssss",
+     "....."
+    ],
+    [
+     ".....",
+     "....w",
+     "ttttt",
+     ".....",
+     "....."
+    ]
+   ],
+   "start": "empty"
+  }
+ ],
+ "ops": [
+  {
+   "t": 1.6,
+   "group": "real",
+   "do": "reveal",
+   "anim": "pop",
+   "cells": [
+    [
+     0,
+     0,
+     0
+    ],
+    [
+     1,
+     0,
+     0
+    ],
+    [
+     2,
+     0,
+     0
+    ],
+    [
+     3,
+     0,
+     0
+    ],
+    [
+     4,
+     0,
+     0
+    ],
+    [
+     4,
+     0,
+     1
+    ],
+    [
+     3,
+     0,
+     1
+    ],
+    [
+     2,
+     0,
+     1
+    ],
+    [
+     1,
+     0,
+     1
+    ],
+    [
+     0,
+     0,
+     1
+    ],
+    [
+     0,
+     0,
+     2
+    ],
+    [
+     1,
+     0,
+     2
+    ],
+    [
+     2,
+     0,
+     2
+    ],
+    [
+     3,
+     0,
+     2
+    ],
+    [
+     4,
+     0,
+     2
+    ]
+   ],
+   "dur": 0.15,
+   "stagger": 0.2,
+   "order": "given"
+  },
+  {
+   "t": 7.0,
+   "group": "real",
+   "do": "reveal",
+   "anim": "drop",
+   "cells": [
+    [
+     2,
+     0,
+     4
+    ],
+    [
+     1,
+     0,
+     4
+    ],
+    [
+     3,
+     0,
+     4
+    ],
+    [
+     0,
+     0,
+     4
+    ],
+    [
+     4,
+     0,
+     4
+    ],
+    [
+     2,
+     0,
+     3
+    ],
+    [
+     1,
+     0,
+     3
+    ],
+    [
+     3,
+     0,
+     3
+    ],
+    [
+     0,
+     0,
+     3
+    ],
+    [
+     4,
+     0,
+     3
+    ],
+    [
+     2,
+     1,
+     4
+    ],
+    [
+     1,
+     1,
+     4
+    ],
+    [
+     3,
+     1,
+     4
+    ],
+    [
+     0,
+     1,
+     4
+    ],
+    [
+     4,
+     1,
+     4
+    ],
+    [
+     0,
+     1,
+     3
+    ],
+    [
+     4,
+     1,
+     3
+    ],
+    [
+     2,
+     2,
+     4
+    ],
+    [
+     1,
+     2,
+     4
+    ],
+    [
+     3,
+     2,
+     4
+    ],
+    [
+     0,
+     2,
+     4
+    ],
+    [
+     4,
+     2,
+     4
+    ],
+    [
+     0,
+     2,
+     3
+    ],
+    [
+     4,
+     2,
+     3
+    ],
+    [
+     2,
+     3,
+     4
+    ],
+    [
+     1,
+     3,
+     4
+    ],
+    [
+     3,
+     3,
+     4
+    ],
+    [
+     0,
+     3,
+     4
+    ],
+    [
+     4,
+     3,
+     4
+    ],
+    [
+     2,
+     3,
+     3
+    ],
+    [
+     1,
+     3,
+     3
+    ],
+    [
+     3,
+     3,
+     3
+    ],
+    [
+     0,
+     3,
+     3
+    ],
+    [
+     4,
+     3,
+     3
+    ],
+    [
+     2,
+     4,
+     3
+    ],
+    [
+     1,
+     4,
+     3
+    ],
+    [
+     3,
+     4,
+     3
+    ],
+    [
+     0,
+     4,
+     3
+    ],
+    [
+     4,
+     4,
+     3
+    ]
+   ],
+   "stagger": 0.04,
+   "order": "given"
+  },
+  {
+   "t": 11.6,
+   "group": "real",
+   "do": "reveal",
+   "anim": "drop",
+   "cells": [
+    [
+     2,
+     1,
+     0
+    ],
+    [
+     1,
+     1,
+     0
+    ],
+    [
+     3,
+     1,
+     0
+    ],
+    [
+     0,
+     1,
+     0
+    ],
+    [
+     4,
+     1,
+     0
+    ],
+    [
+     0,
+     1,
+     1
+    ],
+    [
+     4,
+     1,
+     1
+    ],
+    [
+     0,
+     1,
+     2
+    ],
+    [
+     4,
+     1,
+     2
+    ],
+    [
+     2,
+     2,
+     0
+    ],
+    [
+     1,
+     2,
+     0
+    ],
+    [
+     3,
+     2,
+     0
+    ],
+    [
+     0,
+     2,
+     0
+    ],
+    [
+     4,
+     2,
+     0
+    ],
+    [
+     0,
+     2,
+     1
+    ],
+    [
+     4,
+     2,
+     1
+    ],
+    [
+     0,
+     2,
+     2
+    ],
+    [
+     4,
+     2,
+     2
+    ],
+    [
+     2,
+     3,
+     0
+    ],
+    [
+     1,
+     3,
+     0
+    ],
+    [
+     3,
+     3,
+     0
+    ],
+    [
+     0,
+     3,
+     0
+    ],
+    [
+     4,
+     3,
+     0
+    ],
+    [
+     2,
+     3,
+     1
+    ],
+    [
+     1,
+     3,
+     1
+    ],
+    [
+     3,
+     3,
+     1
+    ],
+    [
+     0,
+     3,
+     1
+    ],
+    [
+     4,
+     3,
+     1
+    ],
+    [
+     2,
+     3,
+     2
+    ],
+    [
+     1,
+     3,
+     2
+    ],
+    [
+     3,
+     3,
+     2
+    ],
+    [
+     0,
+     3,
+     2
+    ],
+    [
+     4,
+     3,
+     2
+    ],
+    [
+     2,
+     4,
+     1
+    ],
+    [
+     1,
+     4,
+     1
+    ],
+    [
+     3,
+     4,
+     1
+    ],
+    [
+     0,
+     4,
+     1
+    ],
+    [
+     4,
+     4,
+     1
+    ],
+    [
+     2,
+     4,
+     2
+    ],
+    [
+     1,
+     4,
+     2
+    ],
+    [
+     3,
+     4,
+     2
+    ],
+    [
+     0,
+     4,
+     2
+    ],
+    [
+     4,
+     4,
+     2
+    ],
+    [
+     4,
+     5,
+     1
+    ],
+    [
+     2,
+     5,
+     2
+    ],
+    [
+     1,
+     5,
+     2
+    ],
+    [
+     3,
+     5,
+     2
+    ],
+    [
+     0,
+     5,
+     2
+    ],
+    [
+     4,
+     5,
+     2
+    ]
+   ],
+   "stagger": 0.04,
+   "order": "given"
+  },
+  {
+   "t": 20.3,
+   "group": "real",
+   "do": "clear",
+   "anim": "fade",
+   "all": true,
+   "dur": 0.6
+  }
+ ],
+ "tracks": {
+  "camera": [
+   {
+    "t": 0,
+    "yaw": 0.785,
+    "pitch": 0.55,
+    "zoom": 1.65,
+    "focus": [
+     5.5,
+     3.4,
+     5.5
+    ]
+   },
+   {
+    "t": 10,
+    "yaw": 0.95,
+    "ease": "inOut"
+   },
+   {
+    "t": 21,
+    "yaw": 0.785,
+    "ease": "inOut"
+   }
+  ],
+  "cursor": [
+   {
+    "t": 0,
+    "screen": [
+     0.8,
+     0.6
+    ],
+    "alpha": 0
+   },
+   {
+    "t": 0.5,
+    "alpha": 1,
+    "ease": "out"
+   },
+   {
+    "t": 1.6,
+    "at": [
+     3.5,
+     3.0,
+     3.5
+    ],
+    "down": true,
+    "ease": "inOut"
+   },
+   {
+    "t": 1.8,
+    "at": [
+     4.5,
+     3.0,
+     3.5
+    ],
+    "down": true,
+    "alpha": 1,
+    "ease": "linear"
+   },
+   {
+    "t": 2.0,
+    "at": [
+     5.5,
+     3.0,
+     3.5
+    ],
+    "down": true,
+    "alpha": 1,
+    "ease": "linear"
+   },
+   {
+    "t": 2.2,
+    "at": [
+     6.5,
+     3.0,
+     3.5
+    ],
+    "down": true,
+    "alpha": 1,
+    "ease": "linear"
+   },
+   {
+    "t": 2.4,
+    "at": [
+     7.5,
+     3.0,
+     3.5
+    ],
+    "down": true,
+    "alpha": 1,
+    "ease": "linear"
+   },
+   {
+    "t": 2.6,
+    "at": [
+     7.5,
+     3.0,
+     4.5
+    ],
+    "down": true,
+    "alpha": 1,
+    "ease": "linear"
+   },
+   {
+    "t": 2.8,
+    "at": [
+     6.5,
+     3.0,
+     4.5
+    ],
+    "down": true,
+    "alpha": 1,
+    "ease": "linear"
+   },
+   {
+    "t": 3.0,
+    "at": [
+     5.5,
+     3.0,
+     4.5
+    ],
+    "down": true,
+    "alpha": 1,
+    "ease": "linear"
+   },
+   {
+    "t": 3.2,
+    "at": [
+     4.5,
+     3.0,
+     4.5
+    ],
+    "down": true,
+    "alpha": 1,
+    "ease": "linear"
+   },
+   {
+    "t": 3.4,
+    "at": [
+     3.5,
+     3.0,
+     4.5
+    ],
+    "down": true,
+    "alpha": 1,
+    "ease": "linear"
+   },
+   {
+    "t": 3.6,
+    "at": [
+     3.5,
+     3.0,
+     5.5
+    ],
+    "down": true,
+    "alpha": 1,
+    "ease": "linear"
+   },
+   {
+    "t": 3.8,
+    "at": [
+     4.5,
+     3.0,
+     5.5
+    ],
+    "down": true,
+    "alpha": 1,
+    "ease": "linear"
+   },
+   {
+    "t": 4.0,
+    "at": [
+     5.5,
+     3.0,
+     5.5
+    ],
+    "down": true,
+    "alpha": 1,
+    "ease": "linear"
+   },
+   {
+    "t": 4.2,
+    "at": [
+     6.5,
+     3.0,
+     5.5
+    ],
+    "down": true,
+    "alpha": 1,
+    "ease": "linear"
+   },
+   {
+    "t": 4.4,
+    "at": [
+     7.5,
+     3.0,
+     5.5
+    ],
+    "down": true,
+    "alpha": 1,
+    "ease": "linear"
+   },
+   {
+    "t": 4.6,
+    "down": false
+   },
+   {
+    "t": 5.2,
+    "alpha": 0,
+    "ease": "inOut"
+   },
+   {
+    "t": 16.4,
+    "screen": [
+     0.85,
+     0.85
+    ],
+    "alpha": 0,
+    "ease": "inOut"
+   },
+   {
+    "t": 16.8,
+    "alpha": 1,
+    "ease": "out"
+   },
+   {
+    "t": 17.5,
+    "panel": [
+     "warning",
+     1
+    ],
+    "ease": "inOut"
+   },
+   {
+    "t": 17.7,
+    "down": true
+   },
+   {
+    "t": 17.95,
+    "down": false
+   },
+   {
+    "t": 18.6,
+    "alpha": 0,
+    "ease": "inOut"
+   }
+  ]
+ },
+ "captions": [
+  {
+   "t0": 0.0,
+   "t1": 5.4,
+   "text": "In Build choose Place what I look at, then hold use on a ghost block: it goes down at once. Nothing else can be placed.",
+   "title": "1  Assist"
+  },
+  {
+   "t0": 5.4,
+   "t1": 13.8,
+   "text": "Place everything in reach builds what is near you, lowest layer first, while you walk. Sped up here: four blocks a second in the game.",
+   "title": "2  Sweep"
+  },
+  {
+   "t0": 13.8,
+   "t1": 21.0,
+   "text": "On a server it asks first. Enable stays dim for three seconds so the warning gets read.",
+   "title": "3  Servers"
+  }
+ ],
+ "chips": [
+  {
+   "t0": 1.4,
+   "t1": 5.2,
+   "rows": [
+    [
+     "Hold use",
+     "Place cobblestone"
+    ]
+   ],
+   "lit": [
+    [
+     0,
+     1.6,
+     4.6
+    ]
+   ]
+  }
+ ],
+ "overlays": [
+  {
+   "type": "path",
+   "t0": 5.6,
+   "t1": 13.6,
+   "points": [
+    [
+     9.6,
+     2,
+     10.4
+    ],
+    [
+     5.5,
+     2,
+     10.4
+    ],
+    [
+     5.5,
+     2,
+     10.4
+    ],
+    [
+     9.4,
+     2,
+     6.0
+    ],
+    [
+     5.5,
+     2,
+     1.7
+    ]
+   ],
+   "color": "dim",
+   "fade": 0.3
+  },
+  {
+   "type": "avatar",
+   "t0": 5.6,
+   "t1": 13.6,
+   "at": [
+    9.6,
+    2,
+    10.4
+   ],
+   "yaw": 2,
+   "fade": 0.3,
+   "keys": [
+    {
+     "t": 5.6,
+     "at": [
+      9.6,
+      2,
+      10.4
+     ],
+     "yaw": 2
+    },
+    {
+     "t": 5.6,
+     "walk": 1
+    },
+    {
+     "t": 6.5,
+     "walk": 1
+    },
+    {
+     "t": 6.8,
+     "at": [
+      5.5,
+      2,
+      10.4
+     ],
+     "yaw": 2
+    },
+    {
+     "t": 6.9,
+     "walk": 0
+    },
+    {
+     "t": 9.7,
+     "walk": 0
+    },
+    {
+     "t": 9.8,
+     "at": [
+      5.5,
+      2,
+      10.4
+     ],
+     "yaw": 2
+    },
+    {
+     "t": 10.0,
+     "walk": 1
+    },
+    {
+     "t": 10.6,
+     "at": [
+      9.4,
+      2,
+      6.0
+     ],
+     "yaw": 3
+    },
+    {
+     "t": 11.2,
+     "walk": 1
+    },
+    {
+     "t": 11.4,
+     "at": [
+      5.5,
+      2,
+      1.7
+     ],
+     "yaw": 0
+    },
+    {
+     "t": 11.6,
+     "walk": 0
+    },
+    {
+     "t": 13.2,
+     "at": [
+      5.5,
+      2,
+      1.7
+     ],
+     "yaw": 0
+    }
+   ]
+  },
+  {
+   "type": "disc",
+   "t0": 5.6,
+   "t1": 13.6,
+   "center": [
+    9.6,
+    2,
+    10.4
+   ],
+   "radius": 4.4,
+   "fade": 0.3,
+   "keys": [
+    {
+     "t": 5.6,
+     "center": [
+      9.6,
+      2,
+      10.4
+     ]
+    },
+    {
+     "t": 6.8,
+     "center": [
+      5.5,
+      2,
+      10.4
+     ]
+    },
+    {
+     "t": 9.8,
+     "center": [
+      5.5,
+      2,
+      10.4
+     ]
+    },
+    {
+     "t": 10.6,
+     "center": [
+      9.4,
+      2,
+      6.0
+     ]
+    },
+    {
+     "t": 11.4,
+     "center": [
+      5.5,
+      2,
+      1.7
+     ]
+    },
+    {
+     "t": 13.2,
+     "center": [
+      5.5,
+      2,
+      1.7
+     ]
+    }
+   ]
+  }
+ ],
+ "panels": [
+  {
+   "type": "badge",
+   "t0": 1.4,
+   "t1": 5.6,
+   "title": "AUTO: ON",
+   "right": "Assist  20/s",
+   "status": "Placed 15",
+   "color": "cyan",
+   "rect": [
+    0.72,
+    0.03,
+    0.26,
+    0.085
+   ],
+   "fade": 0.3
+  },
+  {
+   "type": "badge",
+   "t0": 5.6,
+   "t1": 13.6,
+   "title": "AUTO: ON",
+   "right": "Sweep  4/s",
+   "status": "Building what is in reach",
+   "color": "cyan",
+   "rect": [
+    0.72,
+    0.03,
+    0.26,
+    0.085
+   ],
+   "fade": 0.3
+  },
+  {
+   "type": "warning",
+   "t0": 13.9,
+   "t1": 19.0,
+   "title": "Auto-placing on a server",
+   "text": "Auto-placing may break this server's rules and can get you banned. Build Buddy can't know what this server allows. Check the rules or ask the staff first. You're responsible for how you use it.",
+   "buttons": [
+    "Keep it off",
+    "Enable on this server"
+   ],
+   "focus": 0,
+   "wait": 3,
+   "lit": -1,
+   "rect": [
+    0.12,
+    0.12,
+    0.76,
+    0.68
+   ],
+   "fade": 0.35,
+   "states": [
+    {
+     "t": 17.7,
+     "lit": 1
+    }
+   ]
+  }
+ ],
+ "sounds": [
+  {
+   "t": 17.7,
+   "name": "ui_press",
+   "volume": 0.8
+  },
+  {
+   "t": 17.95,
+   "name": "ui_release",
+   "volume": 0.7
+  }
+ ]
+}

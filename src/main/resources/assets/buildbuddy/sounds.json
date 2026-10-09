@@ -1,0 +1,82 @@
+{
+  "ui_hover": {
+    "sounds": [
+      {
+        "name": "buildbuddy:ui_hover",
+        "volume": 1.0
+      }
+    ]
+  },
+  "ui_press": {
+    "sounds": [
+      {
+        "name": "buildbuddy:ui_press",
+        "volume": 1.0
+      }
+    ]
+  },
+  "ui_release": {
+    "sounds": [
+      {
+        "name": "buildbuddy:ui_release",
+        "volume": 1.0
+      }
+    ]
+  },
+  "ui_open": {
+    "sounds": [
+      {
+        "name": "buildbuddy:ui_open",
+        "volume": 1.0
+      }
+    ]
+  },
+  "ui_close": {
+    "sounds": [
+      {
+        "name": "buildbuddy:ui_close",
+        "volume": 1.0
+      }
+    ]
+  },
+  "wheel_tick": {
+    "sounds": [
+      {
+        "name": "buildbuddy:wheel_tick",
+        "volume": 1.0
+      }
+    ]
+  },
+  "lock": {
+    "sounds": [
+      {
+        "name": "buildbuddy:lock",
+        "volume": 1.0
+      }
+    ]
+  },
+  "snap": {
+    "sounds": [
+      {
+        "name": "buildbuddy:snap",
+        "volume": 1.0
+      }
+    ]
+  },
+  "complete": {
+    "sounds": [
+      {
+        "name": "buildbuddy:complete",
+        "volume": 1.0
+      }
+    ]
+  },
+  "error": {
+    "sounds": [
+      {
+        "name": "buildbuddy:error",
+        "volume": 1.0
+      }
+    ]
+  }
+}

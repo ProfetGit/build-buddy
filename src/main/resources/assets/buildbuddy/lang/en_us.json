@@ -1,0 +1,15 @@
+{
+  "key.category.buildbuddy.buildbuddy": "Build Buddy",
+  "key.buildbuddy.main": "Tool wheel / edit",
+  "key.buildbuddy.toggle": "Show / hide ghosts",
+  "key.buildbuddy.undo": "Undo (with Ctrl)",
+  "key.buildbuddy.redo": "Redo (with Ctrl)",
+  "key.buildbuddy.mirror": "Mirror build",
+  "key.buildbuddy.paste": "Paste build (creative)",
+  "key.buildbuddy.remove": "Remove placement",
+  "key.buildbuddy.pick": "Smart pick",
+  "key.buildbuddy.help": "How it works",
+  "key.buildbuddy.auto": "Auto-place on / off",
+  "key.buildbuddy.layer_up": "Layer up",
+  "key.buildbuddy.layer_down": "Layer down"
+}

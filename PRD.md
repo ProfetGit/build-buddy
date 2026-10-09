@@ -1,10 +1,10 @@
-# Cyanotype: Product Requirements
+# Build Buddy: Product Requirements
 
-Name chosen 2026-10-04 (mod id `cyanotype`, package `io.github.profetgit.cyanotype`, slug `cyanotype` was free on Modrinth). Status: draft v0.2. Author: Profet.
+Name chosen 2026-10-04 (mod id `buildbuddy`, package `io.github.profetgit.buildbuddy`, slug `buildbuddy` was free on Modrinth). Status: draft v0.2. Author: Profet.
 
 ## 1. Summary
 
-Cyanotype is a client-side Fabric mod for Minecraft Java (26.3) that does what Litematica does (load a schematic, show it as a ghost in the world, build it, verify it, save your own) but is learnable in one minute. There are no keybind lists and no config walls. One held-style tool, a pop-up tool wheel, handles dragged in the world, and a material panel that tells you what to do next. Auto-placing is included, off by default on servers, behind a clear disclaimer.
+Build Buddy is a client-side Fabric mod for Minecraft Java (26.3) that does what Litematica does (load a schematic, show it as a ghost in the world, build it, verify it, save your own) but is learnable in one minute. There are no keybind lists and no config walls. One held-style tool, a pop-up tool wheel, handles dragged in the world, and a material panel that tells you what to do next. Auto-placing is included, off by default on servers, behind a clear disclaimer.
 
 One line: **Litematica's power, Create's feel.**
 
@@ -65,7 +65,7 @@ Primary: survival builder and the new player. Technical power users get depth th
 
 ## 6a. Visual language
 
-Style **B "Cyanotype"** (chosen 2026-10-04): navy blueprint-paper panels with a faint grid, thin white and cyan lines, dashed slots, hatched progress bars, corner brackets. Assets in `dev/ui/out/B_final/` (45 sprites, atlas with 9-slice data). Text uses the vanilla font. The in-world ghost uses the same palette: cyan tint for "to place", red for wrong, nothing for done.
+Style **B "Build Buddy"** (chosen 2026-10-04): navy blueprint-paper panels with a faint grid, thin white and cyan lines, dashed slots, hatched progress bars, corner brackets. Assets in `dev/ui/out/B_final/` (45 sprites, atlas with 9-slice data). Text uses the vanilla font. The in-world ghost uses the same palette: cyan tint for "to place", red for wrong, nothing for done.
 
 ## 6b. Motion and feedback
 
@@ -101,13 +101,13 @@ Premium feel comes from timing, easing and sound, not from baked frames. Rule: *
 | Axiom `.bp` | yes | no | **v1.1** |
 | Legacy `.schematic` (MCEdit, numeric IDs) | maybe | no | v1.1 or never |
 
-- **No custom format.** Schematics are shared as `.litematic`/`.schem`; a new format would be unopenable elsewhere. Our extras (tags, thumbnail, notes) live in a sidecar `name.cyanotype.json` next to the file, so nothing breaks if only the schematic is shared. Whether Litematica tolerates extra keys in its own metadata is untested, so no extra keys go inside the file.
+- **No custom format.** Schematics are shared as `.litematic`/`.schem`; a new format would be unopenable elsewhere. Our extras (tags, thumbnail, notes) live in a sidecar `name.buildbuddy.json` next to the file, so nothing breaks if only the schematic is shared. Whether Litematica tolerates extra keys in its own metadata is untested, so no extra keys go inside the file.
 - **Old schematics:** each file carries a data version; load runs it through the game's data fixer so renamed blocks update instead of failing.
 - **Modded/unknown blocks:** load as marked placeholders, listed in the material panel as "unknown block". A schematic never fails to open because of them.
 - **Entities:** not in v1; all three main formats can carry them, so no format change is needed later.
 
 ### 7.1 Blueprint library
-- Reads `.litematic` files from `config/cyanotype/blueprints/` (and, optionally, the Litematica folder if present).
+- Reads `.litematic` files from `config/buildbuddy/blueprints/` (and, optionally, the Litematica folder if present).
 - Opens as a grid of cards: name, author, size (X×Y×Z), block count, rotating mini 3D preview, tags (user-defined).
 - Search and sort (recent, name, size).
 - Importing: drag a file onto the game window copies it into the folder.
@@ -115,7 +115,7 @@ Premium feel comes from timing, easing and sound, not from baked frames. Rule: *
 
 ### 7.1b Community tab (decided 2026-10-05)
 - A second tab in the Library, "Community": builds that other players shared on the community website, read through its public read-only API v1 (no account, no key). Search, category chips, sort (newest, most downloaded), pages, cards with the server-drawn preview, title, author, size label and downloads.
-- A card opens a detail view: preview, facts, description, materials, and a Download button. Download saves the file into `config/cyanotype/blueprints` after checking size, checksum and that the reader can open it; it never replaces a file (same name rule as Save area: "name 2"); the file then appears in the normal Library, tagged `community`, with a tags file that remembers the site and build id. Only `.litematic` can be downloaded until the mod reads `.schem`/`.nbt`; other builds say so and link to their page.
+- A card opens a detail view: preview, facts, description, materials, and a Download button. Download saves the file into `config/buildbuddy/blueprints` after checking size, checksum and that the reader can open it; it never replaces a file (same name rule as Save area: "name 2"); the file then appears in the normal Library, tagged `community`, with a tags file that remembers the site and build id. Only `.litematic` can be downloaded until the mod reads `.schem`/`.nbt`; other builds say so and link to their page.
 - First use asks once before anything is sent ("This tab contacts <site>: your searches and your internet address are visible to it"). Settings > Community switches it off or on; off sends nothing. The address is a setting (`communityUrl`; default is a constant that stays empty until the site has a public host, https only except for localhost).
 - Network work never runs on the render thread; the tab has loading, empty, offline and error states; requests stay under the site's limits (120 API calls and 30 downloads a minute), answers are cached for the site's max-age.
 
@@ -124,7 +124,7 @@ Premium feel comes from timing, easing and sound, not from baked frames. Rule: *
 - Scroll rotates in 90° steps; shift+scroll moves vertically; a toggle mirrors on X or Z.
 - Click locks the placement (spring settle + sound). A locked placement shows in-world handles: arrows for each axis, a rotate ring, a mirror toggle. Dragging a handle moves/rotates with live snapping and a distance readout.
 - Multiple placements can exist at once; each has a name, visibility toggle and colour accent. One is "active".
-- Placements persist per world and server (saved in `config/cyanotype/placements/`).
+- Placements persist per world and server (saved in `config/buildbuddy/placements/`).
 
 ### 7.3 Ghost rendering
 - Draws the real block model translucent, with a cyan tint for missing blocks.
@@ -168,7 +168,7 @@ Auto-placing places blocks for the player from their inventory.
 **Disclaimer and defaults**
 - In singleplayer and in LAN worlds you host: enabled, no prompt.
 - On any multiplayer server: **off by default**. The first time you try to enable it on a server, a modal shows:
-  > Auto-placing may break this server's rules and can get you banned. Cyanotype can't know what this server allows. Check the rules or ask the staff first. You're responsible for how you use it.
+  > Auto-placing may break this server's rules and can get you banned. Build Buddy can't know what this server allows. Check the rules or ask the staff first. You're responsible for how you use it.
   with buttons "Keep it off" (default focus), "Enable on this server" (requires a 3 second wait before it activates), and a "Don't ask again for this server" checkbox.
 - The choice is stored per server address. A small badge ("AUTO: ON") stays visible in the HUD whenever it is enabled on a server.
 - A config list of server addresses where auto-placing is forcibly disabled ("blocked servers"), plus an in-game way to add the current server.
@@ -194,16 +194,16 @@ Auto-placing places blocks for the player from their inventory.
 
 ### 7.12 Tool Ponders and built-in help: in-game manual
 - **Layers of help**, from lightest to deepest: (1) cursor chips showing the current click/scroll actions; (2) first-use Ponder for each tool; (3) empty states that say the next step ("No blueprints yet: drop a .litematic file onto the window"); (4) errors that say what to do ("Out of reach: move closer or place a scaffold block here"); (5) a searchable Help screen that lists every tool's Ponder; (6) a first-run guided tour of the wheel, using a bundled sample blueprint so there is something to try.
-- Each tool has a short looping lesson (10-20 s, 3-5 captioned steps) in a small 3D viewport with a fake cursor, highlights and captions, in the Cyanotype style. Lessons are called **Ponders** in the milestone name only; the player sees "How it works".
+- Each tool has a short looping lesson (10-20 s, 3-5 captioned steps) in a small 3D viewport with a fake cursor, highlights and captions, in the Build Buddy style. Lessons are called **Ponders** in the milestone name only; the player sees "How it works".
 - **When they show:** the first time a tool is used, the lesson plays before the tool starts (setting "Show a lesson the first time I use a tool", on by default, with "Show all lessons again"); a `?` reopens it: right click on a segment of the open wheel, a `?` on the Build and Save choices, the Library footer (opens the Help list), and the Help key (default J; in a tool it opens that tool's lesson, otherwise the list). Buttons: **Try it** starts the tool (disabled with the reason when it cannot be used yet) and **Skip**/**Close**; on first use Skip also starts the tool (they asked for it), on a replay Close does not. Esc = Skip/Close.
 - **Lessons (first set, adapted 2026-10-07 to the six-tool wheel):** `place` (Library: ghost follows the crosshair, scroll turns, Shift+scroll lifts, M mirrors, click locks), `edit` (arrows, ring, carry, scroll push, Ctrl+Z), `layers`, `build` (red = wrong, nothing = done, next-block marker, progress bar), `auto` (Assist, Sweep, the server warning), `materials`, `pick` (Smart Pick), `box` (Select a box), `paste` (creative P). A lesson is reachable from the Help list whether or not its tool is available.
 
 #### 7.12a Ponder design (decided 2026-10-07)
 - **Renderer: software, off-thread, the Save preview's raster.** A lesson is drawn by `ponder/StageRaster` (orthographic, depth buffer, textured faces from `BlockLook`, so the player's resource pack shows) into a texture on a worker, with the raster's overlays (lines, arrows, rings, boxes, markers) drawn into the same buffer so they depth-test and anti-alias with 2x2 supersampling; text, chips, the cursor and mock panels are drawn by the GUI on top at full resolution. Why not the game's renderer: it would run through the player's shader pack, touch the world renderer, and could not be rendered headless for tests and review stills. Costs: no ambient occlusion; a worker pays about 4-8 ms a frame for a lesson stage (to be measured, budget in 10).
 - **A lesson is a deterministic function of time.** `Scene.at(t)` returns an immutable `Snapshot` (camera, every group's cells and transform, overlays, cursor, caption, chips, panels); nothing is simulated, so scrubbing, stepping, looping, stills and the recorder round trip all use the same call, and a lint can compare the end state with the start state (the loop seam).
-- **Schema (JSON, `assets/cyanotype/ponders/<id>.json`, `format: 1`):** header (id, title, summary, tags, `action` for Try it, duration), `stage` (size, focus), `palette` (short key -> block state string), `groups` (a grid of palette keys by layer and row, a mode `solid` or `ghost`, `start` full or empty, optional `match` = another group: ghost cells are hidden where that group has the same block, red and 1.2 % larger where it has a different one, as the mod's verifier does), and keyframed tracks with eases (`linear`, `in`, `out`, `inOut`, `spring`, `step`): `camera` (yaw, pitch, zoom, focus), `group.<id>` (pos, turn in quarter turns, mirror, alpha, visible, layer window), `ops` (reveal/clear cells at a time with `drop`/`pop`/`fade`/`none`), `cursor` (world point or screen point, down, shape), `captions` (the steps), `chips` (intervals of key/action rows, same words and pictures as the in-game chips through `ChipIcons`), `overlays` (box, arrow, ring, marker, tint, label, dim, avatar; each with its own lifetime and keyframes) and `panels` (mock Library, Save, list, warning, bar). The loader reports errors with a path ("groups[1].rows[2]: unknown key 'x'") and a broken lesson never breaks the others.
-- **Authoring: Python generates the JSON** (`dev/ponder/pondlib.py` helpers, `scenes.py` the nine lessons, `make.py` writes and validates `assets/cyanotype/ponders/` and the index); a `.json` is also hand-editable. The generated files are checked in, the generator is the source.
-- **Recorder (dev only, `-Dcyanotype.demo` or `/cyanotype ponder record <id> [x y z sx sy sz]` / `mark <name>` / `stop`):** samples the real client at 20 Hz into the same schema so a lesson shows what the mod really does (which way scroll turns, how a lift reads, which block the verifier calls wrong), not what an author remembers: the stage box's blocks at the start (a group) and its changes (ops), every placement as a ghost group with its transform keyframes (blueprint embedded), the block under the crosshair (cursor), mouse buttons, scroll notches and the mod's keys with modifiers (chip pulses), the verifier's progress, the selection box, and named marks. Camera, captions, overlays and panels are authored on top by `scenes.py` (anchored to marks so a re-recording keeps them aligned). A Director "take" scene performs the story through the real input seams; the output goes to `dev/ponder/rec/<id>.rec.json`.
+- **Schema (JSON, `assets/buildbuddy/ponders/<id>.json`, `format: 1`):** header (id, title, summary, tags, `action` for Try it, duration), `stage` (size, focus), `palette` (short key -> block state string), `groups` (a grid of palette keys by layer and row, a mode `solid` or `ghost`, `start` full or empty, optional `match` = another group: ghost cells are hidden where that group has the same block, red and 1.2 % larger where it has a different one, as the mod's verifier does), and keyframed tracks with eases (`linear`, `in`, `out`, `inOut`, `spring`, `step`): `camera` (yaw, pitch, zoom, focus), `group.<id>` (pos, turn in quarter turns, mirror, alpha, visible, layer window), `ops` (reveal/clear cells at a time with `drop`/`pop`/`fade`/`none`), `cursor` (world point or screen point, down, shape), `captions` (the steps), `chips` (intervals of key/action rows, same words and pictures as the in-game chips through `ChipIcons`), `overlays` (box, arrow, ring, marker, tint, label, dim, avatar; each with its own lifetime and keyframes) and `panels` (mock Library, Save, list, warning, bar). The loader reports errors with a path ("groups[1].rows[2]: unknown key 'x'") and a broken lesson never breaks the others.
+- **Authoring: Python generates the JSON** (`dev/ponder/pondlib.py` helpers, `scenes.py` the nine lessons, `make.py` writes and validates `assets/buildbuddy/ponders/` and the index); a `.json` is also hand-editable. The generated files are checked in, the generator is the source.
+- **Recorder (dev only, `-Dbuildbuddy.demo` or `/buildbuddy ponder record <id> [x y z sx sy sz]` / `mark <name>` / `stop`):** samples the real client at 20 Hz into the same schema so a lesson shows what the mod really does (which way scroll turns, how a lift reads, which block the verifier calls wrong), not what an author remembers: the stage box's blocks at the start (a group) and its changes (ops), every placement as a ghost group with its transform keyframes (blueprint embedded), the block under the crosshair (cursor), mouse buttons, scroll notches and the mod's keys with modifiers (chip pulses), the verifier's progress, the selection box, and named marks. Camera, captions, overlays and panels are authored on top by `scenes.py` (anchored to marks so a re-recording keeps them aligned). A Director "take" scene performs the story through the real input seams; the output goes to `dev/ponder/rec/<id>.rec.json`.
 - **Accessibility and motion:** with Reduce motion a lesson opens paused on step 1 as a still, steps with Next/Previous, and drops, pops, springs and camera moves become cuts; Play still works. Keyboard: Space play/pause, Left/Right step, R restart, Enter Try it, Esc leave.
 - **Lints (JUnit over every shipped lesson):** the file parses, every block state parses, every chip key is a known picture (no raw text keys), times are inside the duration, the end state equals the start state, every action is known, every lesson is in the index, and captions fit in two lines at the narrowest layout.
 - **Polish rules (0.0.56):** a lesson's stage is never cut by the picture (the camera keeps the ground slab and the groups inside it, or inside the lesson's `stage.frame`); the mock panels copy what the HUD really draws (badge, DONE stamp) rather than approximate it; the little player is the game's own player model and skin; a lesson may play quiet interface sounds (`sounds` cues: click, scroll tick, lock, chime) at the player's Sounds volume, only while it plays.
@@ -224,7 +224,7 @@ Auto-placing places blocks for the player from their inventory.
 - **World observation:** hook block updates and chunk loads on the client level to mark sections dirty for the verifier; no per-tick full scan.
 - **Inventory/material data:** client inventory plus nearby containers the client has already opened or whose contents are known; chests not opened are shown as "unknown", never guessed. (An optional "scan nearby containers" is only possible by opening them, and is a manual action.)
 - **Auto-placing:** uses the vanilla client interaction path (`MultiPlayerGameMode.useItemOn`) with a rotation toward the target, so server-side checks see ordinary player behaviour. Rate-limited on the client tick; the rate and reach caps are enforced in code.
-- **Persistence:** placements in JSON; blueprints are files; settings in `config/cyanotype.json`.
+- **Persistence:** placements in JSON; blueprints are files; settings in `config/buildbuddy.json`.
 - **Compatibility:** coexists with Litematica's file format only (not its code). Sodium, Iris, EntityCulling, Mod Menu, Punchy, Fresh Animations are on the test list. Shader packs: ghost must stay readable.
 
 ## 9. Quality, testing
@@ -245,7 +245,7 @@ Auto-placing places blocks for the player from their inventory.
 | M4 | UI pass | Tool wheel, library, material panel, tooltips and chips using kit B, with the motion and sounds from 6b (reduce-motion setting included). |
 | M5 | Save area | Selection box tool, write `.litematic`, reload test. |
 | M5b | Smart Pick | Click-to-select picks a test set of builds (house, duck, village house, cave cabin) with correct bounds; refinement tools work; no frame hitch while it runs. |
-| M5c | Community tab | Library tab against the community site's API v1: first-run notice and off switch (nothing sent before the answer), list with search/chips/sort/paging, detail with materials, Download into `config/cyanotype/blueprints` (checksum-checked, never overwrites), file shows up in Mine; loading/empty/offline states; JUnit for parsing, paging, file-name safety and no-overwrite; real-client scene against a local site. |
+| M5c | Community tab | Library tab against the community site's API v1: first-run notice and off switch (nothing sent before the answer), list with search/chips/sort/paging, detail with materials, Download into `config/buildbuddy/blueprints` (checksum-checked, never overwrites), file shows up in Mine; loading/empty/offline states; JUnit for parsing, paging, file-name safety and no-overwrite; real-client scene against a local site. |
 | M6 | Auto-placing | Assist and Sweep modes, limits, server disclaimer and per-server memory, blocked-server list, HUD badge. |
 | M6b | Tool Ponders | The engine (schema v1, deterministic `Scene.at(t)`, ease/keyframe tracks, JUnit incl. every shipped lesson), the software viewport (textured, ghost, overlays; measured cost), the lesson screen (steps, scrub, keyboard, reduce motion, Try it) and the Help list with search, first-use flow + `?` entry points + settings, the dev recorder (real take -> JSON, round-trip tested, used for at least three lessons), nine lessons reviewed as stills, real-client scene `ponder` (opens each lesson, advances, steps, Try it arms the tool, first use once only) plus all older scenes still green. See 7.12a. |
 | M7 | Polish and release | Sodium/Iris matrix, performance pass, docs, icon/banner, Modrinth page (with the standard AI disclosure), repo. |
@@ -274,7 +274,7 @@ M1 is deliberately the first risk burn-down: if translucent ghosting at 500k blo
 
 ## 13. Open questions
 
-1. Name is settled (Cyanotype). Still to confirm: slug and any trademark clash before the first upload.
+1. Name is settled (Build Buddy). Still to confirm: slug and any trademark clash before the first upload.
 2. Should Sweep mode exist in v1, or only Assist, to keep the server-rules surface smaller?
 3. Settled: `.schem` and `.nbt` in v1, Axiom `.bp` in v1.1 (see 7.1a).
 4. Entities (armor stands, item frames) in blueprints: v1.1?

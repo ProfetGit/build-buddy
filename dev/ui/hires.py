@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Draws Cyanotype's interface art at 4 texels per GUI unit and ships it into the mod (style B, redrawn as fine line work).
+"""Draws Build Buddy's interface art at 4 texels per GUI unit and ships it into the mod (style B, redrawn as fine line work).
 
 Everything is drawn as vector shapes at 16 px per unit and reduced 4:1, so lines are 0.3-0.7 of a GUI unit wide and edges
 are smooth. The game draws the atlas with a linear sampler (ui/Skin.java), so it stays crisp at any GUI scale. Sizes in
 atlas.json are in GUI units (what the layouts use); x, y, w, h are texels of atlas.png.
 
-Run: python3 dev/ui/hires.py   (writes src/main/resources/assets/cyanotype/ui/{atlas.png,atlas.json,hatch.png}
+Run: python3 dev/ui/hires.py   (writes src/main/resources/assets/buildbuddy/ui/{atlas.png,atlas.json,hatch.png}
 and a preview sheet in dev/ui/out/hires_preview.png).  The wheel is not drawn here: it is made at run time for however many
 tools there are (ui/WheelArt.java), from the same colours.
 """
@@ -16,7 +16,7 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 HERE = Path(__file__).resolve().parent
-OUT = HERE.parent.parent / "src/main/resources/assets/cyanotype/ui"
+OUT = HERE.parent.parent / "src/main/resources/assets/buildbuddy/ui"
 R = 4       # texels per GUI unit in the shipped files
 A = 4       # supersampling on top of that
 U = R * A   # drawing pixels per GUI unit

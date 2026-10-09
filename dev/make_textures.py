@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cyanotype icon textures, drawn from scratch (12x12 texels, 2 px each in the icon): oak siding, window, roof bricks.
+"""Build Buddy icon textures, drawn from scratch (12x12 texels, 2 px each in the icon): oak siding, window, roof bricks.
 
   python3 dev/make_textures.py        # writes dev/icon/sprites/{planks,window,brick}.png and a review sheet
 """

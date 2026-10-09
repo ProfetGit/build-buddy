@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.84
+
+- **The mod is now called Build Buddy** (it was Cyanotype). Mod id `buildbuddy`, commands `/buildbuddy ...`, config in `config/buildbuddy.json` and `config/buildbuddy/` (copy your old `cyanotype` ones over to keep your settings, library tags and placed builds), keys under "Build Buddy" in Controls (your own key choices have to be set again).
+
 ## 0.0.83
 
 - `/cyanotype materials` opens the Materials list (scripted recordings).

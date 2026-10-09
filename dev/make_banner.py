@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cyanotype description banner (1536x512, 3:1): blueprint paper, the title and tagline, and the house animation from
+"""Build Buddy description banner (1536x512, 3:1): blueprint paper, the title and tagline, and the house animation from
 make_icon.frame() at x4 on the right (its texels are the lettering's 8 px, its grid lines the paper's). Writes
 dev/icon/out/banner.png (STILL_FRAME) and banner-animated.gif (shared palette, slot 255 = stepped corners + unchanged
 pixels, every frame decode-checked). Copy the GIF to docs/banner.gif.

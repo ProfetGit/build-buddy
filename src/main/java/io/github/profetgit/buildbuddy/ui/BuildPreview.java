@@ -1,0 +1,354 @@
+package io.github.profetgit.buildbuddy.ui;
+
+import com.mojang.blaze3d.platform.NativeImage;
+import io.github.profetgit.buildbuddy.BuildBuddy;
+import io.github.profetgit.buildbuddy.blueprint.Blueprint;
+import java.nio.ByteOrder;
+import java.util.concurrent.atomic.AtomicBoolean;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Util;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * The picture of what is about to be saved, in the Save screen: a blueprint drawn from any side by {@link PreviewRaster} on a
+ * worker thread and shown as a texture with one texel for every pixel of the screen. Drag to turn it, right-drag (or Shift+drag)
+ * to move it, scroll to zoom toward the cursor. While the hand is moving it is drawn once per pixel (and a big build with only
+ * some of its faces) so it keeps up; when the hand stops it is drawn again at four times the samples and smoothed, so edges
+ * are clean. The pointer can be asked what block it is over (an id buffer comes with every picture).
+ */
+public final class BuildPreview {
+    private static final int FAST_FACES = 250_000;
+    private static final long SETTLE_NS = 220_000_000L;
+    /** The most samples one picture may have: beyond it the smoothing is left out. */
+    private static final long MAX_SAMPLES = 5_000_000L;
+
+    /** A finished picture: what it shows, how big it was drawn compared with the screen ({@code ss} samples a pixel across), and the screen's GUI scale then. */
+    private record Shown(PreviewRaster.Frame frame, int[] abgr, PreviewRaster.Scene scene, int ss, int res, boolean low) {
+    }
+
+    private final Minecraft mc;
+    private volatile PreviewRaster.@Nullable Scene scene;
+    private volatile boolean tooBig, building;
+    private PreviewRaster.View view = PreviewRaster.View.HOME;
+    private final AtomicBoolean busy = new AtomicBoolean(), dirty = new AtomicBoolean();
+    private volatile @Nullable Shown shown;
+    private volatile int frameSeq;
+    private int uploadedSeq = -1;
+    private volatile int hoverCell = -1;
+    private volatile boolean removeMode, whole = true;
+    private volatile int wantW = 1, wantH = 1, wantRes = 1;
+    private volatile long lastMoveNs;
+    private DynamicTexture texture;
+    private Identifier textureId;
+    private int texW, texH;
+
+    public BuildPreview(Minecraft mc) {
+        this.mc = mc;
+    }
+
+    // ---- what is shown
+
+    /** Sets what to draw: null while the box is still being read. A new blueprint keeps the view the player has chosen. */
+    public void setBlueprint(@Nullable Blueprint bp) {
+        if (bp == null) {
+            // nothing to show yet: the old picture goes
+            scene = null;
+            shown = null;
+            tooBig = false;
+            hoverCell = -1;
+            return;
+        }
+        // a new blueprint (an edit, say) replaces the picture when it is ready; until then the old one stays
+        building = true;
+        Util.backgroundExecutor().execute(() -> {
+            PreviewRaster.Scene s = PreviewRaster.scene(bp);
+            if (s != null) s.groups();
+            tooBig = s == null;
+            scene = s;
+            building = false;
+            request();
+        });
+    }
+
+    /** The scene's face count, or -1 when there is no scene (for the demo). */
+    public int faces() {
+        PreviewRaster.Scene s = scene;
+        return s == null ? -1 : s.count + s.custom.length;
+    }
+
+    /** Whether the picture shown is of the newest scene (nothing newer is waiting to be drawn): for the demo. */
+    public boolean current() {
+        Shown sh = shown;
+        return sh != null && sh.scene() == scene && !building && !busy.get();
+    }
+
+    public PreviewRaster.View view() {
+        return view;
+    }
+
+    /** Whether pointing at a block lights it up (the Save screen's remove mode). */
+    public void setRemoveMode(boolean on) {
+        removeMode = on;
+        if (!on && hoverCell >= 0) {
+            hoverCell = -1;
+            request();
+        }
+    }
+
+    /** Whether the hovered block lights up with everything that goes with it (a whole tree, the ground), or alone. */
+    public void setWhole(boolean on) {
+        if (whole != on) {
+            whole = on;
+            if (removeMode && hoverCell >= 0) request();
+        }
+    }
+
+    /** What taking the block under the pointer would take: its group (a tree, the ground...) or the one block; null when there is no scene or no block. */
+    public Groups.@Nullable Type groupType(int cell) {
+        PreviewRaster.Scene s = scene;
+        return s == null || cell < 0 ? null : s.groups().typeOf(cell);
+    }
+
+    /** How many blocks go with a cell when it is taken as a whole. */
+    public int groupSize(int cell) {
+        PreviewRaster.Scene s = scene;
+        return s == null || cell < 0 ? 0 : s.groups().sizeOf(cell);
+    }
+
+    /** The cells (indexes into the box) that go with a cell when it is taken as a whole; just the cell when {@code whole} is off or it stands alone. */
+    public int[] cellsOf(int cell, boolean whole) {
+        PreviewRaster.Scene s = scene;
+        if (s == null || cell < 0) return new int[0];
+        return whole ? s.groups().cellsOf(cell) : new int[]{cell};
+    }
+
+    /** The cells of the picture within a radius (GUI units) of a point ({@code gx, gy} from the picture's top left): what a brush there would touch. */
+    public int[] cellsNear(double gx, double gy, double radius) {
+        Shown sh = shown;
+        if (sh == null) return new int[0];
+        int k = sh.res() * sh.ss();
+        PreviewRaster.Frame f = sh.frame();
+        int r = (int) Math.ceil(radius * k), cx = (int) (gx * k), cy = (int) (gy * k);
+        // one sample every few pixels is enough: blocks are bigger than that
+        int step = Math.max(1, k);
+        it.unimi.dsi.fastutil.ints.IntOpenHashSet out = new it.unimi.dsi.fastutil.ints.IntOpenHashSet();
+        for (int y = cy - r; y <= cy + r; y += step) {
+            for (int x = cx - r; x <= cx + r; x += step) {
+                if (x < 0 || y < 0 || x >= f.w() || y >= f.h()) continue;
+                if ((x - cx) * (x - cx) + (y - cy) * (y - cy) > r * r) continue;
+                int cell = sh.scene().cellOfId(f.ids()[y * f.w() + x]);
+                if (cell >= 0) out.add(cell);
+            }
+        }
+        return out.toIntArray();
+    }
+
+    /** A point of the picture (GUI units from its top left) over a block of the given kind of group, or null: for the demo. */
+    public double @Nullable [] pointOfGroup(Groups.Type type) {
+        Shown sh = shown;
+        if (sh == null) return null;
+        int k = sh.res() * sh.ss();
+        PreviewRaster.Frame f = sh.frame();
+        // a point well inside the group (its neighbours a couple of GUI units off are the same kind), not on an edge
+        int m = 2 * k;
+        for (int y = f.h() - 1 - m; y >= m; y -= 3) {
+            for (int x = m; x < f.w() - m; x += 3) {
+                if (kindAt(sh, x, y) == type && kindAt(sh, x - m, y) == type && kindAt(sh, x + m, y) == type && kindAt(sh, x, y - m) == type && kindAt(sh, x, y + m) == type) {
+                    return new double[]{(x + 0.5) / k, (y + 0.5) / k};
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Groups.@Nullable Type kindAt(Shown sh, int x, int y) {
+        PreviewRaster.Frame f = sh.frame();
+        int cell = sh.scene().cellOfId(f.ids()[y * f.w() + x]);
+        return cell < 0 ? null : sh.scene().groups().typeOf(cell);
+    }
+
+    /** The cell under a point of the picture ({@code gx, gy} in GUI units from its top left), as an index into the box, or -1. */
+    public int cellAt(double gx, double gy) {
+        Shown sh = shown;
+        if (sh == null) return -1;
+        int k = sh.res() * sh.ss();
+        int x = (int) (gx * k), y = (int) (gy * k);
+        PreviewRaster.Frame f = sh.frame();
+        if (x < 0 || y < 0 || x >= f.w() || y >= f.h()) return -1;
+        return sh.scene().cellOfId(f.ids()[y * f.w() + x]);
+    }
+
+    /** The box's size in cells of the scene the picture shows: {x, y, z}, or null. */
+    public int @Nullable [] boxSize() {
+        Shown sh = shown;
+        return sh == null ? null : new int[]{sh.scene().ex, sh.scene().ey, sh.scene().ez};
+    }
+
+    /** Points at a place of the picture (or null when the pointer is elsewhere): in remove mode the block there lights up. */
+    private void point(double gx, double gy, boolean inside) {
+        int cell = removeMode && inside ? cellAt(gx, gy) : -1;
+        if (cell != hoverCell) {
+            hoverCell = cell;
+            request();
+        }
+    }
+
+    /** The cell the pointer is on now (-1 when not in remove mode or not over a block). */
+    public int hovered() {
+        return hoverCell;
+    }
+
+    // ---- the player's hands
+
+    public void reset() {
+        view = PreviewRaster.View.HOME;
+        touch();
+        request();
+    }
+
+    /** Dragging the picture: turns it, or with {@code pan} moves it. {@code dx, dy} are in GUI units. */
+    public void drag(double dx, double dy, boolean pan) {
+        if (pan) {
+            view = new PreviewRaster.View(view.yaw(), view.pitch(), view.zoom(), view.panX() + dx, view.panY() + dy);
+        } else {
+            double pitch = Math.max(-1.5, Math.min(1.5, view.pitch() + dy * 0.012));
+            view = new PreviewRaster.View(view.yaw() - dx * 0.012, pitch, view.zoom(), view.panX(), view.panY());
+        }
+        touch();
+        request();
+    }
+
+    /** Zooms toward a point of the picture ({@code cx, cy} in GUI units from the picture's middle) by wheel steps. */
+    public void zoom(double steps, double cx, double cy) {
+        double f = Math.pow(1.18, steps);
+        double z = Math.max(0.2, Math.min(60, view.zoom() * f));
+        f = z / view.zoom();
+        view = new PreviewRaster.View(view.yaw(), view.pitch(), z, cx + (view.panX() - cx) * f, cy + (view.panY() - cy) * f);
+        touch();
+        request();
+    }
+
+    private void touch() {
+        lastMoveNs = System.nanoTime();
+    }
+
+    // ---- drawing
+
+    /**
+     * Draws the preview into a rectangle.
+     *
+     * @param progress 0..1 while the box is still being read, else negative
+     */
+    public void draw(GuiGraphicsExtractor g, int x, int y, int w, int h, double progress, int mouseX, int mouseY) {
+        int res = (int) Math.max(1, Math.round(mc.getWindow().getGuiScale()));
+        int tw = Math.max(8, w * res), th = Math.max(8, h * res);
+        if (tw != wantW || th != wantH || res != wantRes) {
+            wantW = tw;
+            wantH = th;
+            wantRes = res;
+            request();
+        }
+        Ui.inset(g, x, y, w, h);
+        g.fillGradient(x + 1, y + 1, x + w - 1, y + h - 1, 0x40163B63, 0x400A1B30);
+        PreviewRaster.Scene s = scene;
+        Shown sh = shown;
+        point(mouseX - x, mouseY - y, mouseX >= x && mouseY >= y && mouseX < x + w && mouseY < y + h);
+        if (s != null && sh != null && sh.frame().w() == tw * sh.ss() && sh.frame().h() == th * sh.ss()) {
+            if (frameSeq != uploadedSeq) upload(sh, tw, th);
+            if (textureId != null) g.blit(RenderPipelines.GUI_TEXTURED, textureId, x, y, 0f, 0f, w, h, tw, th, tw, th);
+            // a picture drawn quickly while the hand moved is drawn again, fully, once it has stopped
+            if (System.nanoTime() - lastMoveNs > SETTLE_NS && sh.low()) request();
+            if (s.empty()) Ui.centered(g, "Nothing in the box", x + w / 2, y + h / 2 - 4, Ui.DIM);
+            if (s.thinned) Ui.text(g, "A very big build: only part of it is drawn", x + 6, y + 5, Ui.withAlpha(Ui.WARN, 0.9f));
+            return;
+        }
+        String msg;
+        if (tooBig) msg = "Too big to preview";
+        else if (progress >= 0) msg = "Reading the box... " + Math.round(progress * 100) + "%";
+        else msg = "Drawing the preview...";
+        Ui.centered(g, msg, x + w / 2, y + h / 2 - 4, Ui.DIM);
+    }
+
+    /** Puts the finished picture (already one pixel per texel, in the texture's byte order) in the texture with one copy. */
+    private void upload(Shown sh, int tw, int th) {
+        if (texture == null || texW != tw || texH != th) {
+            close();
+            NativeImage img = new NativeImage(tw, th, true);
+            texture = new Skin.Smooth("Build Buddy build preview", img, false);
+            textureId = Identifier.fromNamespaceAndPath(BuildBuddy.MOD_ID, "preview/" + System.nanoTime());
+            mc.getTextureManager().register(textureId, texture);
+            texW = tw;
+            texH = th;
+        }
+        NativeImage img = texture.getPixels();
+        if (img == null) return;
+        img.getPixelBytes().order(ByteOrder.nativeOrder()).asIntBuffer().put(sh.abgr(), 0, tw * th);
+        texture.upload();
+        uploadedSeq = frameSeq;
+    }
+
+    /**
+     * Averages the samples of each pixel (weighted by how much of it is covered, so edges do not go dark) and puts the colours in
+     * the texture's order (ABGR), a row at a time on several threads. Done on the worker so the game's frame only has to copy it.
+     */
+    private static int[] resolve(PreviewRaster.Frame f, int ss, int tw, int th) {
+        int[] out = PreviewRaster.resolveArgb(f, ss, tw, th);
+        java.util.stream.IntStream.range(0, th).parallel().forEach(yy -> {
+            for (int xx = 0; xx < tw; xx++) {
+                int c = out[yy * tw + xx];
+                out[yy * tw + xx] = c & 0xFF00FF00 | (c & 255) << 16 | (c >> 16) & 255;
+            }
+        });
+        return out;
+    }
+
+    /** Releases the texture. */
+    public void close() {
+        if (texture != null) {
+            texture.close();
+            texture = null;
+            textureId = null;
+        }
+    }
+
+    // ---- the worker
+
+    private void request() {
+        PreviewRaster.Scene s = scene;
+        if (s == null) return;
+        if (!busy.compareAndSet(false, true)) {
+            dirty.set(true);
+            return;
+        }
+        PreviewRaster.View v = view;
+        int tw = wantW, th = wantH, res = wantRes;
+        boolean moving = System.nanoTime() - lastMoveNs < SETTLE_NS;
+        int faces = s.count + s.custom.length;
+        int stride = moving && faces > FAST_FACES ? (int) Math.ceil(faces / (double) FAST_FACES) : 1;
+        int best = (long) tw * th * 4 > MAX_SAMPLES ? 1 : 2;
+        int ss = moving ? 1 : best;
+        int hover = hoverCell;
+        boolean wholeNow = whole;
+        // "low" = a better picture will be drawn when the hand stops; one that is already the best never asks again
+        boolean low = stride > 1 || ss < best;
+        Util.backgroundExecutor().execute(() -> {
+            try {
+                // the pan is in GUI units; the picture is drawn in samples
+                double k = (double) res * ss;
+                PreviewRaster.View scaled = new PreviewRaster.View(v.yaw(), v.pitch(), v.zoom(), v.panX() * k, v.panY() * k);
+                PreviewRaster.Frame made = PreviewRaster.render(s, scaled, tw * ss, th * ss, stride, hover, wholeNow);
+                shown = new Shown(made, resolve(made, ss, tw, th), s, ss, res, low);
+                frameSeq++;
+            } catch (RuntimeException e) {
+                BuildBuddy.LOG.error("The preview could not be drawn", e);
+            } finally {
+                busy.set(false);
+                if (dirty.getAndSet(false)) request();
+            }
+        });
+    }
+}
