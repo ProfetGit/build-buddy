@@ -293,7 +293,7 @@ final class Handles {
      * from above, with a thin light edge so the shape stays crisp over any background. {@code length} is the whole arrow
      * from {@code from} along the axis-aligned {@code dir}; {@code k} scales its thickness (the swell on hover).
      */
-    private void arrow(Vec3 from, Vec3 dir, double length, double k, int color, float hover, float visible, double scale) {
+    private static void arrow(Vec3 from, Vec3 dir, double length, double k, int color, float hover, float visible, double scale) {
         double unit = scale * k;
         double w = 0.21 * unit, headHalf = 0.58 * unit, headLen = Math.min(1.25 * unit, length * 0.45);
         Vec3 headBase = from.add(dir.scale(length - headLen));
@@ -486,23 +486,34 @@ final class Handles {
 
     // ---- next block marker
 
-    /** An animated marker on the next block to build: a pulsing outline, a beam rising from it and a label. */
+    static final int MARK_GOLD = 0xFFFFC43D;
+
+    /** An animated marker on the next block to build: a softly pulsing gold box with bright corner ticks, and a bobbing solid arrow pointing down at it under a label. */
     static void nextMarker(Vec3 cell, String what, double distance, double time) {
-        double pulse = 0.5 + 0.5 * Math.sin(time * 5.0);
-        AABB box = new AABB(cell.x - 0.02 - 0.05 * pulse, cell.y - 0.02 - 0.05 * pulse, cell.z - 0.02 - 0.05 * pulse,
-            cell.x + 1.02 + 0.05 * pulse, cell.y + 1.02 + 0.05 * pulse, cell.z + 1.02 + 0.05 * pulse);
-        Gizmos.cuboid(box, GizmoStyle.strokeAndFill(alpha(WHITE, 0.7 + 0.3 * pulse), 3.5f, alpha(0xFFFFD866, 0.16 + 0.16 * pulse))).setAlwaysOnTop();
-        Vec3 top = new Vec3(cell.x + 0.5, cell.y + 1.0, cell.z + 0.5);
-        double beam = 5 + 2 * pulse;
-        Gizmos.line(top, top.add(0, beam, 0), alpha(0xFFFFD866, 0.85), 3.0f).setAlwaysOnTop();
-        // a small chevron at the end of the beam, pointing down at the block
-        double h = 0.5;
-        Vec3 tip = top.add(0, 0.6, 0), l = top.add(-h, 1.4, 0), r = top.add(h, 1.4, 0), f = top.add(0, 1.4, -h), b = top.add(0, 1.4, h);
-        Gizmos.line(tip, l, alpha(0xFFFFD866, 0.9), 3.0f).setAlwaysOnTop();
-        Gizmos.line(tip, r, alpha(0xFFFFD866, 0.9), 3.0f).setAlwaysOnTop();
-        Gizmos.line(tip, f, alpha(0xFFFFD866, 0.9), 3.0f).setAlwaysOnTop();
-        Gizmos.line(tip, b, alpha(0xFFFFD866, 0.9), 3.0f).setAlwaysOnTop();
-        label(top.add(0, beam + 0.7 + 0.04 * distance, 0), what, labelScale(distance, 0.9, 0.06), WHITE, alpha(0xFFFFD866, 1.0));
+        double pulse = 0.5 + 0.5 * Math.sin(time * 4.0);
+        double grow = 0.025 + 0.025 * pulse;
+        AABB box = new AABB(cell.x - grow, cell.y - grow, cell.z - grow, cell.x + 1 + grow, cell.y + 1 + grow, cell.z + 1 + grow);
+        int rim = mix(MARK_GOLD, WHITE, 0.45f);
+        Gizmos.cuboid(box, GizmoStyle.strokeAndFill(alpha(rim, 0.75 + 0.2 * pulse), 2.2f, alpha(MARK_GOLD, 0.12 + 0.1 * pulse))).setAlwaysOnTop();
+        double t = 0.32;
+        int tick = alpha(mix(MARK_GOLD, WHITE, 0.7f), 1.0);
+        for (int ix = 0; ix < 2; ix++) {
+            for (int iy = 0; iy < 2; iy++) {
+                for (int iz = 0; iz < 2; iz++) {
+                    Vec3 c = new Vec3(ix == 0 ? box.minX : box.maxX, iy == 0 ? box.minY : box.maxY, iz == 0 ? box.minZ : box.maxZ);
+                    Gizmos.line(c, c.add(ix == 0 ? t : -t, 0, 0), tick, 4.0f).setAlwaysOnTop();
+                    Gizmos.line(c, c.add(0, iy == 0 ? t : -t, 0), tick, 4.0f).setAlwaysOnTop();
+                    Gizmos.line(c, c.add(0, 0, iz == 0 ? t : -t), tick, 4.0f).setAlwaysOnTop();
+                }
+            }
+        }
+        double scale = Math.min(2.2, 0.85 + 0.03 * distance);
+        double length = 1.9 * scale;
+        double bob = 0.14 * scale * Math.sin(time * 4.0);
+        Vec3 apex = new Vec3(cell.x + 0.5, cell.y + 1.0 + 0.3 * scale + bob, cell.z + 0.5);
+        Vec3 base = apex.add(0, length, 0);
+        arrow(base, new Vec3(0, -1, 0), length, 1.0, MARK_GOLD, (float) (0.2 + 0.3 * pulse), 1f, scale);
+        label(base.add(0, 0.3 * scale + 0.03 * distance, 0), what, labelScale(distance, 0.9, 0.06), WHITE, alpha(MARK_GOLD, 1.0));
     }
 
     // ---- placement outline
