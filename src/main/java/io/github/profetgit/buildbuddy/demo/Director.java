@@ -78,7 +78,7 @@ public final class Director {
             }
             return;
         }
-        if (mc.level == null || mc.player == null || mc.getSingleplayerServer() == null) return;
+        if (mc.level == null || mc.player == null || (mc.getSingleplayerServer() == null && !ServerScenes.REMOTE)) return;
         tick++;
         if (tick < 10) return;
         if (!built) {
@@ -161,6 +161,7 @@ public final class Director {
 
     static void run(Minecraft mc, String... commands) {
         MinecraftServer server = mc.getSingleplayerServer();
+        if (server == null) return;
         server.execute(() -> {
             for (String c : commands) server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), c);
         });
@@ -241,6 +242,7 @@ public final class Director {
                 case "pick" -> PickScenes.pick();
                 case "auto" -> AutoScenes.auto();
                 case "auto-own" -> AutoScenes.own();
+                case "server-auto" -> ServerScenes.serverAuto();
                 case "finish" -> StrictScenes.finish();
                 case "assist-strict" -> StrictScenes.assistStrict();
                 case "pick-key" -> StrictScenes.pickKey();

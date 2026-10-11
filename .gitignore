@@ -17,3 +17,5 @@ dev/icon/sprites/review*.png
 release-art/
 dev/icon/frames60/
 dev/icon/banner_frames60/
+dev/server/.work/
+dev/server/__pycache__/
