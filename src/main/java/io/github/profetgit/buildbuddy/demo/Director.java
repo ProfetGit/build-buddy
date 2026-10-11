@@ -237,7 +237,6 @@ public final class Director {
                 case "shapes" -> UiScenes.shapes();
                 case "library" -> UiScenes.library();
                 case "firstrun" -> UiScenes.firstRun();
-                case "community" -> CommunityScenes.community();
                 case "save" -> SaveScenes.save();
                 case "pick" -> PickScenes.pick();
                 case "auto" -> AutoScenes.auto();

@@ -6,7 +6,6 @@
 #      WORK_TAG (own game dir, for parallel runs), SKIP_BUILD=1, TIMEOUT (s), PROFILE=1 (the user's Fabric 26.3 mods;
 #      EXCLUDE=regex drops some), SHADERS=1 (Complementary Reimagined, with PROFILE=1 for Iris).
 #      PONDER (lesson ids for ponder-stills, default all), PONDER_STEP (seconds between stills, 2), TAKE (takes of ponder-take: place,layers,edit),
-#      SITE (community site address for the community scene), NBT=0 (skip its .nbt step when the site has no such build),
 #      WS (the workspace folder holding tools/; needed when running from a git worktree under .claude/worktrees). Gradle always runs on /usr/lib/jvm/java-25-openjdk.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -26,11 +25,9 @@ args=(26.3 fabric "$OUT" --game "$HERE/.work/game${WORK_TAG:+-$WORK_TAG}" --jar 
 [ -n "${SINK:-}" ] && args+=(-D "buildbuddy.demo.sink=$SINK")
 [ -n "${PERF:-}" ] && args+=(-D "buildbuddy.demo.perf=$PERF")
 [ -n "${PERF_EDIT:-}" ] && args+=(-D "buildbuddy.demo.perf.edit=true")
-[ -n "${SITE:-}" ] && args+=(-D "buildbuddy.demo.site=$SITE")
 [ -n "${PONDER:-}" ] && args+=(-D "buildbuddy.demo.ponder=$PONDER")
 [ -n "${PONDER_STEP:-}" ] && args+=(-D "buildbuddy.demo.ponder.step=$PONDER_STEP")
 [ -n "${TAKE:-}" ] && args+=(-D "buildbuddy.demo.take=$TAKE")
-[ "${NBT:-}" = "0" ] && args+=(-D "buildbuddy.demo.nbt=false")
 # the mod needs Fabric API (its resource loader serves the art and sounds), so every run has it unless FABRIC_API=0
 [ "${FABRIC_API:-1}" != "0" ] && args+=(--fabric-api)
 if [ -n "${MODS:-}" ]; then IFS=: read -ra extra <<< "$MODS"; for m in "${extra[@]}"; do args+=(--mod "$m"); done; fi

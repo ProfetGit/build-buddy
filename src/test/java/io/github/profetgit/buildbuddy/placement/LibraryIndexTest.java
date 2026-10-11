@@ -42,7 +42,7 @@ class LibraryIndexTest {
         src.addProperty("site", "https://s.example");
         src.addProperty("id", "x1");
         LibraryIndex.put(a, List.of("house", "oak"), null);
-        LibraryIndex.put(b, List.of("community"), src);
+        LibraryIndex.put(b, List.of("tag"), src);
         // a fresh start reads what is on disk
         LibraryIndex.useFile(dir.resolve("config").resolve("library.json"));
         assertEquals(List.of("house", "oak"), LibraryIndex.tags(a));

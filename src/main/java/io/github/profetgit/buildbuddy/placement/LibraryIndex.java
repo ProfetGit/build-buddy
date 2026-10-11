@@ -18,8 +18,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import org.jspecify.annotations.Nullable;
 
 /**
- * What the Library knows about a file besides what is inside it: its tags and, for a build fetched from the community site,
- * where it came from. Kept in one file in the config folder ({@code config/buildbuddy/library.json}), so the schematics folder
+ * What the Library knows about a file besides what is inside it: its tags and where it came from. Kept in one file in the config folder ({@code config/buildbuddy/library.json}), so the schematics folder
  * holds only schematics and a build file is never touched. An entry belongs to a file by its reference
  * ({@code schematics:house.litematic}); entries of files that are gone are dropped when the Library looks at its folders.
  * Older versions wrote a {@code name.buildbuddy.json} beside each file: {@link #importSidecars} moves those in and deletes them.

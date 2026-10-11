@@ -20,7 +20,7 @@ import net.minecraft.network.chat.Component;
  */
 public final class SettingsScreen extends Screen {
     private enum Group {
-        APPEARANCE("Appearance"), GHOST("Ghost"), MATERIALS("Materials"), COMMUNITY("Community"), AUTO("Auto-place"), SERVERS("Servers"), LESSONS("Lessons"), ADVANCED("Advanced");
+        APPEARANCE("Appearance"), GHOST("Ghost"), MATERIALS("Materials"), AUTO("Auto-place"), SERVERS("Servers"), LESSONS("Lessons"), ADVANCED("Advanced");
 
         final String label;
 
@@ -39,7 +39,7 @@ public final class SettingsScreen extends Screen {
     private record Slider(String id, String label, String desc, double min, double max, double step, DoubleSupplier get, DoubleConsumer set, DoubleFunction<String> format) implements Row {
     }
 
-    /** A button with a line beside it; {@code run} is what a click does (null for the ones the screen handles itself: reset, local site). */
+    /** A button with a line beside it; {@code run} is what a click does (null for the ones the screen handles itself: reset). */
     private record Action(String id, String label, String desc, Runnable run) implements Row {
         Action(String id, String label, String desc) {
             this(id, label, desc, null);
@@ -51,12 +51,6 @@ public final class SettingsScreen extends Screen {
 
     /** A row with where it is on screen. */
     private record Laid(Row row, int x, int y, int w, int h) {
-    }
-
-    /** The Community page only exists once the site has an address. */
-    private static Group[] groups() {
-        return io.github.profetgit.buildbuddy.community.Community.base() != null ? Group.values()
-            : java.util.Arrays.stream(Group.values()).filter(g -> g != Group.COMMUNITY).toArray(Group[]::new);
     }
 
     private static final int PANEL_W = 400, TAB_W = 86, SIDE = 106, TRACK_H = 9;
@@ -131,15 +125,6 @@ public final class SettingsScreen extends Screen {
                 r.add(new Toggle("verify", "Check what is built", "Hide right blocks, mark wrong ones, count progress.", () -> d.verify, v -> d.verify = v));
             }
             case MATERIALS -> r.add(new Toggle("groupVariants", "Group variants", "Count every colour or wood of a block as one line.", () -> d.groupVariants, v -> d.groupVariants = v));
-            case COMMUNITY -> {
-                String base = io.github.profetgit.buildbuddy.community.Community.base();
-                r.add(new Toggle("community", "Community tab", "Browse and download builds that people shared on the community website. Off sends nothing.",
-                    () -> io.github.profetgit.buildbuddy.community.CommunityConfig.ON.equals(io.github.profetgit.buildbuddy.community.Community.consent()),
-                    v -> io.github.profetgit.buildbuddy.community.Community.setConsent(v ? io.github.profetgit.buildbuddy.community.CommunityConfig.ON : io.github.profetgit.buildbuddy.community.CommunityConfig.OFF)));
-                r.add(new Note("communityUrl", "Website address", base != null ? base + "  To change it, edit communityUrl in config/buildbuddy.json."
-                    : "None yet: the community website has no public address. To try a local copy, edit communityUrl in config/buildbuddy.json or use the button below."));
-                r.add(new Action("localSite", "Local site", "Test site on this computer."));
-            }
             case AUTO -> {
                 r.add(new Slider("autoRate", "Sweep speed", "Blocks a second while it builds by itself. Assist places one the moment you press, and while held one every tick. The mod never goes above " + io.github.profetgit.buildbuddy.auto.Rate.MAX + ".",
                     io.github.profetgit.buildbuddy.auto.Rate.MIN, io.github.profetgit.buildbuddy.auto.Rate.MAX, 1, () -> d.autoRate, v -> d.autoRate = (int) v, v -> (int) v + " a second"));
@@ -266,7 +251,7 @@ public final class SettingsScreen extends Screen {
         g.fill(px + 8, py + 21, px + pw - 8, py + 22, Ui.withAlpha(Ui.DIM, inner * 0.35f));
 
         int ty = py + 30;
-        for (Group gr : groups()) {
+        for (Group gr : Group.values()) {
             Ui.tab(g, "set#tab" + gr, px + 10, ty, TAB_W, gr.label, gr == group, mx, my);
             ty += 15;
         }
@@ -350,7 +335,7 @@ public final class SettingsScreen extends Screen {
         int mx = (int) event.x(), my = (int) event.y();
         int px = px(), py = py(), ph = panelH(), pw = panelW();
         int ty = py + 30;
-        for (Group gr : groups()) {
+        for (Group gr : Group.values()) {
             if (Ui.inside(mx, my, px + 10, ty, TAB_W, 13)) {
                 if (gr != group) {
                     group = gr;
@@ -443,16 +428,6 @@ public final class SettingsScreen extends Screen {
                 return true;
             }
         }
-        if (was.equals("localSite")) {
-            for (Laid l : laid()) {
-                if (l.row instanceof Action ac && ac.id.equals("localSite") && Ui.inside(mx, my, l.x, l.y + 1, 90, 16)) {
-                    Settings.get().communityUrl = io.github.profetgit.buildbuddy.community.CommunityConfig.LOCAL_TEST_URL;
-                    Settings.changed();
-                    Sfx.play(Sfx.COMPLETE);
-                    return true;
-                }
-            }
-        }
         if (was.equals("reset")) {
             for (Laid l : laid()) {
                 if (l.row instanceof Action ac && ac.id.equals("reset") && Ui.inside(mx, my, l.x, l.y + 1, 90, 16)) {
@@ -481,7 +456,7 @@ public final class SettingsScreen extends Screen {
     /** Dev demo: the middle of a control on screen ("tab:GHOST", a toggle's id, "reset", "done"), or null. */
     public int[] anchor(String id) {
         if (id.startsWith("tab:")) {
-            int i = java.util.Arrays.asList(groups()).indexOf(Group.valueOf(id.substring(4)));
+            int i = java.util.Arrays.asList(Group.values()).indexOf(Group.valueOf(id.substring(4)));
             return new int[]{px() + 10 + TAB_W / 2, py() + 30 + i * 15 + 6};
         }
         if (id.equals("done")) return new int[]{px() + panelW() - 10 - 26, py() + panelH() - 16};

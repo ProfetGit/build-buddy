@@ -32,10 +32,6 @@ public final class Settings {
         public boolean saveToSchematics = true;
         // Materials
         public boolean groupVariants = false;
-        // Community: "ask" until the player answers the first-run notice, then "on" or "off"
-        public String community = "ask";
-        /** Address of the community site; empty = the built-in one (CommunityConfig.DEFAULT_BASE_URL). */
-        public String communityUrl = "";
         // Auto-place
         public int autoRate = io.github.profetgit.buildbuddy.auto.Rate.DEFAULT;
         public boolean autoTurn = false;
@@ -88,8 +84,6 @@ public final class Settings {
         data.range = Math.max(32, Math.min(512, data.range));
         data.wheelHoldMs = Math.max(80, Math.min(600, data.wheelHoldMs));
         data.autoRate = io.github.profetgit.buildbuddy.auto.Rate.clamp(data.autoRate);
-        if (!"on".equals(data.community) && !"off".equals(data.community)) data.community = "ask";
-        data.communityUrl = data.communityUrl == null ? "" : data.communityUrl.trim();
         if (data.lessonsSeen == null) data.lessonsSeen = new java.util.ArrayList<>();
     }
 
