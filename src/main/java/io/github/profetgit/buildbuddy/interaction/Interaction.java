@@ -1011,8 +1011,6 @@ public final class Interaction {
                 p.set(d.startOrigin.offset((int) (d.axis.x * steps), (int) (d.axis.y * steps), (int) (d.axis.z * steps)), p.orientation);
                 Sfx.play(Sfx.SNAP, 1.0f + 0.04f * Math.min(12, Math.abs(steps)));
             }
-            String what = steps == 0 ? "Drag along the arrow" : "Move " + Math.abs(steps) + " " + wordFor(d.handle.axis, steps);
-            if (!Settings.get().chips) say(mc, what + "   now at " + p.origin.getX() + " " + p.origin.getY() + " " + p.origin.getZ());
         } else {
             if (!d.armed) {
                 // the angle is taken about the ring's own centre, fixed for the whole drag: the build's middle for a ring round
@@ -1043,7 +1041,6 @@ public final class Interaction {
                 p.set(new BlockPos(xz[0], d.startOrigin.getY(), xz[1]), o);
                 Sfx.play(Sfx.SNAP, 1.25f);
             }
-            if (!Settings.get().chips) say(mc, d.turns == 0 ? "Drag around the ring" : "Turn " + Math.abs(d.turns * 90) + " degrees " + (d.turns > 0 ? "clockwise" : "anticlockwise"));
         }
     }
 
@@ -1280,10 +1277,9 @@ public final class Interaction {
         };
     }
 
-    /** Shows cursor chips, or the same words on the action bar when chips are switched off. */
+    /** Shows cursor chips; nothing at all when they are switched off. */
     static void chips(Minecraft mc, Chips.Chip... chips) {
         if (Settings.get().chips) Chips.show(chips);
-        else say(mc, Chips.line(chips));
     }
 
     /** Where a handle's tip is drawn this frame, for the demo to aim at ("move+x", "move-z", "ring", "flipx", "flipz"). */

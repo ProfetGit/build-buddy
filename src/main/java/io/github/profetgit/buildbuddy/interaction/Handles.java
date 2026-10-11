@@ -22,7 +22,7 @@ final class Handles {
         MOVE, RING
     }
 
-    static final int X_COLOR = 0xFFFF93A8, Y_COLOR = 0xFF93EBB4, Z_COLOR = 0xFF93C9FF, RING_COLOR = 0xFFF2F9FF, WHITE = 0xFFFFFFFF;
+    static final int X_COLOR = 0xFFFF3B55, Y_COLOR = 0xFF34D96B, Z_COLOR = 0xFF3B8CFF, RING_COLOR = 0xFFF2F9FF, WHITE = 0xFFFFFFFF;
 
     /** One handle: what it does, where it is drawn, and the boxes a ray is tested against. */
     static final class Handle {
@@ -309,9 +309,9 @@ final class Handles {
             u = new Vec3(1, 0, 0);
             v = new Vec3(0, 1, 0);
         }
-        int body = mix(color, WHITE, 0.12f + 0.35f * hover);
-        double opacity = (0.66 + 0.26 * hover) * visible;
-        int edge = alpha(mix(color, WHITE, 0.6f + 0.4f * hover), (0.55 + 0.4 * hover) * visible);
+        int body = mix(color, WHITE, 0.02f + 0.2f * hover);
+        double opacity = (0.82 + 0.16 * hover) * visible;
+        int edge = alpha(mix(color, WHITE, 0.3f + 0.4f * hover), (0.55 + 0.4 * hover) * visible);
         float ew = 1.5f + 1.2f * hover;
         // shaft: four corners at the base and at the head
         Vec3[] sb = square(from, u, v, w), sh = square(headBase, u, v, w);
