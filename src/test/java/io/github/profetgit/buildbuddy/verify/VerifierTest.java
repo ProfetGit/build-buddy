@@ -103,6 +103,25 @@ class VerifierTest {
     private static final BlockState STONE = Blocks.STONE.defaultBlockState(), PLANKS = Blocks.OAK_PLANKS.defaultBlockState(), DIRT = Blocks.DIRT.defaultBlockState();
 
     @Test
+    void rightBlockInAnotherStateIsOffAndCountsAsBuilt() {
+        BlockState north = Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.NORTH);
+        BlockState south = north.setValue(StairBlock.FACING, Direction.SOUTH);
+        Blueprint bp = blueprint(2, 1, 1, (c, k) -> north);
+        Verifier v = verifier(bp, Orientation.NONE, 100, 64, -50);
+        FakeWorld w = new FakeWorld();
+        w.set(100, 64, -50, north);
+        w.set(101, 64, -50, south);
+        run(v, w);
+        Counts c = v.counts();
+        assertEquals(1, c.correct());
+        assertEquals(1, c.off());
+        assertEquals(0, c.wrong());
+        assertEquals(0, c.todo());
+        assertEquals(Verifier.OFF, v.statusAt(101, 64, -50));
+        assertEquals(1.0, c.progress(), 1e-9);
+    }
+
+    @Test
     void countsMissingWrongAndCorrect() {
         // a 4 x 3 x 4 box: stone floor (16), planks column at (1,1,1) and (1,2,1)
         Blueprint bp = blueprint(4, 3, 4, (c, k) -> c[1] == 0 ? STONE : (c[0] == 1 && c[2] == 1 ? PLANKS : null));

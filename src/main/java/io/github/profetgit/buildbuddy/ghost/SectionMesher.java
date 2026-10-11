@@ -51,7 +51,7 @@ final class SectionMesher {
         }
     }
 
-    private static final int WRONG_TINT = 0xFFFF4A4A;
+    private static final int WRONG_TINT = 0xFFFF4A4A, OFF_TINT = 0xFFFF8C00;
     private static final float WRONG_GROW = 1.012f;
 
     private SectionMesher() {
@@ -78,13 +78,13 @@ final class SectionMesher {
         BufferBuilder builder = new BufferBuilder(bytes, type.primitiveTopology(), format);
         PoseStack ps = new PoseStack();
         int[] quads = new int[1];
-        boolean[] wrong = new boolean[1];
+        int[] tint = new int[1];
         BlockQuadOutput out = (x, y, z, quad, instance) -> {
             instance.setLightCoords(LightCoordsUtil.FULL_BRIGHT);
             ps.pushPose();
             ps.translate(x, y, z);
-            if (wrong[0]) {
-                instance.multiplyColor(WRONG_TINT);
+            if (tint[0] != 0) {
+                instance.multiplyColor(tint[0]);
                 ps.translate(0.5f, 0.5f, 0.5f);
                 ps.scale(WRONG_GROW, WRONG_GROW, WRONG_GROW);
                 ps.translate(-0.5f, -0.5f, -0.5f);
@@ -109,7 +109,7 @@ final class SectionMesher {
                         if (status == Verifier.CORRECT) continue;
                         BlockState state = region.state(x, y, z);
                         if (state.isAir() || state.getRenderShape() != RenderShape.MODEL) continue;
-                        wrong[0] = status == Verifier.WRONG;
+                        tint[0] = status == Verifier.WRONG ? WRONG_TINT : status == Verifier.OFF ? OFF_TINT : 0;
                         pos.set(wx + x, wy + y, wz + z);
                         BlockStateModel model = models.get(state);
                         renderer.tesselateBlock(out, x - x0, y - y0, z - z0, view, pos, state, model, state.getSeed(pos));
@@ -145,7 +145,7 @@ final class SectionMesher {
         BufferBuilder builder = new BufferBuilder(bytes, type.primitiveTopology(), format);
         PoseStack ps = new PoseStack();
         int[] quads = new int[1];
-        boolean[] wrong = new boolean[1];
+        int[] tint = new int[1];
         java.util.Set<BakedQuad> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
         BlockQuadOutput collect = (x, y, z, quad, instance) -> seen.add(quad);
         BlockQuadOutput out = (x, y, z, quad, instance) -> {
@@ -153,8 +153,8 @@ final class SectionMesher {
             instance.setLightCoords(LightCoordsUtil.FULL_BRIGHT);
             ps.pushPose();
             ps.translate(x, y, z);
-            if (wrong[0]) {
-                instance.multiplyColor(WRONG_TINT);
+            if (tint[0] != 0) {
+                instance.multiplyColor(tint[0]);
                 ps.translate(0.5f, 0.5f, 0.5f);
                 ps.scale(WRONG_GROW, WRONG_GROW, WRONG_GROW);
                 ps.translate(-0.5f, -0.5f, -0.5f);
@@ -174,7 +174,7 @@ final class SectionMesher {
                 if (state.isAir() || state.getRenderShape() != RenderShape.MODEL) continue;
                 // nothing to uncover when the neighbour is air already
                 if (region.state(x, y + (top ? 1 : -1), z).isAir()) continue;
-                wrong[0] = status == Verifier.WRONG;
+                tint[0] = status == Verifier.WRONG ? WRONG_TINT : status == Verifier.OFF ? OFF_TINT : 0;
                 pos.set(wx + x, wy + y, wz + z);
                 BlockStateModel model = models.get(state);
                 long seed = state.getSeed(pos);

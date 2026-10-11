@@ -23,10 +23,10 @@ import net.minecraft.world.level.block.state.BlockState;
  * cells change, which is how the ghost knows to bake it again.
  */
 public final class Verifier {
-    public static final byte NONE = 0, CORRECT = 1, MISSING = 2, WRONG = 3, UNKNOWN = 4, UNLOADED = 5;
+    public static final byte NONE = 0, CORRECT = 1, MISSING = 2, WRONG = 3, UNKNOWN = 4, UNLOADED = 5, OFF = 6;
     public static final long NO_TARGET = Long.MIN_VALUE;
     static final int SEC = 16;
-    private static final int STATES = 6;
+    private static final int STATES = 7;
     /** How many dirty cells are rechecked per slice of work before the clock is looked at again. */
     private static final int DIRTY_BATCH = 256;
 
@@ -39,7 +39,7 @@ public final class Verifier {
         public final int nx, ny, nz;
         final int[] version;
         final boolean[] checked, queued, hasUnloaded;
-        /** Cells per palette slot and state: {@code [slot * 6 + state]}. */
+        /** Cells per palette slot and state: {@code [slot * STATES + state]}. */
         final int[] paletteCounts;
         final boolean[] air;
 
@@ -126,7 +126,7 @@ public final class Verifier {
     // ---- reading
 
     public Counts counts() {
-        return new Counts(counts[CORRECT], counts[MISSING], counts[WRONG], counts[UNKNOWN], counts[UNLOADED]);
+        return new Counts(counts[CORRECT], counts[MISSING], counts[WRONG], counts[UNKNOWN], counts[UNLOADED], counts[OFF]);
     }
 
     /** How the build stands, for the people who read it: see {@link Phase}. */
@@ -462,6 +462,7 @@ public final class Verifier {
                 BlockState expected = r.states[pal];
                 if (matcher.matches(expected, actual)) now = CORRECT;
                 else if (actual.isAir() || actual.canBeReplaced()) now = MISSING;
+                else if (actual.getBlock() == expected.getBlock()) now = OFF;
                 else now = WRONG;
             }
         }

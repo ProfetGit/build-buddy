@@ -84,6 +84,15 @@ final class VerifyScenes {
         until("verify/mended", 200, () -> counts().wrong() == 0 && counts().correct() == 145);
         act(() -> check("verify/mending turns it correct", counts().wrong() == 0 && counts().correct() == 145, counts().toString()));
 
+        // the right block in the wrong state (a roof stair turned the other way) counts as built and shows orange, never red
+        cmd("setblock 0 " + (G + 6) + " 11 oak_stairs[facing=west,half=bottom]");
+        until("verify/off-state block seen", 200, () -> counts().off() == 1);
+        act(() -> check("verify/a turned stair is off, not wrong", counts().off() == 1 && counts().wrong() == 0 && v().statusAt(0, G + 6, 11) == Verifier.OFF, counts().toString()));
+        waitTicks(25);
+        shot("verify_2b_off");
+        cmd("setblock 0 " + (G + 6) + " 11 air");
+        until("verify/off-state cleared", 200, () -> counts().off() == 0);
+
         // break one of the foundation again: missing, and the lowest unfinished layer is layer 0 again
         cmd("setblock 5 " + (G + 1) + " 12 air");
         until("verify/break seen", 200, () -> counts().correct() == 144);

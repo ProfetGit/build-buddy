@@ -486,34 +486,33 @@ final class Handles {
 
     // ---- next block marker
 
-    static final int MARK_GOLD = 0xFFFFC43D;
+    static final int MARK_GOLD = 0xFFFFB92E;
 
-    /** An animated marker on the next block to build: a softly pulsing gold box with bright corner ticks, and a bobbing solid arrow pointing down at it under a label. */
+    /** The next block to build: a thin gold rim and soft fill with fine corner ticks, and the same solid arrow as the handles bobbing down at it under a label. */
     static void nextMarker(Vec3 cell, String what, double distance, double time) {
-        double pulse = 0.5 + 0.5 * Math.sin(time * 4.0);
-        double grow = 0.025 + 0.025 * pulse;
+        double pulse = 0.5 + 0.5 * Math.sin(time * 3.0);
+        double grow = 0.02 + 0.02 * pulse;
         AABB box = new AABB(cell.x - grow, cell.y - grow, cell.z - grow, cell.x + 1 + grow, cell.y + 1 + grow, cell.z + 1 + grow);
-        int rim = mix(MARK_GOLD, WHITE, 0.45f);
-        Gizmos.cuboid(box, GizmoStyle.strokeAndFill(alpha(rim, 0.75 + 0.2 * pulse), 2.2f, alpha(MARK_GOLD, 0.12 + 0.1 * pulse))).setAlwaysOnTop();
-        double t = 0.32;
-        int tick = alpha(mix(MARK_GOLD, WHITE, 0.7f), 1.0);
+        Gizmos.cuboid(box, GizmoStyle.strokeAndFill(alpha(mix(MARK_GOLD, WHITE, 0.5f), 0.55 + 0.25 * pulse), 1.6f, alpha(MARK_GOLD, 0.10 + 0.08 * pulse))).setAlwaysOnTop();
+        double t = 0.26;
+        int tick = alpha(mix(MARK_GOLD, WHITE, 0.55f), 0.9);
         for (int ix = 0; ix < 2; ix++) {
             for (int iy = 0; iy < 2; iy++) {
                 for (int iz = 0; iz < 2; iz++) {
                     Vec3 c = new Vec3(ix == 0 ? box.minX : box.maxX, iy == 0 ? box.minY : box.maxY, iz == 0 ? box.minZ : box.maxZ);
-                    Gizmos.line(c, c.add(ix == 0 ? t : -t, 0, 0), tick, 4.0f).setAlwaysOnTop();
-                    Gizmos.line(c, c.add(0, iy == 0 ? t : -t, 0), tick, 4.0f).setAlwaysOnTop();
-                    Gizmos.line(c, c.add(0, 0, iz == 0 ? t : -t), tick, 4.0f).setAlwaysOnTop();
+                    Gizmos.line(c, c.add(ix == 0 ? t : -t, 0, 0), tick, 2.6f).setAlwaysOnTop();
+                    Gizmos.line(c, c.add(0, iy == 0 ? t : -t, 0), tick, 2.6f).setAlwaysOnTop();
+                    Gizmos.line(c, c.add(0, 0, iz == 0 ? t : -t), tick, 2.6f).setAlwaysOnTop();
                 }
             }
         }
-        double scale = Math.min(2.2, 0.85 + 0.03 * distance);
-        double length = 1.9 * scale;
-        double bob = 0.14 * scale * Math.sin(time * 4.0);
-        Vec3 apex = new Vec3(cell.x + 0.5, cell.y + 1.0 + 0.3 * scale + bob, cell.z + 0.5);
+        double scale = Math.min(1.8, 0.62 + 0.025 * distance);
+        double length = 2.0 * scale;
+        double bob = 0.12 * scale * Math.sin(time * 3.0);
+        Vec3 apex = new Vec3(cell.x + 0.5, cell.y + 1.0 + 0.35 * scale + bob, cell.z + 0.5);
         Vec3 base = apex.add(0, length, 0);
-        arrow(base, new Vec3(0, -1, 0), length, 1.0, MARK_GOLD, (float) (0.2 + 0.3 * pulse), 1f, scale);
-        label(base.add(0, 0.3 * scale + 0.03 * distance, 0), what, labelScale(distance, 0.9, 0.06), WHITE, alpha(MARK_GOLD, 1.0));
+        arrow(base, new Vec3(0, -1, 0), length, 1.0, MARK_GOLD, 0f, 1f, scale);
+        label(base.add(0, 0.3 * scale + 0.03 * distance, 0), what, labelScale(distance, 0.9, 0.06), WHITE, alpha(MARK_GOLD, 0.9));
     }
 
     // ---- placement outline
