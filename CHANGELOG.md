@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.90
+
+- First CurseForge release. The license text in the jar now names Build Buddy (it still had another mod's name in the warranty paragraph). The right block in another state shows orange and counts as built; the next-block marker is a bobbing arrow with a gold box.
+
 ## 0.0.84
 
 - **The mod is now called Build Buddy** (it was Cyanotype). Mod id `buildbuddy`, commands `/buildbuddy ...`, config in `config/buildbuddy.json` and `config/buildbuddy/` (copy your old `cyanotype` ones over to keep your settings, library tags and placed builds), keys under "Build Buddy" in Controls (your own key choices have to be set again).
