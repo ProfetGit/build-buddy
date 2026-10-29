@@ -10,18 +10,16 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 *///?}
 
-/** 26.2 only (26.3 uses {@link LevelRendererMixin}): the ghost goes in around the level's translucent phases. */
+/** 26.2 only (26.3 uses {@link LevelRendererMixin}): the ghost goes in with the feature frame's outline step. */
 @Mixin(FeatureRenderDispatcher.PreparedFrame.class)
 public abstract class PreparedFrameMixin {
     //? if <26.3 {
-    /*/^* The translucent features come before the water: the blocks that stand in water are drawn here. ^/
-    @Inject(method = "executeTranslucent", at = @At("HEAD"))
-    private void buildbuddy$ghostInWater(CallbackInfo ci) {
-        GhostRenderer.drawEarlyInLevel(Minecraft.getInstance().gameRenderer.mainRenderTarget());
-    }
-
-    /^* The last phase of the main pass, after the water: the rest of the ghost goes in its own render pass. ^/
-    @Inject(method = "executeTranslucentAfterTerrain", at = @At("RETURN"))
+    /*/^*
+     * Between the translucent features and the water, so the water blends over the blocks that stand in it. It is also
+     * the only point of the main pass where Iris keeps what a pass of our own draws: before it or after the water the
+     * ghost is lost under a shader pack.
+     ^/
+    @Inject(method = "executeOutline", at = @At("HEAD"))
     private void buildbuddy$ghost(CallbackInfo ci) {
         GhostRenderer.renderInLevel(Minecraft.getInstance(), Minecraft.getInstance().gameRenderer.mainRenderTarget());
     }

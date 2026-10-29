@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.92
+
+- 26.2: the ghost shows with a shader pack on (Iris drew nothing of it before).
+
 ## 0.0.91
 
 - Minecraft 26.2 support (Fabric), from the same code as 26.3.

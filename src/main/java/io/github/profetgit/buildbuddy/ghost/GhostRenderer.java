@@ -271,13 +271,9 @@ public final class GhostRenderer {
 
     /** Called once per frame from the level renderer, after the main pass has composed the scene. */
     /**
-     * 26.2 has no level-renderer hooks around the water: the feature frame's own phases are used, and they also run for
-     * pictures drawn outside the level, so these act only between {@link #prepare} and the level's draw.
+     * 26.2 has no level-renderer hooks around the water: the feature frame's outline step is used, and it also runs for
+     * pictures drawn outside the level, so this acts only between {@link #prepare} and the level's draw.
      */
-    public static void drawEarlyInLevel(RenderTarget target) {
-        if (prepared) drawEarly(target);
-    }
-
     public static void renderInLevel(Minecraft mc, RenderTarget target) {
         if (prepared && frameCam != null) render(mc, frameCam, target);
     }
