@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.91
+
+- Minecraft 26.2 support (Fabric), from the same code as 26.3.
+
 ## 0.0.90
 
 - First CurseForge release. The license text in the jar now names Build Buddy (it still had another mod's name in the warranty paragraph). The right block in another state shows orange and counts as built; the next-block marker is a bobbing arrow with a gold box.

@@ -1,0 +1,17 @@
+[
+  {"regex": "com\\.mojang\\.renderpearl\\.api\\.(?:commands|systems)\\b", "to": "com.mojang.blaze3d.systems", "when": "<26.3"},
+  {"regex": "com/mojang/renderpearl/api/(?:commands|systems)/", "to": "com/mojang/blaze3d/systems/", "when": "<26.3"},
+  {"regex": "com\\.mojang\\.renderpearl\\.api\\.(buffers|pipeline|vertex|textures)\\b", "to": "com.mojang.blaze3d.$1", "when": "<26.3", "groups": "1"},
+  {"regex": "com/mojang/renderpearl/api/(buffers|pipeline|vertex|textures)/", "to": "com/mojang/blaze3d/$1/", "when": "<26.3", "groups": "1"},
+  {"from": "SwingSource.PREDICTED", "to": "SwingSource.CLIENT", "when": "<26.3"},
+  {"regex": "com\\.mojang\\.blaze3d\\.Blaze3D\\.openPath\\(", "to": "net.minecraft.util.Util.getPlatform().openPath(", "when": "<26.3"},
+  {"regex": "import net\\.minecraft\\.world\\.level\\.block\\.entity\\.SignTextSlot;\\n", "to": "", "when": "<26.3"},
+  {"regex": "(?:net\\.minecraft\\.world\\.level\\.block\\.entity\\.)?SignTextSlot\\.FRONT\\b", "to": "true", "when": "<26.3"},
+  {"from": "SignTextSlot", "to": "boolean", "when": "<26.3"},
+  {"from": "RedstoneWireBlock", "to": "RedStoneWireBlock", "when": "<26.3"},
+  {"from": "SignText.CODEC", "to": "SignText.DIRECT_CODEC", "when": "<26.3"},
+  {"regex": "((?:\\w+(?:\\([^()]*\\))?\\.)*\\w+(?:\\([^()]*\\))?)\\.getMessages\\((\\w+)\\)", "to": "java.util.Arrays.asList($1.getMessages($2))", "when": "<26.3", "groups": "1"},
+  {"regex": "RenderSystem\\.getCompiledPipeline\\((\\w+)\\)", "to": "$1", "when": "<26.3", "groups": "1"},
+  {"regex": "pass\\.setUniform\\(t\\.name\\(\\), t\\.textureView\\(\\)", "to": "pass.bindTexture(t.name(), t.textureView()", "when": "<26.3"},
+  {"regex": "InputConstants\\.isKeyDown\\(", "to": "InputConstants.isKeyDown(net.minecraft.client.Minecraft.getInstance().getWindow(), ", "when": "<26.3"}
+]

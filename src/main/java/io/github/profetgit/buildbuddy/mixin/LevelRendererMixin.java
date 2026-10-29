@@ -1,16 +1,18 @@
 package io.github.profetgit.buildbuddy.mixin;
 
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.renderpearl.api.commands.RenderPass;
 import io.github.profetgit.buildbuddy.ghost.GhostRenderer;
 import io.github.profetgit.buildbuddy.interaction.Interaction;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
-import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import net.minecraft.client.renderer.state.level.LevelRenderState;
 import org.spongepowered.asm.mixin.Mixin;
+//? if >=26.3 {
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
+import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
+//?}
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -34,6 +36,7 @@ public abstract class LevelRendererMixin {
         GhostRenderer.prepare(mc, state.cameraRenderState);
     }
 
+    //? if >=26.3 {
     /**
      * The water is drawn after the translucent features and writes depth, so a ghost drawn after it is hidden below the
      * surface. The blocks that stand in water are drawn here instead, before the water, like a real translucent block.
@@ -62,4 +65,5 @@ public abstract class LevelRendererMixin {
         RenderTarget target = mc.gameRenderer.mainRenderTarget();
         GhostRenderer.render(mc, levelRenderState.cameraRenderState, target);
     }
+    //?}
 }

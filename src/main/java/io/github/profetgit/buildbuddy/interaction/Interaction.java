@@ -70,7 +70,7 @@ public final class Interaction {
     /** Dev demo only: which modifier keys the scroll sees (1 = shift, 2 = ctrl) instead of the real ones; -1 = the real keys. */
     public static volatile int testModifiers = -1;
 
-    /** Modifier bits of the last mouse press as the window reported them (3 = Shift, 192 = Ctrl), and when. */
+    /** Modifier bits of the last mouse press as the window reported them (InputConstants.MOD_SHIFT / MOD_CONTROL: SDL bits on 26.3, GLFW bits on 26.2), and when. */
     private static volatile int clickMods;
     private static volatile long clickNs;
 
@@ -90,7 +90,7 @@ public final class Interaction {
     }
 
     static boolean shift(Minecraft mc) {
-        return testModifiers >= 0 ? (testModifiers & 1) != 0 : mc.hasShiftDown() || recentClick(3);
+        return testModifiers >= 0 ? (testModifiers & 1) != 0 : mc.hasShiftDown() || recentClick(com.mojang.blaze3d.platform.InputConstants.MOD_SHIFT);
     }
 
     /** Whether Ctrl is down now, by the keyboard or by what the last mouse press carried (for screens that take Ctrl+click). */
@@ -99,7 +99,7 @@ public final class Interaction {
     }
 
     static boolean ctrl(Minecraft mc) {
-        return testModifiers >= 0 ? (testModifiers & 2) != 0 : mc.hasControlDown() || recentClick(192);
+        return testModifiers >= 0 ? (testModifiers & 2) != 0 : mc.hasControlDown() || recentClick(com.mojang.blaze3d.platform.InputConstants.MOD_CONTROL);
     }
 
     /** Blocks the placement has been lifted above the surface it aims at (shift+scroll). */

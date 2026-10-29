@@ -61,8 +61,10 @@ class ShippedLessonsTest {
                 CompoundTag given = SchematicReader.stateTag(spec);
                 CompoundTag written = NbtUtils.writeBlockState(PaletteEntry.read(given).state());
                 CompoundTag props = given.getCompoundOrEmpty("Properties");
+                // 26.3 writes {id, properties}, 26.2 {Name, Properties}
+                CompoundTag out = written.contains("properties") ? written.getCompoundOrEmpty("properties") : written.getCompoundOrEmpty("Properties");
                 for (String k : props.keySet()) {
-                    assertEquals(props.getStringOr(k, ""), written.getCompoundOrEmpty("properties").getStringOr(k, "?"), s.id + ": " + spec + " property " + k + " does not mean what it says");
+                    assertEquals(props.getStringOr(k, ""), out.getStringOr(k, "?"), s.id + ": " + spec + " property " + k + " does not mean what it says");
                 }
             }
         }

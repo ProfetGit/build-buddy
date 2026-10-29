@@ -1,8 +1,8 @@
 plugins {
-    id("net.fabricmc.fabric-loom") version "1.18.2"
+    id("net.fabricmc.fabric-loom")
 }
 
-val mc = property("mc") as String
+val mc = stonecutter.current.version
 val modId = property("mod.id") as String
 
 version = "${property("mod.version")}+$mc-fabric"
@@ -20,6 +20,7 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    workingDir = rootProject.projectDir
 }
 
 loom {
@@ -57,3 +58,6 @@ tasks.processResources {
 tasks.named<Jar>("jar") {
     from(rootProject.file("LICENSE"))
 }
+
+extra["mcVersion"] = mc
+apply(from = rootProject.file("../../tools/Backport/renames.gradle.kts"))

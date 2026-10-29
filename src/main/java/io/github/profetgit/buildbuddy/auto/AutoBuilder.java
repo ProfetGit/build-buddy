@@ -648,7 +648,12 @@ public final class AutoBuilder {
         BlockPos pos = sign.getBlockPos();
         Long at = SIGNS.remove(pos.asLong());
         if (at == null || tickNo - at > SIGN_TICKS || mc.getConnection() == null || mc.level == null) return false;
-        mc.getConnection().send(new ServerboundSignUpdatePacket(pos, blueprintSignLines(mc, pos), slot));
+        List<String> lines = blueprintSignLines(mc, pos);
+        //? if >=26.3 {
+        mc.getConnection().send(new ServerboundSignUpdatePacket(pos, lines, slot));
+        //?} else {
+        /*mc.getConnection().send(new ServerboundSignUpdatePacket(pos, slot, lines.get(0), lines.get(1), lines.get(2), lines.get(3)));
+        *///?}
         signEditors++;
         return true;
     }
@@ -710,8 +715,13 @@ public final class AutoBuilder {
         InteractionResult r = useFacing(mc, p, hit, plan);
         if (r instanceof InteractionResult.Success success) {
             if (success.swingSource() == InteractionResult.SwingSource.PREDICTED) {
+                //? if >=26.3 {
                 p.swing(InteractionHand.MAIN_HAND, held.getInteractAnimation(), false);
                 if (!held.isEmpty() && (held.getCount() != before || p.hasInfiniteMaterials())) p.itemUsed(InteractionHand.MAIN_HAND);
+                //?} else {
+                /*p.swing(InteractionHand.MAIN_HAND);
+                if (!held.isEmpty() && (held.getCount() != before || p.hasInfiniteMaterials())) mc.gameRenderer.itemInHandRenderer.itemUsed(InteractionHand.MAIN_HAND);
+                *///?}
             }
             placed++;
             if (AUTOLOG) System.out.println("[autolog] tick " + tickNo + " cell " + BlockPos.of(cell).toShortString() + " support " + plan.support().toShortString() + " " + plan.face() + " hit " + plan.hit() + " plan " + plan.yaw() + "/" + plan.pitch() + " pending " + PENDING.containsKey(cell) + " fails " + FAILS.get(cell));

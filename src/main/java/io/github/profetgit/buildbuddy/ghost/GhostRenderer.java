@@ -211,6 +211,7 @@ public final class GhostRenderer {
     private static List<DrawItem> earlyItems = List.of(), lateItems = List.of();
     private static int earlyQuads, lateQuads;
     private static boolean prepared, earlyDrawn;
+    private static CameraRenderState frameCam;
 
     /**
      * Called once per frame from the level renderer, before any pass: moves the ghosts, bakes, uploads and decides what
@@ -222,6 +223,7 @@ public final class GhostRenderer {
         earlyQuads = lateQuads = 0;
         earlyDrawn = false;
         prepared = true;
+        frameCam = cam;
         Stats.quadsDrawn = 0;
         if (t0 < pausedUntilNs) return;
         try {
@@ -268,6 +270,18 @@ public final class GhostRenderer {
     }
 
     /** Called once per frame from the level renderer, after the main pass has composed the scene. */
+    /**
+     * 26.2 has no level-renderer hooks around the water: the feature frame's own phases are used, and they also run for
+     * pictures drawn outside the level, so these act only between {@link #prepare} and the level's draw.
+     */
+    public static void drawEarlyInLevel(RenderTarget target) {
+        if (prepared) drawEarly(target);
+    }
+
+    public static void renderInLevel(Minecraft mc, RenderTarget target) {
+        if (prepared && frameCam != null) render(mc, frameCam, target);
+    }
+
     public static void render(Minecraft mc, CameraRenderState cam, RenderTarget target) {
         long t0 = System.nanoTime();
         if (!prepared) prepare(mc, cam);
@@ -607,7 +621,11 @@ public final class GhostRenderer {
             c.indexCount = b.mesh().drawState().indexCount();
             c.meshFormat = b.mesh().drawState().format();
             c.quads = b.quads();
+            //? if >=26.3 {
             RenderSystem.getSequentialBuffer(SectionMesher.renderType().primitiveTopology()).requestIndexCount(c.indexCount);
+            //?} else {
+            /*RenderSystem.getSequentialBuffer(SectionMesher.renderType().primitiveTopology()).getBuffer(c.indexCount);
+            *///?}
             c.state = Ghost.Section.UPLOADED;
         } catch (RuntimeException e) {
             BuildBuddy.LOG.error("Ghost cap upload failed", e);
@@ -820,7 +838,11 @@ public final class GhostRenderer {
             s.quads = b.quads();
             s.layerQuads = b.layerQuads();
             s.wetQuads = b.wetQuads();
+            //? if >=26.3 {
             RenderSystem.getSequentialBuffer(SectionMesher.renderType().primitiveTopology()).requestIndexCount(s.indexCount);
+            //?} else {
+            /*RenderSystem.getSequentialBuffer(SectionMesher.renderType().primitiveTopology()).getBuffer(s.indexCount);
+            *///?}
             s.state = Ghost.Section.UPLOADED;
             Stats.uploaded++;
             Stats.bytesUploaded.add(bytes);

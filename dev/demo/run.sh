@@ -6,6 +6,7 @@
 #      WORK_TAG (own game dir, for parallel runs), SKIP_BUILD=1, TIMEOUT (s), PROFILE=1 (the user's Fabric 26.3 mods;
 #      EXCLUDE=regex drops some), SHADERS=1 (Complementary Reimagined, with PROFILE=1 for Iris).
 #      PONDER (lesson ids for ponder-stills, default all), PONDER_STEP (seconds between stills, 2), TAKE (takes of ponder-take: place,layers,edit),
+#      MC (26.3 default, or 26.2; 26.2 needs dev/demo/.work/world-26.2, a copy of BeltLantern's flat world),
 #      WS (the workspace folder holding tools/; needed when running from a git worktree under .claude/worktrees). Gradle always runs on /usr/lib/jvm/java-25-openjdk.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -13,11 +14,14 @@ ROOT=$(cd "$HERE/../.." && pwd)
 WS=${WS:-$(cd "$ROOT/../.." && pwd)}
 OUT=$(realpath -m "${1:?usage: run.sh <out> [scenes]}")
 SCENES=${2:-house}
+MC=${MC:-26.3}
 export JAVA_HOME=/usr/lib/jvm/java-25-openjdk
-if [ -z "${SKIP_BUILD:-}" ]; then (cd "$ROOT" && ./gradlew -q --console=plain build --offline); fi
-JAR=$(ls -t "$ROOT"/build/libs/buildbuddy-*.jar | grep -v -- -sources | sed -n 1p)
-WORLD="$HERE/.work/world-26.3"
-args=(26.3 fabric "$OUT" --game "$HERE/.work/game${WORK_TAG:+-$WORK_TAG}" --jar "$JAR" --world "$WORLD"
+if [ -z "${SKIP_BUILD:-}" ]; then (cd "$ROOT" && ./gradlew -q --console=plain ":$MC:build" --offline); fi
+JAR=$(ls -t "$ROOT"/versions/$MC/build/libs/buildbuddy-*.jar | grep -v -- -sources | sed -n 1p)
+WORLD="$HERE/.work/world-$MC"
+# 26.2's GLFW dies with SIGBUS in glfwPollEvents when the game dir is on the home disk (vanilla too, 2026-10-29): use /tmp
+GAME="$HERE/.work/game"; [ "$MC" != 26.3 ] && GAME="${TMPDIR:-/tmp}/buildbuddy-demo/game-$MC"
+args=("$MC" fabric "$OUT" --game "$GAME${WORK_TAG:+-$WORK_TAG}" --jar "$JAR" --world "$WORLD"
       -D "buildbuddy.demo=$OUT" -D "buildbuddy.demo.scenes=$SCENES" -D "buildbuddy.demo.measure=${MEASURE:-300}"
       --opt "fps=${FPS:-260}" --opt volume=0.0001 --opt render_distance=8 --opt "xmx=${XMX:-3G}" --width "${WIDTH:-1280}" --height "${HEIGHT:-720}"
       --user Builder --log-errors "Build Buddy.*(cannot|failed|error)" --timeout "${TIMEOUT:-900}" --label "buildbuddy $SCENES")
@@ -31,9 +35,9 @@ args=(26.3 fabric "$OUT" --game "$HERE/.work/game${WORK_TAG:+-$WORK_TAG}" --jar 
 # the mod needs Fabric API (its resource loader serves the art and sounds), so every run has it unless FABRIC_API=0
 [ "${FABRIC_API:-1}" != "0" ] && args+=(--fabric-api)
 if [ -n "${MODS:-}" ]; then IFS=: read -ra extra <<< "$MODS"; for m in "${extra[@]}"; do args+=(--mod "$m"); done; fi
-if [ -n "${SHADERS:-}" ]; then args+=(--shaders "$(ls -t "$HOME"/.local/share/ModrinthApp/profiles/"Fabric 26.3"/shaderpacks/ComplementaryReimagined_*.zip | sed -n 1p)"); fi
+if [ -n "${SHADERS:-}" ]; then args+=(--shaders "$(ls -t "$HOME"/.local/share/ModrinthApp/profiles/"Fabric $MC"/shaderpacks/ComplementaryReimagined_*.zip | sed -n 1p)"); fi
 if [ -n "${PROFILE:-}" ]; then
-  P="$HOME/.local/share/ModrinthApp/profiles/Fabric 26.3/mods"
+  P="$HOME/.local/share/ModrinthApp/profiles/Fabric $MC/mods"
   for m in "$P"/*.jar; do
     case "$(basename "$m")" in buildbuddy*) continue ;; esac
     [ -n "${EXCLUDE:-}" ] && basename "$m" | grep -qiE "$EXCLUDE" && continue

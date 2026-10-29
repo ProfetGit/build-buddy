@@ -41,9 +41,9 @@ OX, OZ, Y0 = 30, 30, -60
 LOG_ERRORS = "Build Buddy.*(cannot|failed|error)"
 
 
-def jar() -> Path:
+def jar(mc: str) -> Path:
     version = re.search(r"^mod\.version=(.+)$", (ROOT / "gradle.properties").read_text(), re.M).group(1).strip()
-    j = ROOT / "build/libs" / f"buildbuddy-{version}+26.3-fabric.jar"
+    j = ROOT / "versions" / mc / "build/libs" / f"buildbuddy-{version}+{mc}-fabric.jar"
     if not j.is_file():
         sys.exit(f"no {j.name} in {j.parent}: build it first (./gradlew build --offline)")
     return j
@@ -178,7 +178,7 @@ def run(mc: str, port: int) -> tuple[bool, list[str]]:
 
             def run_client():
                 result["r"] = client.run(
-                    mc=mc, loader="fabric", out=out, game=game, mod_jars=[jar()], fabric_api_jar=True, keep_out=True,
+                    mc=mc, loader="fabric", out=out, game=game, mod_jars=[jar(mc)], fabric_api_jar=True, keep_out=True,
                     props={"buildbuddy.demo": str(out), "buildbuddy.demo.scenes": "server-auto", "buildbuddy.demo.server": "true", "modtest.audit": "1"},
                     join=f"127.0.0.1:{port}", options={"fps": 60, "volume": 0.0001, "render_distance": 8, "xmx": "3G"}, width=960, height=540,
                     timeout=1500, user=USER[0], uuid=USER[1], log_errors=LOG_ERRORS, label="BuildBuddy mp server-auto")

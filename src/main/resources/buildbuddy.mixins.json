@@ -11,8 +11,10 @@
     "LevelRendererMixin",
     "LocalPlayerMixin",
     "MinecraftMixin",
+    "MouseHandlerInvoker",
     "MouseHandlerMixin",
-    "OptionsMixin"
+    "OptionsMixin",
+    "PreparedFrameMixin"
   ],
   "injectors": {
     "defaultRequire": 1

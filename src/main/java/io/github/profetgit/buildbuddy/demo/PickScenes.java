@@ -48,7 +48,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * buildings); save with and without the plants and lay the file back over the house.
  */
 final class PickScenes {
-    /** What the mouse handler does when a button goes down with Shift (3) or Ctrl (192) held. */
+    /** What the mouse handler does when a button goes down with Shift (InputConstants.MOD_SHIFT) or Ctrl (MOD_CONTROL) held. */
     static final class PickModifiers {
         static void press(int mods) {
             Interaction.noteClick(mods);
@@ -213,7 +213,7 @@ final class PickScenes {
         act(() -> {
             SaveScreen sv = (SaveScreen) screen();
             int[] at = sv.anchor("preview");
-            var ctrlClick = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 192);
+            var ctrlClick = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, com.mojang.blaze3d.platform.InputConstants.MOD_CONTROL);
             sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], ctrlClick), false);
             sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], ctrlClick));
             check("pick/Ctrl+click takes the block under the pointer out of what is saved", sv.removedCount() == 1 && sv.captured().totalBlocks() == houseA[0] - 1, sv.removedCount() + " removed, " + sv.captured().totalBlocks() + " blocks");
@@ -222,7 +222,7 @@ final class PickScenes {
         shot("pick_5d_block_removed");
         act(() -> {
             SaveScreen sv = (SaveScreen) screen();
-            int ctrl = 192;
+            int ctrl = com.mojang.blaze3d.platform.InputConstants.MOD_CONTROL;
             sv.keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_Z, 0, ctrl));
             check("pick/Ctrl+Z puts the block back", sv.removedCount() == 0 && sv.captured().totalBlocks() == houseA[0], sv.removedCount() + " removed, " + sv.captured().totalBlocks() + " blocks");
             sv.keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_Y, 0, ctrl));
@@ -375,7 +375,7 @@ final class PickScenes {
             SaveScreen sv = (SaveScreen) screen();
             int[] at = pointer[0];
             long total = sv.captured().totalBlocks();
-            var ctrlClick = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 192);
+            var ctrlClick = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, com.mojang.blaze3d.platform.InputConstants.MOD_CONTROL);
             sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], ctrlClick), false);
             check("pick/nothing is taken until the button goes up", sv.removedCount() == 0, sv.removedCount() + " removed");
             sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], ctrlClick));
@@ -386,7 +386,7 @@ final class PickScenes {
         shot("pick_8_tree_gone");
         act(() -> {
             SaveScreen sv = (SaveScreen) screen();
-            sv.keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_Z, 0, 192));
+            sv.keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_Z, 0, com.mojang.blaze3d.platform.InputConstants.MOD_CONTROL));
             check("pick/Ctrl+Z puts the whole tree back at once", sv.removedCount() == 0, sv.removedCount() + " removed");
         });
         until("pick/the tree is drawn again", 200, () -> ((SaveScreen) screen()).preview().current());
@@ -409,13 +409,13 @@ final class PickScenes {
             int size = sv.preview().groupSize(sv.preview().hovered());
             // Ctrl+Shift+click: one block only
             Interaction.testModifiers = 3;
-            var one = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 195);
+            var one = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, com.mojang.blaze3d.platform.InputConstants.MOD_CONTROL | com.mojang.blaze3d.platform.InputConstants.MOD_SHIFT);
             sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], one), false);
             sv.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], one));
             check("pick/Ctrl+Shift+click takes one block of the ground only", sv.removedCount() == 1 && size > 1, sv.removedCount() + " removed, ground was " + size);
             Interaction.testModifiers = 2;
             // a stroke of the eraser across the picture takes what it passes over, as one step
-            var ctrl = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 192);
+            var ctrl = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, com.mojang.blaze3d.platform.InputConstants.MOD_CONTROL);
             int before = sv.removedCount(), steps = sv.removalSteps();
             sv.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], ctrl), false);
             for (int i = 1; i <= 8; i++) sv.mouseDragged(new net.minecraft.client.input.MouseButtonEvent(at[0] + i * 6, at[1] - i * 2, ctrl), 6, -2);
@@ -428,7 +428,7 @@ final class PickScenes {
             SaveScreen sv = (SaveScreen) screen();
             // a plain Ctrl+click on the ground takes all of it
             Interaction.testModifiers = 2;
-            var ctrl = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 192);
+            var ctrl = new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, com.mojang.blaze3d.platform.InputConstants.MOD_CONTROL);
             int[] at = sv.anchorOfGroup(io.github.profetgit.buildbuddy.ui.Groups.Type.GROUND);
             int before = sv.removedCount();
             if (at != null) {

@@ -64,7 +64,7 @@ final class PlaceScenes {
     }
 
     static void scroll(Minecraft mc, double amount) {
-        mc.mouseHandler.onScroll(mc.getWindow().handle(), 0, amount);
+        ((io.github.profetgit.buildbuddy.mixin.MouseHandlerInvoker) mc.mouseHandler).buildbuddy$onScroll(mc.getWindow().handle(), 0, amount);
     }
 
     /** Turns the player's head so the crosshair passes through a point. */
