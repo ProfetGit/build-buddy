@@ -13,6 +13,23 @@ import com.mojang.renderpearl.api.commands.RenderPass;
 import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 //?}
+//? if <26.3 {
+/*import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.resource.GraphicsResourceAllocator;
+import com.mojang.blaze3d.systems.RenderSystem;
+import java.util.List;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.renderer.SubmitNodeStorage;
+import net.minecraft.client.renderer.gizmos.DrawableGizmoPrimitives;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.gizmos.Gizmos;
+import net.minecraft.gizmos.SimpleGizmoCollector;
+import net.minecraft.util.Util;
+import org.joml.Matrix4fStack;
+import org.joml.Matrix4fc;
+import org.joml.Vector4f;
+*///?}
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -32,9 +49,75 @@ public abstract class LevelRendererMixin {
     @Inject(method = "submitFeatures", at = @At("HEAD"))
     private void buildbuddy$interact(LevelRenderState state, SubmitNodeCollector collector, boolean renderOutline, CallbackInfo ci) {
         Minecraft mc = Minecraft.getInstance();
+        //? if <26.3 {
+        /*if (buildbuddy$shaderPack()) {
+            try (Gizmos.TemporaryCollection ignored = Gizmos.withCollector(buildbuddy$late)) {
+                Interaction.frame(mc, state.cameraRenderState);
+            }
+        } else
+        *///?}
         Interaction.frame(mc, state.cameraRenderState);
         GhostRenderer.prepare(mc, state.cameraRenderState);
     }
+
+    //? if <26.3 {
+    /*/^* The tools' gizmos while a shader pack is on: Iris 1.11.4 keeps the depth of the always-on-top pass and composites over it, so they go in after its final pass. ^/
+    @org.spongepowered.asm.mixin.Unique
+    private final SimpleGizmoCollector buildbuddy$late = new SimpleGizmoCollector();
+    @org.spongepowered.asm.mixin.Unique
+    private final SubmitNodeStorage buildbuddy$lateStorage = new SubmitNodeStorage();
+    @org.spongepowered.asm.mixin.Unique
+    private static java.lang.invoke.@org.jspecify.annotations.Nullable MethodHandle buildbuddy$inUse;
+    @org.spongepowered.asm.mixin.Unique
+    private static boolean buildbuddy$looked;
+
+    @org.spongepowered.asm.mixin.Unique
+    private static boolean buildbuddy$shaderPack() {
+        if (!buildbuddy$looked) {
+            buildbuddy$looked = true;
+            try {
+                Class<?> api = Class.forName("net.irisshaders.iris.api.v0.IrisApi");
+                Object instance = api.getMethod("getInstance").invoke(null);
+                buildbuddy$inUse = java.lang.invoke.MethodHandles.publicLookup().unreflect(api.getMethod("isShaderPackInUse")).bindTo(instance);
+            } catch (ReflectiveOperationException | LinkageError e) {
+                buildbuddy$inUse = null;
+            }
+        }
+        if (buildbuddy$inUse == null) return false;
+        try {
+            return (boolean) buildbuddy$inUse.invoke();
+        } catch (Throwable e) {
+            return false;
+        }
+    }
+
+    @Inject(method = "render", at = @At("RETURN"))
+    private void buildbuddy$lateGizmos(GraphicsResourceAllocator allocator, DeltaTracker delta, boolean renderOutline, CameraRenderState camera,
+                                       Matrix4fc modelView, GpuBufferSlice fog, Vector4f fogColor, boolean sky, CallbackInfo ci) {
+        List<SimpleGizmoCollector.GizmoInstance> gizmos = buildbuddy$late.drainGizmos();
+        if (gizmos.isEmpty()) return;
+        DrawableGizmoPrimitives primitives = new DrawableGizmoPrimitives();
+        long now = Util.getMillis();
+        for (SimpleGizmoCollector.GizmoInstance g : gizmos) g.gizmo().emit(primitives, g.getAlphaMultiplier(now));
+        primitives.submit(buildbuddy$lateStorage, camera, true);
+        Minecraft mc = Minecraft.getInstance();
+        RenderTarget main = mc.gameRenderer.mainRenderTarget();
+        Matrix4fStack stack = RenderSystem.getModelViewStack();
+        stack.pushMatrix();
+        stack.mul(modelView);
+        RenderSystem.setShaderFog(fog);
+        RenderSystem.outputColorTextureOverride = main.getColorTextureView();
+        RenderSystem.outputDepthTextureOverride = main.getDepthTextureView();
+        RenderSystem.getDevice().createCommandEncoder().clearDepthTexture(main.getDepthTexture(), 0.0);
+        try {
+            mc.gameRenderer.featureRenderDispatcher().renderAllFeatures(buildbuddy$lateStorage);
+        } finally {
+            RenderSystem.outputColorTextureOverride = null;
+            RenderSystem.outputDepthTextureOverride = null;
+            stack.popMatrix();
+        }
+    }
+    *///?}
 
     //? if >=26.3 {
     /**

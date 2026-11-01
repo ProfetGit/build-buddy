@@ -16,6 +16,7 @@ server's block checks, and the server log (no kick, no warning about the player,
 import argparse
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -164,6 +165,9 @@ def run(mc: str, port: int) -> tuple[bool, list[str]]:
     work = HERE / ".work" / "mp"
     shutil.rmtree(work, ignore_errors=True)
     game, out = work / "game", work / "out"
+    if mc != "26.3":
+        game = Path(os.environ.get("TMPDIR", "/tmp")) / "buildbuddy-mp" / f"game-{mc}"
+        shutil.rmtree(game, ignore_errors=True)
     (game / "config/buildbuddy").mkdir(parents=True)
     (game / "config/buildbuddy/servers.json").write_text(json.dumps({"remembered": {f"127.0.0.1:{port}": "allowed"}, "blocked": []}))
     notes, ok = [], True

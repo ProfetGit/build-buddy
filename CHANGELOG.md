@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.93
+
+- 26.2: the tools' boxes, handles and arrows keep their fill with a shader pack on (only the lines showed before).
+
 ## 0.0.92
 
 - 26.2: the ghost shows with a shader pack on (Iris drew nothing of it before).
