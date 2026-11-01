@@ -9,7 +9,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
  * Compares the world with a placed blueprint, block by block, and keeps the answer up to date at a cost that follows
@@ -462,7 +464,7 @@ public final class Verifier {
                 BlockState expected = r.states[pal];
                 if (matcher.matches(expected, actual)) now = CORRECT;
                 else if (actual.isAir() || actual.canBeReplaced()) now = MISSING;
-                else if (actual.getBlock() == expected.getBlock()) now = OFF;
+                else if (actual.getBlock() == expected.getBlock() && !halfOfDouble(expected, actual)) now = OFF;
                 else now = WRONG;
             }
         }
@@ -522,5 +524,10 @@ public final class Verifier {
             }
         }
         return target;
+    }
+    /** A single slab where a double one is wanted: the block still needs one more of the item, so it is not built (Sweep and Assist add the second half). */
+    static boolean halfOfDouble(BlockState expected, BlockState actual) {
+        return expected.hasProperty(SlabBlock.TYPE) && actual.hasProperty(SlabBlock.TYPE)
+            && expected.getValue(SlabBlock.TYPE) == SlabType.DOUBLE && actual.getValue(SlabBlock.TYPE) != SlabType.DOUBLE;
     }
 }

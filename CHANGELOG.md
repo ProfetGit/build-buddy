@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.94
+
+- A double slab with only its first half placed counts as still to do again, so Sweep and Assist add the second half (since 0.0.89 it counted as built).
+
 ## 0.0.93
 
 - 26.2: the tools' boxes, handles and arrows keep their fill with a shader pack on (only the lines showed before).

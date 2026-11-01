@@ -122,6 +122,39 @@ class VerifierTest {
     }
 
     @Test
+    void aSingleSlabWhereADoubleIsWantedIsStillToDo() {
+        BlockState dbl = Blocks.OAK_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.DOUBLE);
+        BlockState bottom = dbl.setValue(SlabBlock.TYPE, SlabType.BOTTOM);
+        BlockState top = dbl.setValue(SlabBlock.TYPE, SlabType.TOP);
+        Blueprint bp = blueprint(3, 1, 1, (c, k) -> dbl);
+        Verifier v = verifier(bp, Orientation.NONE, 100, 64, -50);
+        FakeWorld w = new FakeWorld();
+        w.set(100, 64, -50, dbl);
+        w.set(101, 64, -50, bottom);
+        w.set(102, 64, -50, top);
+        run(v, w);
+        Counts c = v.counts();
+        assertEquals(1, c.correct());
+        assertEquals(0, c.off());
+        assertEquals(2, c.wrong());
+        assertEquals(2, c.todo());
+        assertEquals(Verifier.WRONG, v.statusAt(101, 64, -50));
+    }
+
+    @Test
+    void aSlabOfTheWrongHalfIsOffNotToDo() {
+        BlockState bottom = Blocks.OAK_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.BOTTOM);
+        BlockState top = bottom.setValue(SlabBlock.TYPE, SlabType.TOP);
+        Blueprint bp = blueprint(1, 1, 1, (c, k) -> bottom);
+        Verifier v = verifier(bp, Orientation.NONE, 100, 64, -50);
+        FakeWorld w = new FakeWorld();
+        w.set(100, 64, -50, top);
+        run(v, w);
+        assertEquals(1, v.counts().off());
+        assertEquals(0, v.counts().todo());
+    }
+
+    @Test
     void countsMissingWrongAndCorrect() {
         // a 4 x 3 x 4 box: stone floor (16), planks column at (1,1,1) and (1,2,1)
         Blueprint bp = blueprint(4, 3, 4, (c, k) -> c[1] == 0 ? STONE : (c[0] == 1 && c[2] == 1 ? PLANKS : null));

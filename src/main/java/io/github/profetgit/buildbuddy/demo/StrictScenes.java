@@ -350,7 +350,7 @@ final class StrictScenes {
         for (int y = 0; y < b.sizeY; y++) for (int z = 0; z < b.sizeZ; z++) for (int x = 0; x < b.sizeX; x++) {
             int wx = OX + x, wy = G + 1 + y, wz = OZ + z;
             byte st = ver.statusAt(wx, wy, wz);
-            if (st == Verifier.MISSING || st == Verifier.WRONG) {
+            if (st == Verifier.MISSING || st == Verifier.WRONG || st == Verifier.OFF) {
                 if (n++ < 10) sb.append(" [").append(x).append(',').append(y).append(',').append(z).append(' ').append(ver.expectedAt(wx, wy, wz)).append(" now ").append(mc().level.getBlockState(new BlockPos(wx, wy, wz))).append(']');
             }
         }
