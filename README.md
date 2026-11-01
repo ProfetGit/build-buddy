@@ -5,7 +5,7 @@
 <a href="https://ko-fi.com/profetgit"><img src="https://raw.githubusercontent.com/ProfetGit/assets/main/buttons/kofi.webp" alt="Ko-fi" width="23.96%"></a>
 </p>
 
-**Blueprints, made easy.** Load a build, see it as a see-through ghost in your world, and put it up block by block while the screen tells you what to do next. For Minecraft 26.3 on Fabric. It runs on your client alone, so it works on any server, and you never need a tutorial to use it.
+**Blueprints, made easy.** Load a build, see it as a see-through ghost in your world, and put it up block by block while the screen tells you what to do next. For Minecraft 26.3 and 26.2 on Fabric. It runs on your client alone, so it works on any server, and you never need a tutorial to use it.
 
 ![Features](https://raw.githubusercontent.com/ProfetGit/build-buddy/main/docs/desc/title-features.webp)
 
@@ -39,7 +39,7 @@ To save a build, hold **V**, choose Save, and click the build you want. Right cl
 
 ![Compatibility](https://raw.githubusercontent.com/ProfetGit/build-buddy/main/docs/desc/title-compatibility.webp)
 
-- Minecraft Java 26.3 on Fabric. [Fabric API](https://www.curseforge.com/minecraft/mc-mods/fabric-api) is required: it serves the mod's art and sounds.
+- Minecraft Java 26.3 or 26.2 on Fabric. [Fabric API](https://www.curseforge.com/minecraft/mc-mods/fabric-api) is required: it serves the mod's art and sounds.
 - Works with Sodium, and with Iris shaders (checked with Complementary).
 - Client side only. Nothing has to be installed on a server.
 
